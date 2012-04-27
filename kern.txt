@@ -1,0 +1,177 @@
+;;;;;;;;
+; BOOT ;
+;;;;;;;;
+
+SET A, bootname
+SET B, 15
+SET C, 4
+SET PUSH, 0xF000
+JSR f_dispmin
+
+SET A, bootbar
+SET B, 12
+SET C, 6
+SET PUSH, 0xF000
+JSR f_dispmin
+
+;JSR f_init_dash
+
+:load
+SET A, 0x80CC
+SET C, 0xB000
+:load_l1
+SET B, 1
+JSR f_xor
+ADD A, 1
+IFG A, 0x80D5
+  SET A, 0x80CC
+JSR wait
+SET PC, load_l1
+
+:wait
+SET PUSH, J
+SET J, 10000
+:wait_l1
+SUB J, 1
+IFG J, 0
+SET PC, wait_l1
+
+SET J, POP
+SET PC, POP
+ ;
+
+:hang SET PC, hang
+
+:bootname DAT 0x6b38, 0x3800, 0 ;k88
+:bootbar DAT 0x2a20, 0x2a20, 0x2a20, 0x2a20, 0x2a00, 0 ;"* * * * *"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; DERPVID ; Video Driver       ;
+;                              ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+:f_display ; (text_location, X_offset, Y_offset, XOR_effect)
+SET J, SP
+
+;X_offset is already correct form
+MUL C, 32 ;to make Y_offset the correct index
+ADD B, C ;to make B index
+ADD B, 0x8000 ;put the index onscreen
+
+SET C, [J+1]
+JSR f_copy
+
+SET PC, POP
+ ;
+
+:f_dispmin ; (text_location, X_offset, Y_offset, XOR_effect)
+SET PUSH, B
+SET B, 0x0A00
+JSR f_unpack
+
+SET A, 0xA00
+SET B, POP
+SET PC, f_display
+ ;
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; ASCIIMIN ; Text Driver       ;
+;                              ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+:f_copy ; (locsrc, loctarg, XOR_effect)
+SET PUSH, I
+SET PUSH, J
+
+SET I, B ;targ
+SET J, A ;src
+
+:f_copy_l1 ;
+SET [I], [J]
+
+XOR [I], C
+
+ADD I, 1
+ADD J, 1
+
+IFN [J], 0
+  SET PC, f_copy_l1
+
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
+
+:f_xor ; (locstart, len, XOR_effect)
+ADD B, A ;set end address
+
+:f_xor_l1
+XOR [A], C
+ADD A, 1
+IFG B, A
+  SET PC, f_xor_l1
+SET PC, POP
+ ;
+
+
+:f_pack ; (locplaintext, locoutput)
+SET PUSH, X
+SET PUSH, Y
+
+:f_pack_l1
+SET X, 0x00FF
+SET Y, 0x00FF
+AND X, [A]    ; get ascii byte
+SHL X, 8
+AND Y, [A+1]  ; get ascii byte
+BOR X, Y      ; combine
+SET [B], X    ; store
+
+ADD A, 2
+ADD B, 1
+
+IFG [A], 0   ;check next word if [A] is not 0, exit else
+IFG 0, [A+1] ;exit if [A+1] < 0, continue else
+  SET PC, f_pack_e1
+SET PC, f_pack_l1
+
+:f_pack_e1
+
+SET Y, POP
+SET X, POP
+SET PC, POP
+ ;
+
+
+:f_unpack ; (locpackedtext, locoutput)
+SET PUSH, I
+SET PUSH, J
+SET PUSH, X
+SET PUSH, Y
+
+SET I, B
+SET PC, f_unpack_l1_l1
+
+:f_unpack_l1
+AND X, [A] ;get correct byte
+AND Y, [A] ;get correct byte
+
+SHR X, 8
+;STI [I], X
+;STI [I], Y
+
+ADD A, 1
+
+:f_unpack_l1_l1
+SET X, 0xFF00
+SET Y, 0x00FF
+
+IFB [A], 0x00FF ;only stop if [A] is 0x0000
+SET PC, f_unpack_l1
+
+SET Y, POP
+SET X, POP
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
+ ;;
