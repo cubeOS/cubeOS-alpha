@@ -1,0 +1,14 @@
+#!/bin/bash
+
+kern=archive/$(date +derpkern-%F.%H%M%S.dasm16)
+
+if [ "$1" == "-v" ]
+then
+	kern=kerns/derpkos-v"$2".dasm16
+fi
+
+fin=k88.dasm16
+touch $kern
+cat *.k88 > $kern
+cp $kern $fin
+gedit $fin
