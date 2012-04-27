@@ -2,7 +2,8 @@
 ; BOOT ;
 ;;;;;;;;
 
-HWQ 0
+SET A, 0
+JSR hwmount_screen
 
 SET A, bootname
 SET B, 15
@@ -15,6 +16,9 @@ SET B, 12
 SET C, 6
 SET PUSH, 0xF000
 JSR f_dispmin
+
+SET A, 0x8000
+JSR hwmount_screen
 
 ;JSR f_init_dash
 
@@ -46,6 +50,61 @@ SET PC, POP
 
 :bootname DAT 0x6b38, 0x3800 ;k88
 :bootbar DAT 0x2a20, 0x2a20, 0x2a20, 0x2a20, 0x2a00 ;"* * * * *"
+ ;;
+;;;;;;;
+; ENV ;
+;;;;;;;
+:CWD DAT 0 ;Current Working Directory
+:RAM DAT 0 ;Random Access Memory
+
+:SCRN DAT 0 ;Active Screen
+ ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; HARDMAN ; Hardware device    ;
+; manager                      ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+:hwmount_screen ; (location)
+SET PUSH, X ;preserve for HWQ
+SET PUSH, Y
+SET PUSH, I
+SET PUSH, J
+
+SET PUSH, A ;store location
+HWN I
+SET J, 0
+
+:hwmount_screen_l1
+HWQ J
+
+IFE A, 0x7349
+  IFE B, 0xF615
+    IFE C, 0x1802
+      SET PC, hwmount_screen_e1
+
+ADD J, 1
+IFE Z, J
+  SET PC, hwmount_screen_e2
+SET PC, hwmount_screen_l1
+:hwmount_screen_e1
+
+SET B, POP ;retrieve location
+HWI J
+
+SET PC, hwmount_screen_e3
+:hwmount_screen_e2
+SET A, POP ;discard location
+SET A, 1 ;exit unsuccessfully
+
+:hwmount_screen_e3
+
+SET J, POP
+SET I, POP
+SET Y, POP
+SET X, POP
+
+SET PC, POP
+ ;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; DERPVID ; Video Driver       ;
@@ -75,10 +134,10 @@ SET A, 0xA00
 SET B, POP
 SET PC, f_display
  ;
- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; ASCIIMIN ; Text Driver       ;
-;                              ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; DATAMAN ; Textual and Mathe-   ;
+; matical Manager                ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :f_copy ; (locsrc, loctarg, XOR_effect)
 SET PUSH, I
