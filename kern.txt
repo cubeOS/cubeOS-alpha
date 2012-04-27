@@ -77,17 +77,17 @@ SET J, 0
 :hwmount_screen_l1
 HWQ J
 
-IFE A, 0x7349
-  IFE B, 0xF615
+IFE A, 0xF615
+  IFE B, 0x7349
     IFE C, 0x1802
       SET PC, hwmount_screen_e1
 
 ADD J, 1
-IFE Z, J
+IFE I, J
   SET PC, hwmount_screen_e2
 SET PC, hwmount_screen_l1
 :hwmount_screen_e1
-
+SET A, 0
 SET B, POP ;retrieve location
 HWI J
 
@@ -139,6 +139,17 @@ SET PC, f_display
 ; matical Manager                ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+:f_clear ; (loc, len)
+SET PUSH, I
+ADD B, A
+:f_clear_l1
+IFE A, B
+  SET PC, POP
+
+STI [I], 0
+SET PC, f_clear_l1
+ ;
+
 :f_copy ; (locsrc, loctarg, XOR_effect)
 SET PUSH, I
 SET PUSH, J
@@ -147,12 +158,10 @@ SET I, B ;targ
 SET J, A ;src
 
 :f_copy_l1 ;
-SET [I], [J]
+SET B, I
+STI [I], [J]
 
-XOR [I], C
-
-ADD I, 1
-ADD J, 1
+XOR [B], C
 
 IFN [J], 0
   SET PC, f_copy_l1
