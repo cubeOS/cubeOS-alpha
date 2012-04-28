@@ -14,8 +14,13 @@ SET C, 6
 SET PUSH, 0xF000
 JSR f_dispmin
 
-SET A, screenid
-JSR hwscan
+SET A, 0x0A00
+SET B, 0x0200
+SET C, 0x0100
+JSR raminit
+
+;SET A, screenid
+;JSR hwscan
 
 ;SET B, 0x8000
 ;JSR hwmount_screen
@@ -91,6 +96,40 @@ JSR f_display
 SET PC, POP
 :s_dashprompt DAT "$  ", 0 ;0x2420, 0x2000 ;"$  "
  ;
+ ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; RAMMAN ; RAM manager         ;
+;                              ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+ ;[RAM] is a pointer to the first open spot of RAM
+ ;Call ramcleanup when finished using RAM
+
+:raminit ; (loc, len, safelen)
+SET [RAM], A
+
+SET PUSH, A
+SET PUSH, B
+SET PUSH, C
+
+SET C, [ramresword]
+JSR f_replace
+
+SET C, POP
+SET B, POP
+SET A, POP
+
+ADD C, A
+SET [A+1], C
+
+ADD B, A
+SET [A+2], B
+
+SET B, A
+ADD B, 0x10
+SET [A], B
+
+:ramresword DAT 0x4E4F
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; HARDMAN ; Hardware device    ;
@@ -172,19 +211,24 @@ SET PC, f_display
 ; matical Manager                ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-:f_clear ; (loc, len)
+:f_replace ; (loc, len, fill)
 SET PUSH, I
 SET I, A
 ADD B, A
 
-:f_clear_l1
+:f_replace_l1
 
-STI [I], 0
+STI [I], C
 IFN I, B
-  SET PC, f_clear_l1
+  SET PC, f_replace_l1
 
 SET I, POP
 SET PC, POP
+ ;
+
+:f_clear
+SET C, 0
+SET PC, f_replace
  ;
 
 :f_copy ; (locsrc, loctarg, XOR_effect)
