@@ -2,6 +2,11 @@
 ; BOOT ;
 ;;;;;;;;
 
+SET A, 0x0A00
+SET B, 0x0200
+SET C, 0x0100
+JSR raminit
+
 SET A, bootname
 SET B, 15
 SET C, 4
@@ -13,11 +18,6 @@ SET B, 12
 SET C, 6
 SET PUSH, 0xF000
 JSR f_dispmin
-
-SET A, 0x0A00
-SET B, 0x0200
-SET C, 0x0100
-JSR raminit
 
 ;SET A, screenid
 ;JSR hwscan
@@ -241,12 +241,15 @@ SET PC, POP
 
 :f_dispmin ; (text_location, X_offset, Y_offset, XOR_effect)
 SET PUSH, B
-SET B, 0xA00
+SET B, [RAM]
+SET B, [B]
+SET PUSH, B
 JSR f_unpack
 
-SET A, 0xA00
+SET A, POP
 SET B, POP
-SET PC, f_display
+JSR f_display
+SET PC, ramcleanup
  ;
  ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -305,6 +308,7 @@ XOR [B], C
 IFN [J], 0
   SET PC, f_copy_l1
 
+SET [I], 0
 SET J, POP
 SET I, POP
 SET PC, POP
