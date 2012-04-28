@@ -131,44 +131,68 @@ SET A, POP
 ADD C, A
 SET [A+1], C
 
-SUB B, 0x10
+SUB B, 0x20
 ADD B, A
 SET [A+2], B
 
 SET B, A
-ADD B, 0x10
+ADD B, 0x20
 SET [A], B ;pointer to first open spot
 SET [A+3], B ;pointer to first word of ram (won't change)
 
 SET PC, POP
 :ramresword DAT 0x4E4F
  ;
-
-:ramcleanup
+:ramalloc ; (minlen(*16))
 SET PUSH, X
 SET X, [RAM]
+SET B, A ;make a copy of A
 
-SET A, [X+3]
-SET B, [X+2]
-SET C, [ramresword]
-JSR f_search
+:ramalloc_l1
+SET A, B ;restore A
 
-IFE A, 1
-  SET PC, ramoverflow
+:ramalloc_l2
+IFN [X], [ramresword]
+  SET PC, ramalloc_l1
 
-IFL A, [X+1]
-  SET PC, ramcleanup_e1
+SUB A, 1
+ADD X, 16
+IFN A, 0
+  SET PC, ramalloc_l2
 
-:ramcleanup_e1
-SET [X], A
+SET A, X
+SET X, POP
 SET PC, POP
+ ;
 
-:ramcleanup_e2
-SET [X], [X+3]
-SET A, [X]
-SET B, [X+2]
-SET C, [ramresword]
-SET PC, f_replace
+;:ramcleanup
+;SET PUSH, X
+;SET X, [RAM]
+
+;SET A, [X+3]
+;SET B, [X+2]
+;SET C, [ramresword]
+;JSR f_search
+
+;IFE A, 1
+;  SET PC, ramoverflow
+
+;IFL A, [X+1]
+;  SET PC, ramcleanup_e1
+
+;:ramcleanup_e1
+;SET [X], A
+;SET PC, POP
+
+;:ramcleanup_e2
+;SET [X], [X+3] ;set parameters
+;SET A, [X]
+;SET B, [X+2]
+;SET C, [ramresword]
+
+;SET X, POP ;remove X
+
+;SET PC, f_replace ;call subroutine and exit immediately
  ;
 :ramoverflow
 SET PC, hang
@@ -240,16 +264,16 @@ SET PC, POP
  ;
 
 :f_dispmin ; (text_location, X_offset, Y_offset, XOR_effect)
+SET PUSH, A
 SET PUSH, B
-SET B, [RAM]
-SET B, [B]
+SET A, 4
+JSR ramalloc
 SET PUSH, B
 JSR f_unpack
 
 SET A, POP
 SET B, POP
 JSR f_display
-SET PC, ramcleanup
  ;
  ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -391,6 +415,7 @@ ADD A, 1
 SET PC, f_unpack_l1
 
 :f_unpack_e1
+SET [I], Y ;write a padding 0
 
 SET Y, POP
 SET X, POP
