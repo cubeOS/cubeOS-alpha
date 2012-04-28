@@ -2,12 +2,6 @@
 ; BOOT ;
 ;;;;;;;;
 
-SET A, screenid
-JSR hwscan
-
-SET B, 0x8000
-JSR hwmount_screen
-
 SET A, bootname
 SET B, 15
 SET C, 4
@@ -20,10 +14,16 @@ SET C, 6
 SET PUSH, 0xF000
 JSR f_dispmin
 
-SET A, 0x8000
-JSR hwmount_screen
+SET A, screenid
+JSR hwscan
 
-;JSR f_init_dash
+;SET B, 0x8000
+;JSR hwmount_screen
+SET [SCRN], 0x8000
+
+JSR dashinit
+
+SET PC, HANG
 
 :load
 SET A, 0x80CC
@@ -59,11 +59,39 @@ SET PC, POP
 ;;;;;;;
 ; ENV ;
 ;;;;;;;
-:CWD DAT 0 ;Current Working Directory
-:RAM DAT 0 ;Random Access Memory
+:CWDT DAT "/", 0 ;0x2F00, 0 ;Current Working Directory in pascii form
+:RAM DAT 0x0A00 ;Random Access Memory
 
 :SCRN DAT 0 ;Active Screen
+
+:DASHCOL DAT 0xF000 ;DASH display color
  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; DASH ; Shell                 ;
+;                              ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+:dashinit
+SET A, [SCRN]
+SET B, 0x180
+JSR f_clear ;blank screen
+
+SET A, CWDT
+SET B, 1
+SET C, 9
+SET PUSH, [DASHCOL]
+JSR f_display
+
+SET A, s_dashprompt
+SET B, 0
+SET C, 10
+SET PUSH, [DASHCOL]
+JSR f_display
+
+SET PC, POP
+:s_dashprompt DAT "$  ", 0 ;0x2420, 0x2000 ;"$  "
+ ;
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; HARDMAN ; Hardware device    ;
 ; manager                      ;
@@ -103,13 +131,13 @@ SET PC, POP
 
 :hwmount_screen ; (devadr, location)
 SET C, A
-SET A, 0 ;do map
+SET B, 0 ;do map
 HWI C
 
 SET [SCRN], A
 SET PC, POP
  ;
-
+ ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; DERPVID ; Video Driver       ;
 ;                              ;
@@ -131,13 +159,14 @@ SET PC, POP
 
 :f_dispmin ; (text_location, X_offset, Y_offset, XOR_effect)
 SET PUSH, B
-SET B, 0x0A00
+SET B, 0xA00
 JSR f_unpack
 
 SET A, 0xA00
 SET B, POP
 SET PC, f_display
  ;
+ ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; DATAMAN ; Textual and Mathe-   ;
 ; matical Manager                ;
@@ -145,13 +174,17 @@ SET PC, f_display
 
 :f_clear ; (loc, len)
 SET PUSH, I
+SET I, A
 ADD B, A
+
 :f_clear_l1
-IFE A, B
-  SET PC, POP
 
 STI [I], 0
-SET PC, f_clear_l1
+IFN I, B
+  SET PC, f_clear_l1
+
+SET I, POP
+SET PC, POP
  ;
 
 :f_copy ; (locsrc, loctarg, XOR_effect)
