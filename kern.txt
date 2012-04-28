@@ -112,6 +112,9 @@ SET PUSH, A
 SET PUSH, B
 SET PUSH, C
 
+ADD A, 0x10 ;exclude the control words
+SUB B, 0x10
+
 SET C, [ramresword]
 JSR f_replace
 
@@ -122,14 +125,20 @@ SET A, POP
 ADD C, A
 SET [A+1], C
 
+SUB B, 0x10
 ADD B, A
 SET [A+2], B
 
 SET B, A
 ADD B, 0x10
-SET [A], B
+SET [A], B ;pointer to first open spot
+SET [A+3], B ;pointer to first word of ram (won't change)
 
+SET PC, POP
 :ramresword DAT 0x4E4F
+ ;
+
+:ramcleanup
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; HARDMAN ; Hardware device    ;
