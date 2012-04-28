@@ -105,6 +105,12 @@ SET PC, POP
  ;[RAM] is a pointer to the first open spot of RAM
  ;Call ramcleanup when finished using RAM
 
+;- - RAM INFO
+;0 first open spot
+;1 buffer beyond which RAM will reset on cleanup
+;2 RAM storage length including buffer
+;3 first word of RAM storage
+
 :raminit ; (loc, len, safelen)
 SET [RAM], A
 
@@ -139,7 +145,35 @@ SET PC, POP
  ;
 
 :ramcleanup
+SET PUSH, X
+SET X, [RAM]
 
+SET A, [X+3]
+SET B, [X+2]
+SET C, [ramresword]
+JSR f_search
+
+IFE A, 1
+  SET PC, ramoverflow
+
+IFL A, [X+1]
+  SET PC, ramcleanup_e1
+
+:ramcleanup_e1
+SET [X], A
+SET PC, POP
+
+:ramcleanup_e2
+SET [X], [X+3]
+SET A, [X]
+SET B, [X+2]
+SET C, [ramresword]
+SET PC, f_replace
+ ;
+:ramoverflow
+SET PC, hang
+ ; 
+ ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; HARDMAN ; Hardware device    ;
 ; manager                      ;
@@ -239,6 +273,21 @@ SET PC, POP
 SET C, 0
 SET PC, f_replace
  ;
+
+:f_search ; (loc, len, word) ;ret wordloc
+ADD B, A
+
+:f_search_l1
+IFE [A], C
+  SET PC, POP ;return successful
+IFN A, B
+  SET PC, f_search_l1
+
+:f_search_e1
+SET A, 1 ;exit failed
+SET PC, POP
+ ;
+
 
 :f_copy ; (locsrc, loctarg, XOR_effect)
 SET PUSH, I
