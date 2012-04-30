@@ -1,0 +1,12 @@
+;;;;;;;;
+; BOOT ;
+;;;;;;;;
+
+SET A, 31
+SET B, 0
+JSR sv.getLoc
+IFE A, 1
+  SET PC, halt
+SET [A], 0xF02B ;colored text
+
+:halt SET PC, halt
