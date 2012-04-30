@@ -1,14 +1,14 @@
 #!/bin/bash
 
-kern=archive/$(date +derpkern-%F.%H%M%S.dasm16)
+kern=archive/$(date +cubeos-%F.%H%M%S.dasm16)
 
 if [ "$1" == "-v" ]
 then
-	kern=kerns/derpkos-v"$2".dasm16
+	kern=kerns/cubeos-v"$2".dasm16
 fi
 
-fin=k88.dasm16
+fin=cubeOS.dasm16
 touch $kern
-cat *.k88 > $kern
+cat *.cubeos > $kern
 cp $kern $fin
 gedit $fin
