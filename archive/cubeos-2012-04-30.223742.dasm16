@@ -63,8 +63,8 @@ SET A, packedCol7
 SET B, 4
 JSR p.uCol
 
-SET A, 13
-SET B, 5
+SET A, 12
+SET B, 4
 JSR sv.getLoc
 IFE A, 1
   SET PC, halt

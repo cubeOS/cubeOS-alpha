@@ -1,3 +1,15 @@
+;;;;;;;;
+; BOOT ;
+;;;;;;;;
+
+SET A, 31
+SET B, 0
+JSR sv.getLoc
+IFE A, 1
+  SET PC, halt
+SET [A], 0xF02B ;colored text
+
+:halt SET PC, halt
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; SIMVID ; Video Manager ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -9,8 +21,8 @@
 :sv.getLoc ; (xOffset, yOffset) ; A=1 if illegal location
 IFL A, [v.scrnWidth]
   IFL B, [v.scrnHeight]
-    SET PC, sv.getLoc.loc ;if onscreen, continue
-SET PC, exf
+    SET PC, sv.getLoc.loc ;if onscreen, contine
+SET PC, sv.getLoc.exf ;exit false if else
 
 :sv.getLoc.loc
 MUL B, [v.scrnWidth] ;make yOffset a line index
@@ -21,5 +33,3 @@ SET PC, POP           ;return in A
 :sv.getLoc.exf ;need global routine exitfalse?
 SET A, 1              ;illegal location
 SET PC, POP           ;exit false
- ;
- ;;

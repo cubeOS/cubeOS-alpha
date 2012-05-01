@@ -1,0 +1,110 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; PACKER ; Data Compressor ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+:p.uCol ; (packedCol, packedLen, outputChar)
+SET PUSH, I
+SET PUSH, X
+SET PUSH, Y
+SET I, C
+ADD B, A
+SET Y, 0
+
+:p.uCol.selNibble
+
+SET X, 0xF000
+SHR X, Y
+ADD Y, 4
+AND X, [A]
+
+:p.uCol.shift
+IFB X, 0x0F00
+  SET PC, p.uCol.makeWord
+SHL X, 4
+XOR X, EX
+SET PC, p.uCol.shift
+
+:p.uCol.makeWord
+XOR X, 0x20
+STI [I], X
+
+IFL Y, 16 ;if should continue with this word
+  SET PC, p.uCol.selNibble
+;else, go to next word or exit
+SET Y, 0
+ADD A, 1
+
+IFN A, B ;
+  SET PC, p.uCol.selNibble
+
+SET Y, POP
+SET X, POP
+SET I, POP
+SET PC, POP
+ ;
+
+:p.pStr ; (fullStringLoc, fullStringLen, packedOut)
+SET PUSH, I
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+
+SET Z, 0x007F
+SET I, A
+ADD B, A
+
+
+:p.pStr.loop
+STI X, [I]
+AND X, Z
+SET [C], X
+STI X, [I]
+AND X, Z
+SHL X, 8
+XOR [C], x
+
+ADD C, 1
+IFL I, B
+  SET PC, p.pStr.loop
+
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET I, POP
+SET PC, POP
+ ;
+
+:p.uStr ; (packedStringLoc, packedStringLen, packedOut)
+SET PUSH, I
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+
+SET I, C
+ADD B, A
+SET Z, 0x007F
+SET Y, 0x7F00
+
+:p.uStr.loop
+SET X, [A]
+AND X, Z
+XOR X, 0xF000
+STI [I], X
+
+SET X, [A]
+AND X, Y
+SHR X, 8
+XOR X, 0xF000
+STI [I], X
+
+ADD A, 1
+IFL A, B
+  SET PC, p.uStr.loop
+
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET I, POP
+SET PC, POP
+ ;
+ ;;

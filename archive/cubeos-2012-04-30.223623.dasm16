@@ -63,8 +63,8 @@ SET A, packedCol7
 SET B, 4
 JSR p.uCol
 
-SET A, 13
-SET B, 5
+SET A, 12
+SET B, 4
 JSR sv.getLoc
 IFE A, 1
   SET PC, halt
@@ -85,7 +85,7 @@ SET PC, halt
 :packedCol6 DAT 0xF1F1, 0x1111, 0x1111, 0x1F1F
 :packedCol7 DAT 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF
 
-:pTitle DAT 0x7563, 0x6562, 0x534f
+:pTitle 0x6375, 0x6265, 0x4f53
 
 :halt SET PC, halt
  ;;
