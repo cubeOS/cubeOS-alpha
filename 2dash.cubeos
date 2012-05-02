@@ -47,6 +47,9 @@ IFG C, 0x1f
 
 IFE C, 0x10
   SET PC, s.takeIn.backspace
+
+IFE C, 0x11
+  SET PC, POP
 SET PC, s.takeIn.wait
 
 :s.takeIn.write
@@ -58,4 +61,5 @@ SET PC, s.takeIn.loop
 STD [I], 0
 SET [I], 0
 SET PC, s.takeIn.loop
+ ;
  ;;
