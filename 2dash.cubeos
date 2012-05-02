@@ -1,0 +1,28 @@
+;;;;;;;;;;;;;;;;
+; DASH ; Shell ;
+;;;;;;;;;;;;;;;;
+
+:v.sPrompt DAT 0x2024
+
+:s.init
+SET A, 0
+SET B, 9
+JSR sv.getLoc
+
+SET C, A
+SET A, env.cwds
+SET B, 1
+JSR p.uStr
+
+SET A, 0
+SET B, 10
+JSR sv.getLoc
+
+SET C, A
+SET A, v.sPrompt
+SET B, 1
+JSR p.uStr
+
+SET PC, POP
+ ;
+ ;;

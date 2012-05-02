@@ -97,12 +97,6 @@ SET A, 0
 SET PC, POP
  ;
  ;;
-;;;;;;;
-; ENV ;
-;;;;;;;
-:env.cwds DAT 0
-
- ;;
 ;;;;;;;;;;;;;;;;
 ; DASH ; Shell ;
 ;;;;;;;;;;;;;;;;
@@ -260,5 +254,9 @@ MUL B, [v.scrnWidth] ;make yOffset a line index
 ADD A, B              ;combine them
 ADD A, [v.scrnLoc]    ;make the index an index onscreen
 SET PC, POP           ;return in A
+
+:sv.getLoc.exf ;need global routine exitfalse?
+SET A, 1              ;illegal location
+SET PC, POP           ;exit false
  ;
  ;;
