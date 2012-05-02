@@ -126,7 +126,6 @@ SET PC, POP
  ;
 
 :s.takeIn ; (cursorLoc) ;SHOULD PUSH AND POP I
-SET PUSH, I
 SET I, 0
 
 JSR s.drawPrompt
@@ -164,12 +163,7 @@ SET PC, s.takeIn.loop
 
 :s.takeIn.enter
 SET [I], 0
-SET A, [v.promptLoc]
-SET B, I
-JSR s.stdin
-
-SET A, I;return location in A
-SET I, POP
+SET A, I ;return location in A
 SET PC, POP
  ;
 
@@ -192,20 +186,19 @@ SET [v.promptLoc], A
 SET PC, POP
  ;
 
-:s.stdin ; (startLoc, stopLoc) ;NEED TO CALL THIS SUBROUTINE
+:s.stdin ; (enterLoc) ;NEED TO CALL THIS SUBROUTINE
 SET PUSH, I
-SET I, A
-SET C, [v.stdin]
+SET I, [v.promptLoc]
+SET B, [v.stdin]
 
 :s.stdin.loop
-STI [C], [I]
-AND [C], 0x007F
-ADD C, 1
+STI [B], [I]
+AND [B], 0x007F
+ADD B, 1
 
-IFN I, B
+IFN I, A
   SET PC, s.stdin.loop
 
-SET [C], 0
 SET I, POP
 SET PC, POP
  ;
