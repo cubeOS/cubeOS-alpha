@@ -2,8 +2,8 @@
 ; BOOT ;
 ;;;;;;;;
 
-JSR s.init
-JSR s.takeIn
+JSR s.instance
+
 SET PC, halt
 
 SET A, 8

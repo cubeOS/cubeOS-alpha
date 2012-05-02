@@ -3,10 +3,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :v.scrnLoc DAT 0x8000
+:v.scrnEnd DAT 0x8180
 :v.scrnHeight DAT 12
 :v.scrnWidth DAT 32
 
-:sv.getLoc ; (xOffset, yOffset) ; A=1 if illegal location
+:sv.getLoc ; (xOffset, yOffset)
 IFL A, [v.scrnWidth]
   IFL B, [v.scrnHeight]
     SET PC, sv.getLoc.loc ;if onscreen, continue
@@ -17,5 +18,22 @@ MUL B, [v.scrnWidth] ;make yOffset a line index
 ADD A, B              ;combine them
 ADD A, [v.scrnLoc]    ;make the index an index onscreen
 SET PC, POP           ;return in A
+ ;
+
+:sv.getNewLine ; (currentLoc)
+SET PUSH, I
+SET I, [v.scrnLoc]
+SET PC, sv.getNewLine.loop.sub
+
+:sv.getNewLine.loop
+ADD I, [v.scrnWidth]
+
+:sv.getNewLine.loop.sub
+IFG A, I ;exit successful if line scrnindex >= currentindex
+  SET PC, sv.getNewLine.loop
+
+SET A, I
+SET I, POP
+SET PC, POP
  ;
  ;;
