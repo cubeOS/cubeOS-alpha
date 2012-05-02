@@ -3,6 +3,7 @@
 ;;;;;;;;
 
 JSR s.init
+JSR s.takeIn
 SET PC, halt
 
 SET A, 8

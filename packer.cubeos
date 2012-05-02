@@ -101,6 +101,8 @@ ADD A, 1
 IFL A, B
   SET PC, p.uStr.loop
 
+SET A, I ;return in A
+
 SET Z, POP
 SET Y, POP
 SET X, POP

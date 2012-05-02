@@ -3,8 +3,10 @@
 ;;;;;;;;;;;;;;;;
 
 :v.sPrompt DAT 0x2024
+:v.promptLoc DAT 0
 
 :s.init
+SET [env.cwds], 0x202F
 SET A, 0
 SET B, 9
 JSR sv.getLoc
@@ -22,7 +24,38 @@ SET C, A
 SET A, v.sPrompt
 SET B, 1
 JSR p.uStr
+SET [v.promptLoc], A
 
 SET PC, POP
  ;
+
+:s.takeIn
+SET PUSH, I
+SET A, 1 ;HWI parameter
+
+:s.takeIn.loop
+IFL I, [v.promptLoc]
+  SET I, [v.promptLoc]
+SET [I], 0xF09D
+
+:s.takeIn.wait
+HWI 1 ;KEYBOARD HARDWARE DEVICE
+
+IFG C, 0x1f
+  IFL C, 0x80
+    SET PC, s.takeIn.write
+
+IFE C, 0x10
+  SET PC, s.takeIn.backspace
+SET PC, s.takeIn.wait
+
+:s.takeIn.write
+XOR C, 0xF000
+STI [I], C
+SET PC, s.takeIn.loop
+
+:s.takeIn.backspace
+STD [I], 0
+SET [I], 0
+SET PC, s.takeIn.loop
  ;;
