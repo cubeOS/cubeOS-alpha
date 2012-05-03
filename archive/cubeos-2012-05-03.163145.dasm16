@@ -2,10 +2,92 @@
 ; BOOT ;
 ;;;;;;;;
 
-SET [0xB00], 0x443A
 JSR s.instance
 
 SET PC, halt
+
+SET A, 8
+SET B, 2
+JSR sv.getLoc
+IFE A, 1
+  SET PC, halt
+SET PUSH, A
+
+SET C, PEEK
+SET A, packedCol0
+SET B, 4
+JSR p.uCol
+
+SET C, POP
+ADD C, 32
+SET PUSH, C
+SET A, packedCol1
+SET B, 4
+JSR p.uCol
+
+SET C, POP
+ADD C, 32
+SET PUSH, C
+SET A, packedCol2
+SET B, 4
+JSR p.uCol
+
+SET C, POP
+ADD C, 32
+SET PUSH, C
+SET A, packedCol3
+SET B, 4
+JSR p.uCol
+
+SET C, POP
+ADD C, 32
+SET PUSH, C
+SET A, packedCol4
+SET B, 4
+JSR p.uCol
+
+SET C, POP
+ADD C, 32
+SET PUSH, C
+SET A, packedCol5
+SET B, 4
+JSR p.uCol
+
+SET C, POP
+ADD C, 32
+SET PUSH, C
+SET A, packedCol6
+SET B, 4
+JSR p.uCol
+
+SET C, POP
+ADD C, 32
+SET PUSH, C
+SET A, packedCol7
+SET B, 4
+JSR p.uCol
+
+SET A, 13
+SET B, 5
+JSR sv.getLoc
+IFE A, 1
+  SET PC, halt
+
+SET C, A
+SET A, pTitle
+SET B, 3
+JSR p.uStr
+
+SET PC, halt
+
+:packedCol0 DAT 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF
+:packedCol1 DAT 0xF1F1, 0x1111, 0x1111, 0x1F1F
+:packedCol2 DAT 0xFF11, 0x1441, 0x1441, 0x11FF
+:packedCol3 DAT 0xF111, 0x4444, 0x4444, 0x111F
+:packedCol4 DAT 0xF111, 0x1444, 0x4441, 0x111F
+:packedCol5 DAT 0xFF11, 0x1144, 0x4411, 0x11FF
+:packedCol6 DAT 0xF1F1, 0x1114, 0x4111, 0x1F1F
+:packedCol7 DAT 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF
 
 :pTitle DAT 0x7563, 0x6562, 0x534f
 
