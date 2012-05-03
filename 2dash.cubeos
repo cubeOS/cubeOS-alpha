@@ -105,6 +105,13 @@ SET I, POP
 SET PC, POP
  ;
 
-:s.stdout ; (enterLoc) ;NEED TO WRITE AND CALL THIS
+:s.stdout ; (stdoutlen, scrnLoc) ;NEED TO WRITE AND CALL THIS
+SET PUSH, A
+SET A, B
+JSR sv.getNewLine
+SET A, C ;output
+SET B, POP ;length
+SET A, [v.stdout] ;location
+
  ;
  ;;
