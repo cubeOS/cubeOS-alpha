@@ -20,9 +20,48 @@ ADD A, [v.scrnLoc]    ;make the index an index onscreen
 SET PC, POP           ;return in A
  ;
 
+:sv.autoScroll ; () does not modify registers
+SET PUSH, X
+
+SET X, [v.scrnEnd]
+SUB X, [v.scrnWidth]
+
+IFE [X], 0
+  SET PC, sv.autoScroll.ex
+
+SET PUSH, I
+SET PUSH, J
+SET I, [v.scrnLoc]
+SET J, I
+ADD J, [v.scrnWidth]
+
+:sv.autoScroll.loop
+STI [I], [J]
+IFN J, X
+  SET PC, sv.autoScroll.loop
+
+SET X, J
+:sv.autoScroll.looplast
+STI [I], [X]
+SET [X], 0
+ADD X, 1
+IFG X, [v.scrnEnd]
+  SET PC, sv.autoScroll.subex
+SET PC, sv.autoScroll.looplast
+
+:sv.autoScroll.subex
+SET J, POP
+SET I, POP
+
+:sv.autoScroll.ex
+SET X, POP
+SET PC, POP
+ ;
+
 :sv.getNewLine ; (currentLoc)
 SET PUSH, I
 SET I, [v.scrnLoc]
+JSR sv.autoScroll
 SET PC, sv.getNewLine.loop.sub
 
 :sv.getNewLine.loop
@@ -31,6 +70,9 @@ ADD I, [v.scrnWidth]
 :sv.getNewLine.loop.sub
 IFG A, I ;exit successful if line scrnindex >= currentindex
   SET PC, sv.getNewLine.loop
+
+IFE I, [v.scrnEnd]
+  SUB I, [v.scrnWidth]
 
 SET A, I
 SET I, POP
