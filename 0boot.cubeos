@@ -2,7 +2,8 @@
 ; BOOT ;
 ;;;;;;;;
 
-SET [0xB00], 0x443A
+SET [0xB00], 0x293A
+JSR m.init
 JSR s.instance
 
 SET PC, halt

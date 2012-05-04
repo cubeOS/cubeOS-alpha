@@ -8,6 +8,8 @@
 :v.stdin DAT 0xA00
 :v.stdout DAT 0xB00
 
+:v.cmdmem DAT 1 ;reserve 8 words
+
 :s.instance ;SHOULD PREPARE SDIN and SDOUT
 SET [env.cwds], 0x202F
 
@@ -15,15 +17,47 @@ SET A, [v.scrnLoc]
 
 :s.instance.promptLoop
 JSR s.takeIn
-SET B, A
-SET A, 1
+SET PUSH, A
+
+JSR s.parse ;outputs length for stdout
+
+SET B, POP
 JSR s.stdout
 SET PC, s.instance.promptLoop
 
 SET PC, POP
  ;
 
-:s.takeIn ; (cursorLoc) ;SHOULD PUSH AND POP I
+:s.parse
+SET PUSH, I
+SET I, [v.stdin]
+SET A, v.cmdmem
+SET [A], 1
+SET B, 0x1F ;last five bits
+
+:s.parse.trans
+IFE [I], 0
+  SET PC, s.parse.compare
+
+SET C, B
+AND C, [I]
+MUL [A], C
+ADD I, 1
+SET PC, s.parse.trans
+
+
+:s.parse.compare
+AND [A], 0xFF
+ADD [A], 0x900 ;MEMORY LOCATION
+
+SET A, [A]
+SET I, POP
+IFE [A], 0 ;SHOULD EXIT WITH ERROR MESSAGE
+  SET PC, exf
+SET PC, [A] ;look up in table
+ ;
+
+:s.takeIn ; (cursorLoc)
 SET PUSH, I
 SET I, 0
 
