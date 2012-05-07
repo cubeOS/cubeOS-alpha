@@ -58,6 +58,34 @@ SET X, POP
 SET PC, POP
  ;
 
+:sv.scrollUp
+SET PUSH, I
+SET PUSH, J
+
+SET I, [v.scrnLoc]
+SET J, I
+ADD J, [v.scrnWidth]
+
+:sv.scrollUp.loop
+STI [I], [J]
+IFL J, [v.scrnEnd]
+  SET PC, sv.scrollUp.loop
+
+:sv.scrollUp.clearLast
+SET I, [v.scrnEnd]
+SUB I, [v.scrnWidth]
+
+:sv.scrollUp.clearLast.loop
+STI [I], 0
+IFL I, [v.scrnEnd]
+  SET PC, sv.scrollUp.clearLast.loop
+
+SET J, POP
+SET I, POP
+SUB I, [v.scrnWidth] ;adjust I for caller, hopefully
+SET PC, POP
+ ;
+
 :sv.getNewLine ; (currentLoc)
 SET PUSH, I
 SET I, [v.scrnLoc]

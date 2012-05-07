@@ -87,6 +87,8 @@ SET PC, s.takeIn.wait
 :s.takeIn.write
 XOR C, 0xF000
 STI [I], C
+IFE I, [v.scrnEnd]
+  JSR sv.scrollUp
 SET PC, s.takeIn.loop
 
 :s.takeIn.backspace
