@@ -1,5 +1,5 @@
-= cubeOS =
+== cubeOS ==
 
-'''cubeOS''' is a work-in-progress operating system for 0x10<sup>c</sup>'s emulated 16-bit computer, the DCPU-16.
+'''cubeOS''' is a work-in-progress operating system for 0x10<sup>c</sup>'s emulated 16-bit computer, the DCPU-16. It is a UNIX-inspired, command line interface (CLI) driven, and powerful opating system, with the intent to be included on every ship that needs fast and powerful tools to quickly solve mathematical problems, including those posed by navigation, trading, warfare, and other number-crunching activities.
 
-It is intended to be a UNIX-like operating system with only an extensive math library and bare essentials included in the kernal. Bare essentials tools are not to be mistaken for lack of a full operating system, however. In its finished state, it should include an advanced hardware driver capable of detecting and utilizing hardware at its disposal. Furthermore, data manipulation with it will be simple, using an included filesystem and data manager (for copies, moves, clears, and block word manipulations. It is intended to be used as a platform for onboard navigation management and data crunching, and hopefully other automated processes, as documentation for other hardware is released.
+Besides its UNIX-like shell, ''dash'', its most obvious feature will be an included math library.
