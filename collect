@@ -15,4 +15,4 @@ then
 	cat $temp > $stable
 fi
 
-gedit $fin
+gedit $temp
