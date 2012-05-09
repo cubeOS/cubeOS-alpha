@@ -1,14 +1,18 @@
 #!/bin/bash
 
-kern=archive/$(date +cubeos-%F.%H%M%S.dasm16)
-
 if [ "$1" == "-v" ]
 then
 	kern=kerns/cubeos-v"$2".dasm16
+	stable=kerns/stable-cubeOS.dasm16
 fi
 
-fin=cubeOS.dasm16
-touch $kern
-cat *.cubeos > $kern
-cp $kern $fin
+temp=cubeOS.dasm16
+cat *.cubeos > $temp
+
+if [[ -n $kern ]]
+then
+	cat $temp > $kern
+	cat $temp > $stable
+fi
+
 gedit $fin
