@@ -1,22 +1,3 @@
-SET A, b1
-SET B, a1
-JSR ifg32
-IFE A, 0
-  SET [0x8000], 0x0F20
-
-SET A, b2
-SET B, a2
-JSR ifg32
-IFE A, 0
-  SET [0x8001], 0x0F20
-SUB PC, 1
-
-:a1 DAT 0x1000, 0x0000
-:b1 DAT 0x017F, 0xF891
-
-:a2 DAT 0x010F, 0x0F00
-:b2 DAT 0x010F, 0x0001
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; D32 ; 32-Bit Utility Set ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -1,6 +1,9 @@
 ;;;;;;;;
 ; BOOT ;
 ;;;;;;;;
+;:# BOOT Loader
+;:Initializes the kernal on startup
+;:
 
 SET [0xB00], 0x293A
 JSR m.init
@@ -12,11 +15,24 @@ SET PC, halt
 
 :halt SET PC, halt
  ;;
-:exf ; EXitFalse
+;:## ext
+;:Exits a subroutine with A set to 0
+;:To use, do `SET PC, ext` instead of `SET PC, POP` at the end of a subroutine
+;:
+:ext ; exit true
 SET A, 0
 SET PC, POP
  ;
- ;;
+
+;:## exf
+;:Exits a subroutine with A set to 1
+;:To use, do `SET PC, exf` instead of `SET PC, POP~ at the end of a subroutine
+;:
+:exf ; exit false
+SET A, 1
+SET PC, POP
+ ;
+;:
 ;;;;;;;
 ; ENV ;
 ;;;;;;;
@@ -179,6 +195,110 @@ SET A, [v.stdout] ;location
 JSR p.uStr
 
 SET PC, POP
+ ;
+ ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; D32 ; 32-Bit Utility Set ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:# d32
+;:32-bit utility set
+;:
+
+;:## ifg32 (firstawordloc, firstbwordloc)
+;:- returns 0 if the first 32-bit word is greater than the second 32-bit word
+;:
+
+:ifg32
+SET C, A
+SET A, 0 ;return 0 if true
+
+IFG [C], [B] ;if the first is less than the second
+  SET PC, ext
+IFE [C], [B]
+  IFG [C+1], [B+1]
+    SET PC, ext
+
+SET A, 1
+SET PC, POP
+ ;
+;:
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; DATALIB ; Data Managing Library ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:# DataLib
+;:DataLib is a library for managing arbitrary amounts of data with relative speed and efficiency.
+;:
+
+;:## dl.valuesort
+
+;:
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; HEAPMAN ; Heap Manager   ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;:# Heap Manager
+:heap.loc DAT 0
+:heap.header DAT 0
+
+
+;:## heap.init
+;:(location, allocsize, length)
+;:heap.init reserves a 16 word header consisting of the following values.
+;:
+
+:heap.init ; (location, allocsize, length)
+SET PUSH, I
+SET PUSH, A
+SET I, A
+ADD A, 16 ;16 word header
+
+STI [I], 0x9EA9	;0
+;:1. **0x9EA9** magic word
+STI [I], A	;1
+;:1. first heap memory location
+STI [I], B	;2
+;:1. allocation size
+STI [I], C	;3
+;:1. length
+STI [I], 0	;4
+;:1. *reserved*
+STI [I], 0	;5
+;:1. *reserved*
+STI [I], 0	;6
+;:1. *reserved*
+STI [I], 0	;7
+;:1. *reserved*
+STI [I], 0	;8
+;:1. *reserved*
+STI [I], 0	;9
+;:1. *reserved*
+STI [I], 0	;A
+;:1. *reserved*
+STI [I], 0	;B
+;:1. *reserved*
+STI [I], 0	;C
+;:1. *reserved*
+STI [I], 0	;D
+;:1. *reserved*
+STI [I], 0	;E
+;:1. *reserved*
+STI [I], 0	;F
+;:1. *reserved*
+
+
+ADD C, A ;create ending location
+SET A, I ;have another iterator
+
+:heap.init.loop
+ADD A, B
+SET [I], A
+
+ADD I, B
+IFL I, C
+  SET PC, heap.init.loop
+
+;:**STILL IN DEVELOPMENT; DO NOT USE**
  ;
  ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;

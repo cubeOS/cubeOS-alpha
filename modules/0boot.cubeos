@@ -15,7 +15,7 @@ SET PC, halt
 
 :halt SET PC, halt
  ;;
-;:# ext
+;:## ext
 ;:Exits a subroutine with A set to 0
 ;:To use, do `SET PC, ext` instead of `SET PC, POP` at the end of a subroutine
 ;:
@@ -24,7 +24,7 @@ SET A, 0
 SET PC, POP
  ;
 
-;:# exf
+;:## exf
 ;:Exits a subroutine with A set to 1
 ;:To use, do `SET PC, exf` instead of `SET PC, POP~ at the end of a subroutine
 ;:
