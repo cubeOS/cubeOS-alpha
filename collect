@@ -7,7 +7,7 @@ then
 fi
 
 temp=cubeOS.dasm16
-cat *.cubeos > $temp
+cat ./modules/*.cubeos > $temp
 
 if [[ -n $kern ]]
 then

@@ -1,8 +1,6 @@
 ;;;;;;;;
 ; BOOT ;
 ;;;;;;;;
-;:# BOOT Loader
-;:Initializes the kernal on startup
 
 SET [0xB00], 0x293A
 JSR m.init
@@ -19,4 +17,3 @@ SET A, 0
 SET PC, POP
  ;
  ;;
-

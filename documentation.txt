@@ -1,3 +1,0 @@
-cubeOS-alpha documentation as of Wed May 9 09:58:53 EDT 2012
-;: documentation
-;: for the most recent version of cubeOS

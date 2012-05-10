@@ -1,0 +1,24 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; HEAPMAN ; Heap Manager   ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;:# Heap Manager
+:heap.loc DAT 0
+:heap.header DAT 0
+
+
+;:## heap.init
+;:(location, allocsize, length)
+;:heap.init reserves a 16 word header...
+
+:heap.init ; (location, allocsize, length)
+SET PUSH, I
+SET I, A
+ADD A, 16 ;16 word header
+
+STI [I], 0x9EA9 ;:1. **0x9EA9** magic word
+STI [I], A ;:2. first memory
+SET [A], POP
+ADD A, 1
+
+ ;
+ ;;
