@@ -3,6 +3,7 @@
 ;;;;;;;;
 ;:# BOOT Loader
 ;:Initializes the kernal on startup
+;:
 
 SET [0xB00], 0x293A
 JSR m.init
@@ -14,9 +15,21 @@ SET PC, halt
 
 :halt SET PC, halt
  ;;
-:exf ; EXitFalse
+;:# ext
+;:Exits a subroutine with A set to 0
+;:To use, do `SET PC, ext` instead of `SET PC, POP` at the end of a subroutine
+;:
+:ext ; exit true
 SET A, 0
 SET PC, POP
  ;
- ;;
 
+;:# exf
+;:Exits a subroutine with A set to 1
+;:To use, do `SET PC, exf` instead of `SET PC, POP~ at the end of a subroutine
+;:
+:exf ; exit false
+SET A, 1
+SET PC, POP
+ ;
+;:

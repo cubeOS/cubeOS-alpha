@@ -8,17 +8,60 @@
 
 ;:## heap.init
 ;:(location, allocsize, length)
-;:heap.init reserves a 16 word header...
+;:heap.init reserves a 16 word header consisting of the following values.
+;:
 
 :heap.init ; (location, allocsize, length)
 SET PUSH, I
+SET PUSH, A
 SET I, A
 ADD A, 16 ;16 word header
 
-STI [I], 0x9EA9 ;:1. **0x9EA9** magic word
-STI [I], A ;:2. first memory
-SET [A], POP
-ADD A, 1
+STI [I], 0x9EA9	;0
+;:1. **0x9EA9** magic word
+STI [I], A	;1
+;:1. first heap memory location
+STI [I], B	;2
+;:1. allocation size
+STI [I], C	;3
+;:1. length
+STI [I], 0	;4
+;:1. *reserved*
+STI [I], 0	;5
+;:1. *reserved*
+STI [I], 0	;6
+;:1. *reserved*
+STI [I], 0	;7
+;:1. *reserved*
+STI [I], 0	;8
+;:1. *reserved*
+STI [I], 0	;9
+;:1. *reserved*
+STI [I], 0	;A
+;:1. *reserved*
+STI [I], 0	;B
+;:1. *reserved*
+STI [I], 0	;C
+;:1. *reserved*
+STI [I], 0	;D
+;:1. *reserved*
+STI [I], 0	;E
+;:1. *reserved*
+STI [I], 0	;F
+;:1. *reserved*
 
+
+ADD C, A ;create ending location
+SET A, I ;have another iterator
+
+:heap.init.loop
+ADD A, B
+SET [I], A
+
+ADD I, B
+IFL I, C
+  SET PC, heap.init.loop
+
+;:**STILL IN DEVELOPMENT; DO NOT USE**
  ;
  ;;
