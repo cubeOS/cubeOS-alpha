@@ -5,7 +5,18 @@
 ;:# DataLib
 ;:DataLib is a library for managing arbitrary amounts of data with relative speed and efficiency.
 ;:
+;:**requires**
+;:- crypt
 
-;:## dl.valuesort
-
+;:## dl.searchValTable (searchTerm, location, length)
 ;:
+:dl.searchValTable
+SET PUSH, I
+
+SET I, C
+SHR I, 1 ;divide by 2
+ADD I, B
+
+IFG [I], A
+
+:dl.searchValTable.
