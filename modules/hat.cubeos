@@ -1,0 +1,37 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; HAT ; HAT FileSystem         ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;:# HAT
+;:**HAT** is the default file system for cubeOS. It implements [Harry's Allocation Table](https://github.com/0x10cStandardsCommittee/0x10c-Standards/blob/master/FS/Draft_Harrys_Allocation_Table.txt) file system format. CubeOS uses version 1.0.
+;:
+;:**requires**
+;:
+;:- crypt
+;:
+;:**STILL UNDER HEAVY DEVELOPMENT. DO NOT USE**
+
+;:## hat.mountSystem (location, length, sectorSize)
+;:Mounts */* directory at *location*, reserving *length* words after it. It then initializes a HAT filesystem with the given *sectorSize*.
+;:
+;:Currently assumes fixed number of sectors, rendering *length* unused
+;:**returns** location of first word in header
+
+:hat.mountSystem
+SET PUSH, I
+SET PUSH, J
+SET PUSH, A
+SET I, A
+
+ADD A, 10 ;make A the start of the sector map
+
+;should find the maximum number of sectors, but doesn't
+
+
+STI [I], 0x4001 ;magic number, HAT v1.0
+STI [I], 2 ;number of sectors; SHOULD NOT BE STATIC
+STI [I], A ;location of sector map
+
+ADD A, 1 ;size of sector map; SHOULD NOT BE STATIC
+
+STI [I], A
+
