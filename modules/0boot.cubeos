@@ -12,7 +12,7 @@ SET C, 128
 JSR cat.mountSystem ;initialize FS
 
 SET [0xB00], 0x293A
-JSR m.init
+JSR p.init
 JSR s.instance
 
 SET PC, halt

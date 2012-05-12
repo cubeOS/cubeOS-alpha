@@ -1,10 +1,3 @@
-SET A, 0x8000
-SET B, 0x810
-SET C, 128
-
-JSR cat.mountSystem
-SUB PC, 1
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; CAT ; CAT FileSystem         ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -27,6 +20,8 @@ SUB PC, 1
 ;SHOULD KEEP TRACK OF WHERE FILESYSTEM IS SO IT CAN ADD NEW STRIPS AND DO SEARCHES
 
 :cat.mountSystem
+SET [env.fs], A
+
 SET PUSH, I
 SET PUSH, J
 SET PUSH, X

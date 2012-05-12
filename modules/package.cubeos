@@ -1,16 +1,33 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; PACKAGE ; Dash Package Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 :p.init
-
-SET [0x09E4], mod.ls
-
+SET [0x09E4], pack.ls
 SET PC, POP
  ;
 
 :pack.ls
-SET [0xB00], 0x443A ; ":D" > stdout
-SET A, 1
+
+;0b00 is stdout
+
+SET PUSH, I
+SET PUSH, J
+
+;SHOULD LIST CURRENT DIRECTORY
+;SHOULD LIST MORE THAN ONE ITEM
+
+SET I, [env.fs]
+SET I, [I+4]
+SET J, [I+3] ;track length of sector
+ADD I, 5 ;first letter of first link
+
+SET A, I
+SET B, 15
+SET C, 0xB00
+
+SET J, POP
+SET I, POP
 SET PC, POP
  ;
  ;;
