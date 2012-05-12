@@ -84,17 +84,25 @@ IFE C, 0x11
   SET PC, s.takeIn.enter
 SET PC, s.takeIn.wait
 
+
 :s.takeIn.write
 XOR C, 0xF000
 STI [I], C
-IFE I, [v.scrnEnd]
-  JSR sv.scrollUp
+
+IFN I, [v.scrnEnd] ;write normally
+  SET PC, s.takeIn.loop
+
+:s.takeIn.write.scroll
+SUB [v.promptLoc], [v.scrnWidth] ;make prompt scroll, too
+JSR sv.scrollUp ;scroll everything up
 SET PC, s.takeIn.loop
+
 
 :s.takeIn.backspace
 STD [I], 0
 SET [I], 0
 SET PC, s.takeIn.loop
+
 
 :s.takeIn.enter
 SET [I], 0

@@ -124,17 +124,25 @@ IFE C, 0x11
   SET PC, s.takeIn.enter
 SET PC, s.takeIn.wait
 
+
 :s.takeIn.write
 XOR C, 0xF000
 STI [I], C
-IFE I, [v.scrnEnd]
-  JSR sv.scrollUp
+
+IFN I, [v.scrnEnd] ;write normally
+  SET PC, s.takeIn.loop
+
+:s.takeIn.write.scroll
+SUB [v.promptLoc], [v.scrnWidth] ;make prompt scroll, too
+JSR sv.scrollUp ;scroll everything up
 SET PC, s.takeIn.loop
+
 
 :s.takeIn.backspace
 STD [I], 0
 SET [I], 0
 SET PC, s.takeIn.loop
+
 
 :s.takeIn.enter
 SET [I], 0
@@ -282,6 +290,13 @@ ADD I, B
 IFG [I], A
 
 :dl.searchValTable.
+SET A, 0x8000
+SET B, 0x810
+SET C, 128
+
+JSR hat.mountSystem
+SUB PC, 1
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; HAT ; HAT FileSystem         ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -297,28 +312,92 @@ IFG [I], A
 ;:## hat.mountSystem (location, length, sectorSize)
 ;:Mounts */* directory at *location*, reserving *length* words after it. It then initializes a HAT filesystem with the given *sectorSize*.
 ;:
-;:Currently assumes fixed number of sectors, rendering *length* unused
+;:Currently unsafe if the number of sectors is greater than 16
 ;:**returns** location of first word in header
+;:
 
 :hat.mountSystem
 SET PUSH, I
 SET PUSH, J
+SET PUSH, X
 SET PUSH, A
 SET I, A
-
-ADD A, 10 ;make A the start of the sector map
+DIV B, C ;make B the maximum number of sectors ;SHOULD 
 
 ;should find the maximum number of sectors, but doesn't
 
-
+:hat.mountSystem.initHeader
 STI [I], 0x4001 ;magic number, HAT v1.0
-STI [I], 2 ;number of sectors; SHOULD NOT BE STATIC
-STI [I], A ;location of sector map
+STI [I], B ;number of sectors
+STI [I], 0 ;reserved for sector map start
+STI [I], 0 ;reserved for sector joins start
+STI [I], 0 ;reserved for sectors start
+STI [I], C ;sector size
+STI [I], 0 ;sectors in use
 
-ADD A, 1 ;size of sector map; SHOULD NOT BE STATIC
+:hat.mountSystem.initSectorMap
+SET [A+2], I ;sector map start
+SET PUSH, B ;store B
+SET C, B ;we will change B later
+DIV C, 16 ;find number of words needed to represent sector use states
+;OPTIMIZE DIV WITH SHR
+ADD C, I ;C becomes sector map end location
 
-STI [I], A
+:hat.mountSystem.initSectorMap.loop
+SET X, 0xFFFF ;make X initializer for sector map
+SHR X, B ;set only the excess sectors to used
+STI [I], X
 
+IFG X, 0 ;exit if that was enough bits to represent all sectors
+  SET PC, hat.mountSystem.initSectorMap.end
+
+SUB B, 16 ;CAN WRAP AND BE UNSAFE
+SET PC, hat.mountSystem.initSectorMap.loop ;COULD BE REORDERED MORE EFFICIENTLY
+
+:hat.mountSystem.initSectorMap.end
+SET B, POP ;restore number of sectors
+
+:hat.mountSystem.initSectorJoin
+SET [A+3], I ;sector join start
+ADD B, I ;make B the ending location of sector join
+
+:hat.mountSystem.initSectorJoin.loop
+STI [I], 0
+IFN I, B ;continue reserving until I reaches the end location
+  SET PC, hat.mountSystem.initSectorJoin.loop
+
+:hat.mountSystem.initSectors
+SET [A+4], I
+
+:hat.mountSystem.initializeRoot
+STI [I], 1 ;inode is a directory (root directory)
+STI [I], 0
+STI [I], 32
+
+;NEEDS TO HAVE LINKS
+
+:hat.mountSystem.exit
+SET A, POP ;return location
+
+SET X, POP
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
+
+;;:## hat.newStrip (location, stripStartSector, nameLocation)
+
+;:## hat.newInode (location, type)
+;:Creates a new inode at *location*.
+;:Types are 0, for unused, 1, for directory, and 2, for file.
+;:
+;:**returns** location after inode
+
+:hat.newInode
+SET [A], B
+ADD A, 4
+SET PC, POP
+ ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; HEAPMAN ; Heap Manager   ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
