@@ -2,4 +2,5 @@
 ; ENV ;
 ;;;;;;;
 :env.cwds DAT 0
+:env.fs DAT 0
  ;;

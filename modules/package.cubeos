@@ -1,0 +1,16 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; PACKAGE ; Dash Package Handler ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+:p.init
+
+SET [0x09E4], mod.ls
+
+SET PC, POP
+ ;
+
+:pack.ls
+SET [0xB00], 0x443A ; ":D" > stdout
+SET A, 1
+SET PC, POP
+ ;
+ ;;

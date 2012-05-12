@@ -2,8 +2,14 @@
 ; BOOT ;
 ;;;;;;;;
 ;:# BOOT Loader
-;:Initializes the kernal on startup
+;:Initializes the kernel on startup
 ;:
+
+SET A, 0x9000
+SET B, 0x810
+SET C, 128
+
+JSR cat.mountSystem ;initialize FS
 
 SET [0xB00], 0x293A
 JSR m.init
