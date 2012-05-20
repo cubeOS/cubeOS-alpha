@@ -5,7 +5,9 @@
 ;:Initializes the kernel on startup
 ;:
 
-SET A, 0x9000
+:__BOOT
+
+SET A, 0x8000
 SET B, 0x810
 SET C, 128
 

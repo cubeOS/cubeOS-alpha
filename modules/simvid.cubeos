@@ -2,10 +2,19 @@
 ; SIMVID ; Video Manager ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-:v.scrnLoc DAT 0x8000
-:v.scrnEnd DAT 0x8180
+:v.scrnLoc DAT 0
+:v.scrnEnd DAT 0
 :v.scrnHeight DAT 12
 :v.scrnWidth DAT 32
+
+:sv.init ; (location)
+SET B, A
+SET A, 0
+HWI 0
+SET [v.scrnLoc], B
+ADD B, 0x180
+SET [v.scrnLoc], B
+SET PC, POP
 
 :sv.getLoc ; (xOffset, yOffset)
 IFL A, [v.scrnWidth]
@@ -85,25 +94,3 @@ SET I, POP
 SUB I, [v.scrnWidth] ;adjust I for caller, hopefully
 SET PC, POP
  ;
-
-:sv.getNewLine ; (currentLoc)
-SET PUSH, I
-SET I, [v.scrnLoc]
-JSR sv.autoScroll
-SET PC, sv.getNewLine.loop.sub
-
-:sv.getNewLine.loop
-ADD I, [v.scrnWidth]
-
-:sv.getNewLine.loop.sub
-IFG A, I ;exit successful if line scrnindex >= currentindex
-  SET PC, sv.getNewLine.loop
-
-IFE I, [v.scrnEnd]
-  SUB I, [v.scrnWidth]
-
-SET A, I
-SET I, POP
-SET PC, POP
- ;
- ;;

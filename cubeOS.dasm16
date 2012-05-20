@@ -9,6 +9,13 @@
 ;THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ;
 ;
+SET PC, __BOOT
+;;;;;;;
+; ENV ;
+;;;;;;;
+:env.cwds DAT 0
+:env.fs DAT 0
+ ;;
 ;;;;;;;;
 ; BOOT ;
 ;;;;;;;;
@@ -16,7 +23,9 @@
 ;:Initializes the kernel on startup
 ;:
 
-SET A, 0x9000
+:__BOOT
+
+SET A, 0x8000
 SET B, 0x810
 SET C, 128
 
@@ -50,12 +59,6 @@ SET A, 1
 SET PC, POP
  ;
 ;:
-;;;;;;;
-; ENV ;
-;;;;;;;
-:env.cwds DAT 0
-:env.fs DAT 0
- ;;
 ;;;;;;;;;;;;;;;;
 ; DASH ; Shell ;
 ;;;;;;;;;;;;;;;;
@@ -223,13 +226,6 @@ JSR p.uStr
 SET PC, POP
  ;
  ;;
-SET A, 0x8000
-SET B, 0x810
-SET C, 128
-
-JSR cat.mountSystem
-SUB PC, 1
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; CAT ; CAT FileSystem         ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -252,6 +248,8 @@ SUB PC, 1
 ;SHOULD KEEP TRACK OF WHERE FILESYSTEM IS SO IT CAN ADD NEW STRIPS AND DO SEARCHES
 
 :cat.mountSystem
+SET [env.fs], A
+
 SET PUSH, I
 SET PUSH, J
 SET PUSH, X
@@ -515,10 +513,9 @@ IFL I, C
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; PACKAGE ; Dash Package Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 :p.init
-
 SET [0x09E4], pack.ls
-
 SET PC, POP
  ;
 
@@ -533,6 +530,7 @@ SET PUSH, J
 ;SHOULD LIST MORE THAN ONE ITEM
 
 SET I, [env.fs]
+SET I, [I+4]
 SET J, [I+3] ;track length of sector
 ADD I, 5 ;first letter of first link
 
@@ -540,18 +538,28 @@ SET A, I
 SET B, 15
 SET C, 0xB00
 
+SET J, POP
+SET I, POP
 SET PC, POP
  ;
  ;;
- 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; SIMVID ; Video Manager ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-:v.scrnLoc DAT 0x8000
-:v.scrnEnd DAT 0x8180
+:v.scrnLoc DAT 0
+:v.scrnEnd DAT 0
 :v.scrnHeight DAT 12
 :v.scrnWidth DAT 32
+
+:sv.init ; (location)
+SET B, A
+SET A, 0
+HWI 0
+SET [v.scrnLoc], B
+ADD B, 0x180
+SET [v.scrnLoc], B
+SET PC, POP
 
 :sv.getLoc ; (xOffset, yOffset)
 IFL A, [v.scrnWidth]
@@ -632,27 +640,45 @@ SUB I, [v.scrnWidth] ;adjust I for caller, hopefully
 SET PC, POP
  ;
 
-:sv.getNewLine ; (currentLoc)
+;;## cstring.make (sourcePointer, targetPointer, maxLength)
+;;returns B in A
+
+:cstring.make
 SET PUSH, I
-SET I, [v.scrnLoc]
-JSR sv.autoScroll
-SET PC, sv.getNewLine.loop.sub
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, B
+SET I, A
+ADD C, I
 
-:sv.getNewLine.loop
-ADD I, [v.scrnWidth]
+:cstring.make.packloop
+STI X, [I]
+AND X, 0x7F
+SET [B], X ;
 
-:sv.getNewLine.loop.sub
-IFG A, I ;exit successful if line scrnindex >= currentindex
-  SET PC, sv.getNewLine.loop
+IFE X, 0 ;just copied a 0, so the null termination is there already
+  SET PC, cstring.make.exit
 
-IFE I, [v.scrnEnd]
-  SUB I, [v.scrnWidth]
+IFE I, C ;have to terminate with null
+  SET PC, cstring.make.exlen
 
-SET A, I
-SET I, POP
-SET PC, POP
- ;
- ;;
+
+STI Y, [I]
+AND Y, 0x7F
+SHL Y, 8
+
+XOR [B], Y
+
+IFE Y, 0
+  SET PC, cstring.make.exit
+
+IFN I, C ;add null termination if reached length end
+  SET PC, cstring.make.packloop
+
+:cstring.make.exlen
+SET [I], 0
+
+:cstring.make.exit
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; PACKER ; Data Compressor ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -765,3 +791,16 @@ SET I, POP
 SET PC, POP
  ;
  ;;
+:videoRam
+DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
+DAT 0,0,0xF01B,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F, 0xF01F, 0xF01B,0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0xF057,0xF065,0,0,  0,0,0,0, 0,0,0,0,  0,0,0,0,  0,0xF01B,0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0,0x401C,0x401C,0,  0,0x401C,0x401C,0,  0,0,0,0,  0,0,0,0,  0,0xF01B,0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0x401E,0x401B,0x401B,0x401B,  0x401B,0x401B,0x401B,0x401D,  0,0,0,0,  0,0,0,0,  0,0xF01B,0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0,0x401B,0x0443,0x0455,  0x0442,0x0445,0x401B,0,  0,0,0,0,  0,0,0,0,  0,0xF01B,0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0,0,0x401B,0x401B,  0x401B,0x401B,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01B, 0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0,0,0,0x401F,  0x401F,0,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01B,0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0xF053,0xF063,0xF069,0xF065,  0xF06E,0xF063,0xF065,0,  0,0,0,0,  0,0,0,0, 0,0xF01B,0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0xF01B,0,0
+DAT 0,0,0xF01B,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01B,0,0
+DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
