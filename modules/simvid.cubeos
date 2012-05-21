@@ -13,7 +13,7 @@ SET A, 0
 HWI 0
 SET [v.scrnLoc], B
 ADD B, 0x180
-SET [v.scrnLoc], B
+SET [v.scrnEnd], B
 SET PC, POP
 
 :sv.getLoc ; (xOffset, yOffset)
