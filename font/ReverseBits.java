@@ -5,7 +5,7 @@ public class ReverseBits
 		int b = 0;
 		while (x!=0){
 			b<<=1;
-			b|=( x &1);
+			b|=( x & 1);
 			x>>=1;
 		}
 		return b;
@@ -24,7 +24,18 @@ public class ReverseBits
 			//or a byte, then do reverse()
 			//on it; put the result in the
 			//output array
-			
+
+
+			for(int j=0;j<4;j++)
+			{
+				int y;
+				if(j>1) y = derp[i];
+				else y = derp[i+1];
+
+				int x = (y >> ((j % 2) * 8)) & 0xFF;
+			}
+
+
 			newVals[i+1] = reverse(derp[i]);
 			newVals[i] = reverse(derp[i+1]);
 			System.out.printf("0x%04X, 0x%04X, ",newVals[i],newVals[i+1]);
