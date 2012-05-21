@@ -74,7 +74,7 @@ SET I, POP
 SET PC, POP
  ;
 
-:p.uStr ; (packedStringLoc, packedStringLen, packedOut)
+:p.uStr ; (packedStringLoc, packedStringLen, output)
 SET PUSH, I
 SET PUSH, X
 SET PUSH, Y
@@ -108,5 +108,28 @@ SET Y, POP
 SET X, POP
 SET I, POP
 SET PC, POP
+ ;
+
+;:## p.C.uStr (packedStringPointer, outputPointer)
+;:Unpacks a *C-style* (null-terminated) string to the *outputPointer*.
+
+:p.C.uStr
+SET PUSH, I
+SET I, A
+SET C, B
+
+:p.C.uStr.loop
+IFE [I], 0
+  SET PC, p.C.uStr.exit
+  
+ADD I, 1
+SET PC, p.C.uSTR.loop
+
+:p.C.uStr.exit
+SUB I, A
+SET B, I
+
+SET I, POP
+SET PC, p.uStr
  ;
  ;;

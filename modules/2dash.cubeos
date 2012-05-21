@@ -17,11 +17,11 @@ SET A, [v.scrnLoc]
 
 :s.instance.promptLoop
 JSR s.takeIn
-SET PUSH, A
+SET PUSH, A ;keep track of cursor location
 
-JSR s.parse ;outputs length for stdout
+JSR s.parse
 
-SET B, POP
+SET A, POP ;restore cursor location for passing to s.stdout
 JSR s.stdout
 SET PC, s.instance.promptLoop
 
@@ -152,15 +152,12 @@ SET I, POP
 SET PC, POP
  ;
 
-:s.stdout ; (stdoutlen, scrnLoc) ;MUST NULL-TERMINATE
-SET PUSH, A
-SET A, B
+:s.stdout ; (scrnLoc)
 JSR sv.getNewLine
 
-SET C, A ;output
-SET B, POP ;length
+SET B, A ;output
 SET A, [v.stdout] ;location
-JSR p.uStr
+JSR p.C.uStr
 
 SET PC, POP
  ;
