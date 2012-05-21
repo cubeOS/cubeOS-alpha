@@ -25,10 +25,9 @@ ADD J, 4
 ;??? ADD I, 5 ;first letter of first link
 
 SET A, J
-SET B, 15
-SET C, 0xB00
+SET B, 0xB00
 
-JSR p.uStr
+JSR p.C.uStr
 
 SET J, POP
 SET I, POP

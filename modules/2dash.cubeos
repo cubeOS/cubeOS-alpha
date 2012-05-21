@@ -22,7 +22,7 @@ SET PUSH, A ;keep track of cursor location
 JSR s.parse
 
 SET A, POP ;restore cursor location for passing to s.stdout
-JSR s.stdout
+JSR s.stdout ;WRITES WITH STRANGE "p" CHARACTER AFTER EVERY PROPER ONE
 SET PC, s.instance.promptLoop
 
 SET PC, POP
@@ -157,7 +157,7 @@ JSR sv.getNewLine
 
 SET B, A ;output
 SET A, [v.stdout] ;location
-JSR p.C.uStr
+JSR p.C.copy ;copy literally and null-terminated
 
 SET PC, POP
  ;

@@ -86,7 +86,7 @@ SET PUSH, A ;keep track of cursor location
 JSR s.parse
 
 SET A, POP ;restore cursor location for passing to s.stdout
-JSR s.stdout
+JSR s.stdout ;WRITES WITH STRANGE "p" CHARACTER AFTER EVERY PROPER ONE
 SET PC, s.instance.promptLoop
 
 SET PC, POP
@@ -221,7 +221,7 @@ JSR sv.getNewLine
 
 SET B, A ;output
 SET A, [v.stdout] ;location
-JSR p.C.uStr
+JSR p.C.copy ;copy literally and null-terminated
 
 SET PC, POP
  ;
@@ -556,10 +556,9 @@ ADD J, 4
 ;??? ADD I, 5 ;first letter of first link
 
 SET A, J
-SET B, 15
-SET C, 0xB00
+SET B, 0xB00
 
-JSR p.uStr
+JSR p.C.uStr
 
 SET J, POP
 SET I, POP
@@ -746,6 +745,27 @@ SET [I], 0
 ; PACKER ; Data Compressor ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;:## p.C.copy (inputPointer, outputPointer)
+;:Copies the null-terminated string at *inputPointer* to *outputPointer*.
+
+:p.C.copy
+SET PUSH, I
+SET PUSH, J
+SET I, A
+SET J, B
+
+:p.C.copy.loop
+IFE [I], 0
+  SET PC, p.C.copy.exit
+
+STI [J], [I]
+SET PC, p.C.copy.loop
+
+:p.C.copy.exit
+SET J, POP
+SET I, POP
+SET PC, POP
+
 :p.uCol ; (packedCol, packedLen, outputChar)
 SET PUSH, I
 SET PUSH, X
@@ -871,7 +891,7 @@ SET PC, p.C.uSTR.loop
 
 :p.C.uStr.exit
 SUB I, A
-SET A, I
+SET B, I
 
 SET I, POP
 SET PC, p.uStr
