@@ -80,7 +80,7 @@ STI [I], 0
 STI [I], 32
 
 STI [I], 0 ;link directs here
-STI [I], 0x2E ; "."
+STI [I], 0x202E ; "."
 STI [I], 0
 STI [I], 0 ;4
 STI [I], 0

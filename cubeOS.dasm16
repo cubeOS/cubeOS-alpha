@@ -69,14 +69,14 @@ SET PC, POP
 :v.sPrompt DAT 0x2024
 :v.promptLoc DAT 0
 
-:v.stdin DAT 0xA00
-:v.stdout DAT 0xB00
+:v.stdin DAT 0xA00 ;SHOULD NOT HARDCODE
+:v.stdout DAT 0xB00 ;SHOULD NOT HARDCODE
 
 :v.cmdmem DAT 1 ;reserve 8 words
 
 :s.instance ;SHOULD PREPARE SDIN and SDOUT
 SET [env.cwds], 0x202F
-
+JSR sv.clear ;clear the screen
 SET A, [v.scrnLoc]
 
 :s.instance.promptLoop
@@ -216,7 +216,7 @@ SET I, POP
 SET PC, POP
  ;
 
-:s.stdout ; (stdoutlen, scrnLoc) ;NEED TO WRITE AND CALL THIS
+:s.stdout ; (stdoutlen, scrnLoc) ;MUST NULL-TERMINATE
 SET PUSH, A
 SET A, B
 JSR sv.getNewLine
@@ -311,7 +311,7 @@ STI [I], 0
 STI [I], 32
 
 STI [I], 0 ;link directs here
-STI [I], 0x2E ; "."
+STI [I], 0x202E ; "."
 STI [I], 0
 STI [I], 0 ;4
 STI [I], 0
@@ -513,6 +513,25 @@ IFL I, C
 ;:**STILL IN DEVELOPMENT; DO NOT USE**
  ;
  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+; Monitor Preallocation ;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+:fontRAM
+
+:videoRAM
+DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
+DAT 0,0,0xF01B,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F, 0xF01F, 0xF01B,0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0xF057,0xF065,0,0,  0,0,0,0, 0,0,0,0,  0,0,0,0,  0,0xF01B,0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0,0x401C,0x401C,0,  0,0x401C,0x401C,0,  0,0,0,0,  0,0,0,0,  0,0xF01B,0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0x401E,0x401B,0x401B,0x401B,  0x401B,0x401B,0x401B,0x401D,  0,0,0,0,  0,0,0,0,  0,0xF01B,0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0,0x401B,0x0443,0x0455,  0x0442,0x0445,0x401B,0,  0,0,0,0,  0,0,0,0,  0,0xF01B,0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0,0,0x401B,0x401B,  0x401B,0x401B,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01B, 0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0,0,0,0x401F,  0x401F,0,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01B,0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0xF053,0xF063,0xF069,0xF065,  0xF06E,0xF063,0xF065,0,  0,0,0,0,  0,0,0,0, 0,0xF01B,0,0
+DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0xF01B,0,0
+DAT 0,0,0xF01B,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01B,0,0
+DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; PACKAGE ; Dash Package Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -522,6 +541,10 @@ SET [0x09E4], pack.ls
 SET PC, POP
  ;
 
+;MODULES REUTRN STDOUT LENGTH IN A
+;THIS SHOULD BE AUTODETECTED INSTEAD BY THE STDOUT PRINTING
+;ROUTINE
+
 :pack.ls
 
 ;0b00 is stdout
@@ -529,17 +552,20 @@ SET PC, POP
 SET PUSH, I
 SET PUSH, J
 
-;SHOULD LIST CURRENT DIRECTORY
+;SHOULD LIST WHAT IS IN THE CURRENT DIRECTORY
 ;SHOULD LIST MORE THAN ONE ITEM
 
-SET I, [env.fs]
-SET I, [I+4]
-SET J, [I+3] ;track length of sector
+SET J, [env.fs+3]
+SET I, [J+1] ;track length of sector
 ADD I, 5 ;first letter of first link
 
 SET A, I
 SET B, 15
 SET C, 0xB00
+
+JSR p.uStr
+
+SET A, 4
 
 SET J, POP
 SET I, POP
@@ -563,6 +589,24 @@ SET [v.scrnLoc], B
 ADD B, 0x180
 SET [v.scrnEnd], B
 SET PC, POP
+ ;
+ 
+:sv.clear
+SET PUSH, I
+SET PUSH, J
+
+SET I, [v.scrnLoc]
+
+:sv.clear.loop
+STI [I], 0
+
+IFL I, [v.scrnEnd]
+  SET PC, sv.clear.loop
+
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
 
 :sv.getLoc ; (xOffset, yOffset)
 IFL A, [v.scrnWidth]
@@ -816,20 +860,3 @@ SET I, POP
 SET PC, POP
  ;
  ;;
-;;;;;;;;;;;;;;;;;;;;;;;;
-; Designated Video RAM ;
-;;;;;;;;;;;;;;;;;;;;;;;;
-
-:videoRam
-DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
-DAT 0,0,0xF01B,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F, 0xF01F, 0xF01B,0,0
-DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0xF057,0xF065,0,0,  0,0,0,0, 0,0,0,0,  0,0,0,0,  0,0xF01B,0,0
-DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0,0x401C,0x401C,0,  0,0x401C,0x401C,0,  0,0,0,0,  0,0,0,0,  0,0xF01B,0,0
-DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0x401E,0x401B,0x401B,0x401B,  0x401B,0x401B,0x401B,0x401D,  0,0,0,0,  0,0,0,0,  0,0xF01B,0,0
-DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0,0x401B,0x0443,0x0455,  0x0442,0x0445,0x401B,0,  0,0,0,0,  0,0,0,0,  0,0xF01B,0,0
-DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0,0,0x401B,0x401B,  0x401B,0x401B,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01B, 0,0
-DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0,0,0,0x401F,  0x401F,0,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01B,0,0
-DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0xF053,0xF063,0xF069,0xF065,  0xF06E,0xF063,0xF065,0,  0,0,0,0,  0,0,0,0, 0,0xF01B,0,0
-DAT 0,0,0xF01B,0,  0,0,0,0, 0,0,0,0,  0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0xF01B,0,0
-DAT 0,0,0xF01B,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01B,0,0
-DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0

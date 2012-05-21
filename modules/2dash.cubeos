@@ -5,14 +5,14 @@
 :v.sPrompt DAT 0x2024
 :v.promptLoc DAT 0
 
-:v.stdin DAT 0xA00
-:v.stdout DAT 0xB00
+:v.stdin DAT 0xA00 ;SHOULD NOT HARDCODE
+:v.stdout DAT 0xB00 ;SHOULD NOT HARDCODE
 
 :v.cmdmem DAT 1 ;reserve 8 words
 
 :s.instance ;SHOULD PREPARE SDIN and SDOUT
 SET [env.cwds], 0x202F
-
+JSR sv.clear ;clear the screen
 SET A, [v.scrnLoc]
 
 :s.instance.promptLoop
@@ -152,7 +152,7 @@ SET I, POP
 SET PC, POP
  ;
 
-:s.stdout ; (stdoutlen, scrnLoc) ;NEED TO WRITE AND CALL THIS
+:s.stdout ; (stdoutlen, scrnLoc) ;MUST NULL-TERMINATE
 SET PUSH, A
 SET A, B
 JSR sv.getNewLine
