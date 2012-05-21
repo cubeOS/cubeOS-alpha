@@ -1,6 +1,6 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; PACKER ; Data Compressor ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; TYPER ; Data and String Handler ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;:## p.C.copy (inputPointer, outputPointer)
 ;:Copies the null-terminated string at *inputPointer* to *outputPointer*.
