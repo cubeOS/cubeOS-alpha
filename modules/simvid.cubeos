@@ -15,6 +15,24 @@ SET [v.scrnLoc], B
 ADD B, 0x180
 SET [v.scrnEnd], B
 SET PC, POP
+ ;
+ 
+:sv.clear
+SET PUSH, I
+SET PUSH, J
+
+SET I, [v.scrnLoc]
+
+:sv.clear.loop
+STI [I], 0
+
+IFL I, [v.scrnEnd]
+  SET PC, sv.clear.loop
+
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
 
 :sv.getLoc ; (xOffset, yOffset)
 IFL A, [v.scrnWidth]
