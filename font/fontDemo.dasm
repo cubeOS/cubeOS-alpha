@@ -6,6 +6,8 @@ SET A, 1
 SET B, fontram 
 HWI 0 
 
+SUB PC, 1 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;
 ; Designated Video RAM ;
 ;;;;;;;;;;;;;;;;;;;;;;;;
