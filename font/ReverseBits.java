@@ -19,6 +19,12 @@ public class ReverseBits
 		
 		for (int i=0;i<n;i+=2)
 		{
+			//reverse one octet at a time;
+			//put 8 bits at a time into an int
+			//or a byte, then do reverse()
+			//on it; put the result in the
+			//output array
+			
 			newVals[i+1] = reverse(derp[i]);
 			newVals[i] = reverse(derp[i+1]);
 			System.out.printf("0x%04X, 0x%04X, ",newVals[i],newVals[i+1]);
