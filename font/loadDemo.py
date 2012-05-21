@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 output = "SET A, 0\n\
 SET B, videoram \n\
 HWI 0 \n\
