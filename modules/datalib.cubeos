@@ -47,3 +47,12 @@ SET PC, dl.searchValTable.recheck
 SET A, I
 SET I, POP
 SET PC, POP
+
+;:## dl.findInsertIndex (searchTerm, location, length)
+;:Returns the index at which *searchTerm* should be inserted to keep the table at *location* with length *length* sorted
+:dl.findInsertIndex
+SET PUSH, PC
+SET PC, dl.searchValTable
+SET A, B
+ADD A, 1
+SET PC, POP
