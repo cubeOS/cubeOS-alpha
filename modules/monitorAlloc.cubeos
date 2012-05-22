@@ -1,9 +1,19 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Monitor Preallocation ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;
+;:# Monitor Preallocation
+;:Functions as a reserved spot for the font and video RAM of the LEM1802.
+;:
+
+;:## fontRAM
+;:Currently empty (spilling over into videoRAM) <strike>Contains the default font shown [here](http://github.com/cubeOS/cubeOS-alpha/raw/master/font/defaultFont.png).</strike>
+;:
 
 :fontRAM
 
+;:## videoRAM
+;:Contains the cubeOS logo/splash screen, shown [here](https://github.com/cubeOS/cubeOS-alpha/raw/master/logo/cubeOSLogo.png).
+;:
 :videoRAM
 DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
 DAT 0,0,0xF01B,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F, 0xF01F, 0xF01B,0,0
