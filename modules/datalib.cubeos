@@ -24,10 +24,11 @@ SET PC, POP
 ;:
 
 ;:### dl.makeHashTable (headerPointer, indicies)
-;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. 
-
-;:### dl.hashInsert (hashValue, insertValue, hashTableObjectPointer)
+;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 2`, which includes the header, the lookup portion of the table, and the value portion of the table. 
 ;:
+
+;:### dl.hashInsert (lookupValue, insertValue, hashTablePointer)
+;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table.
 ;:
 
 ;:## Sorted Table
