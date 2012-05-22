@@ -11,7 +11,7 @@
 :v.cmdmem DAT 1 ;used in stupid way of "hashing" input
 ;SHOULD USE FOR HASH INSTEAD, BUT ONLY IF NECESSARY
 
-;:## s.instance
+;:### s.instance
 ;:Prepares a new terminal session at the root directory.
 ;:
 ;:1. Set *env.cwds* to "/ " in packed form (`0x202F`)
@@ -39,7 +39,7 @@ SET PC, s.instance.promptLoop
 SET PC, POP
  ;
 
-;:## s.parse
+;:### s.parse
 ;:It's not worth documenting this spaghetti code. It will be completely rewritten when *package* works.
 ;:
 :s.parse
@@ -71,7 +71,7 @@ IFE [A], 0 ;SHOULD EXIT WITH ERROR MESSAGE
 SET PC, [A] ;look up in table
  ;
 
-;:## s.takeIn (cursorPointer)
+;:### s.takeIn (cursorPointer)
 ;:Writes a prompt to the screen using *v.sPrompt* and enters a loop to take ASCII input from the keyboard and write it to the screen at *cursorPointer*. It exits when the user presses `enter`.
 ;:
 ;:**returns** the cursor location on exit
@@ -134,7 +134,7 @@ SET I, POP
 SET PC, POP
  ;
 
-;:## s.drawPrompt (pointer)
+;:### s.drawPrompt (pointer)
 ;:Draws a prompt using *env.cwds* and *v.sPrompt* at *pointer* and sets *v.promptLoc* to the location following the prompt.
 ;:
 ;:**returns** the location following the prompt
@@ -158,7 +158,7 @@ SET [v.promptLoc], A
 SET PC, POP
  ;
 
-;:## s.stdin (startPointer, stopPointer)
+;:### s.stdin (startPointer, stopPointer)
 ;:Copies the values between *startPointer* and *stopPointer* to *v.stdin*.
 ;:
 :s.stdin
@@ -179,7 +179,7 @@ SET I, POP
 SET PC, POP
  ;
 
-;:## s.stdout (outputPointer)
+;:### s.stdout (outputPointer)
 ;:Does a C-style copy from *v.stdout* to *outputPointer*.
 :s.stdout
 JSR sv.getNewLine

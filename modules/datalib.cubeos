@@ -1,3 +1,16 @@
+SET A, 4
+SET B, table
+SET C, 13
+JSR dl.searchValTable
+
+SUB PC, 1
+
+:table DAT 0, 1, 2, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0
+
+:exf
+SET A, 1
+SET PC, POP
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; DATALIB ; Data Managing Library ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -5,12 +18,40 @@
 ;:# DataLib
 ;:DataLib is a library for managing arbitrary amounts of data with relative speed and efficiency.
 ;:
-;:**requires**
-;:- crypt
+
+;:## Hash Table
+;:Subroutines for creating and searching hash tables, which are sorted tables that store values under names
 ;:
 
-;:## dl.searchValTable (searchTerm, location, length)
-;:Performs a binary search on the table at *location* (with length *length*) for *searchTerm* and returns the location
+;:### dl.makeHashTable (headerPointer, indicies)
+;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. 
+
+;:### dl.hashInsert (hashValue, insertValue, hashTableObjectPointer)
+;:
+;:
+
+;:## Sorted Table
+;:Subroutines for creating and searching sorted tables
+;:
+
+;:### dl.sortedInsert (insertValue, tableLocation, tableLength)
+;:Inserts *insertValue* into the sorted table at *tableLocation* of *tableLength*, maintaining the sortedness of the table.
+;:
+;:**returns** location of insert<strike>, or 1 if the value is already present in the table</strike>
+;:
+:dl.sortedInsert
+SET PUSH, A
+JSR dl.findInsertIndex
+
+;NEED TO HANDLE DUPLICATE ENTRY
+
+SET B, A
+SET A, POP
+SET PC, dl.unsortedInsert ;exit when this subroutine exits
+ ;
+
+;:### dl.searchValTable (searchTerm, tableLocation, tableLength)
+;:Performs a binary search on the table at *tableLocation* (with length *tableLength*) for *searchTerm* and returns the memory location
 ;:
 :dl.searchValTable
 SET PUSH, I
@@ -49,13 +90,45 @@ SET PC, dl.searchValTable.recheck
 SET A, I
 SET I, POP
 SET PC, POP
+ ;
 
-;:## dl.findInsertIndex (searchTerm, location, length)
-;:Returns the index at which *searchTerm* should be inserted to keep the table at *location* with length *length* sorted
+;:### dl.findInsertIndex (searchTerm, tableLocation, tableLength)
+;:Returns the index at which *searchTerm* should be inserted to keep the table at *tableLocation* with length *tableLength* sorted.
 ;:
 :dl.findInsertIndex
-SET PUSH, PC
-SET PC, dl.searchValTable
+JSR dl.searchValTable
+
+IFN A, 1
+  SET PC, exf ;exit false if 
+  
 SET A, B
 ADD A, 1
 SET PC, POP
+ ;
+ 
+;:### dl.unsortedInsert (insertValue, insertLocation)
+;:Inserts *insertValue* at *insertLocation* and pushes the value it would replace upward in memory recursively until only a null is overwritten.
+;:
+:dl.unsortedInsert
+SET PUSH, I
+SET PUSH, X ;SHOULD JUST USE A
+SET PUSH, Y ;SHOULD JUST USE B
+
+SET I, B
+SET X, A
+
+:dl.unsortedInsert.loop
+IFE X, 0
+  SET PC, dl.unsortedInsert.exit
+SET Y, [I]
+STI [I], X
+SET X, Y
+
+SET PC, dl.unsortedInsert.loop
+
+:dl.unsortedInsert.exit
+SET Y, POP
+SET X, POP
+SET I, POP
+SET PC, POP
+ ;

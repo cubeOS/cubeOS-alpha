@@ -5,13 +5,13 @@
 ;:Functions as a reserved spot for the font and video RAM of the LEM1802.
 ;:
 
-;:## fontRAM
+;:### fontRAM
 ;:Currently empty (spilling over into videoRAM) <strike>Contains the default font shown [here](http://github.com/cubeOS/cubeOS-alpha/raw/master/font/defaultFont.png).</strike>
 ;:
 
 :fontRAM
 
-;:## videoRAM
+;:### videoRAM
 ;:Contains the cubeOS logo/splash screen, shown [here](https://github.com/cubeOS/cubeOS-alpha/raw/master/logo/cubeOSLogo.png).
 ;:
 :videoRAM

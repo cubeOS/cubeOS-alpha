@@ -6,7 +6,7 @@
 ;:32-bit utility set
 ;:
 
-;:## ifg32 (firstawordloc, firstbwordloc)
+;:### ifg32 (firstawordloc, firstbwordloc)
 ;:- returns 0 if the first 32-bit word is greater than the second 32-bit word
 ;:
 

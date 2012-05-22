@@ -6,7 +6,7 @@
 :heap.header DAT 0
 
 
-;:## heap.init
+;:### heap.init
 ;:(location, allocsize, length)
 ;:heap.init reserves a 16 word header consisting of the following values.
 ;:

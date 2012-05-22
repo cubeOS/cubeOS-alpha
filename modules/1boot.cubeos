@@ -5,7 +5,7 @@
 ;:Initializes the kernel on startup
 ;:
 
-;:## __BOOT
+;:### __BOOT
 ;:Invokes the boot loader
 ;:
 ;:1. Invoke *sv.init* to mount the screen at *videoRAM*.
@@ -40,7 +40,7 @@ SET PC, halt
 :halt SUB PC, 1
  ;
 
-;:## ext
+;:### ext
 ;:Exits a subroutine with A set to 0 (`TRUE`)
 ;:To use, do `SET PC, ext` instead of `SET PC, POP` at the end of a subroutine
 ;:
@@ -49,7 +49,7 @@ SET A, 0
 SET PC, POP
  ;
 
-;:## exf
+;:### exf
 ;:Exits a subroutine with A set to 1 (`FALSE`)
 ;:To use, do `SET PC, exf` instead of `SET PC, POP` at the end of a subroutine
 ;:

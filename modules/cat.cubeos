@@ -10,7 +10,7 @@
 ;:
 ;:**STILL UNDER HEAVY DEVELOPMENT. DO NOT USE**
 
-;:## cat.mountSystem (location, length, sectorSize)
+;:### cat.mountSystem (location, length, sectorSize)
 ;:Mounts */* directory at *location*, reserving *length* words after it. It then initializes a cat filesystem with the given *sectorSize*.
 ;:
 ;:Currently unsafe if the number of sectors is greater than 16
@@ -105,7 +105,7 @@ SET I, POP
 SET PC, POP
  ;
 
-;:## cat.findStrip (index)
+;:### cat.findStrip (index)
 ;:Finds the location in memory of the first word in a strip at the index given.
 ;:
 ;:**returns** first word of header inode of the strip at *index*
@@ -114,7 +114,7 @@ SET PC, POP
 :cat.findStrip
 
 
-;:## cat.newInode (location, type, length)
+;:### cat.newInode (location, type, length)
 ;:Creates a new inode at *location*.
 ;:Types are 0, for unused, 1, for directory, and 2, for file.
 ;:
@@ -128,5 +128,5 @@ ADD A, 2
 SET PC, POP
  ;
 
-;:## cat.newLink (stripSource, stripTarg, nameLocation)
+;:### cat.newLink (stripSource, stripTarg, nameLocation)
 :cat.newLink

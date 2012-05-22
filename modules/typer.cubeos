@@ -2,7 +2,7 @@
 ; TYPER ; Data and String Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;:## typ.cCopy (inputPointer, outputPointer)
+;:### typ.cCopy (inputPointer, outputPointer)
 ;:Copies the null-terminated string at *inputPointer* to *outputPointer*.
 ;:
 
@@ -24,7 +24,7 @@ SET J, POP
 SET I, POP
 SET PC, POP
 
-;:## typ.cUnpack (inputPointer, outputPointer)
+;:### typ.cUnpack (inputPointer, outputPointer)
 ;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) null-terminated at *inputPointer* and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*.
 ;:
 
@@ -48,7 +48,7 @@ SET I, POP
 SET PC, typ.pUnpack
  ;
 
-;:## typ.pPack (inputLocation, inputLength, outputLocation)
+;:### typ.pPack (inputLocation, inputLength, outputLocation)
 ;:Reads an unpacked (`0b0000 0000 0XXX XXXX`) string from *inputLocation* of *inputLength* and outputs a packed (`0b0YYY YYYY 0XXX XXXX`) little-endian style string at *outputLocation*.
 ;:
 
@@ -83,7 +83,7 @@ SET I, POP
 SET PC, POP
  ;
 
-;:## typ.pUnpack (inputPointer, inputLength, outputPoiner)
+;:### typ.pUnpack (inputPointer, inputLength, outputPoiner)
 ;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) in little-endian at *inputPointer* of *inputLength* and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*.
 ;:
 
