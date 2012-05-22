@@ -6,13 +6,19 @@
 ;:Cryptography Library
 ;:
 
-;:##c.dshash (startLocation, length)
-;:Dead Simple Hash
+;:##crp.dsHash (inputPointer, inputLength)
+;:Reads data of *inputLength* from *inputPointer* and performs a hash function on it.
+;:
+;:**returns** the 16-bit hash
 ;:
 ;:For every value, shift the word *i* left and BOR with EX. XOR all of the resulting values together to produce the hash.
+;:```python
+;:for i in inputLength:
+;:	output ^ (inputPointer[i] << i)
+;:```
 ;:
 
-:c.dshash
+:crp.dsHash
 SET PUSH, I
 SET PUSH, J
 SET I, A
@@ -21,7 +27,7 @@ SET J, 0
 SET A, 0
 ADD B, I ;B becomes the exit location
 
-:c.dshash.loop
+:crp.dsHash.loop
 SET C, [I]
 SHL C, J
 BOR C, EX
@@ -29,7 +35,7 @@ XOR A, C
 
 STI C, 0 ;efficient I and J increment
 IFN I, B
-  SET PC, c.dshash.loop
+  SET PC, crp.dsHash.loop
 
 SET J, POP
 SET I, POP

@@ -4,6 +4,7 @@
 
 ;:## typ.cCopy (inputPointer, outputPointer)
 ;:Copies the null-terminated string at *inputPointer* to *outputPointer*.
+;:
 
 :typ.cCopy
 SET PUSH, I
@@ -25,6 +26,7 @@ SET PC, POP
 
 ;:## typ.cUnpack (inputPointer, outputPointer)
 ;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) null-terminated at *inputPointer* and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*.
+;:
 
 :typ.cUnpack
 SET PUSH, I
@@ -48,6 +50,7 @@ SET PC, typ.pUnpack
 
 ;:## typ.pPack (inputLocation, inputLength, outputLocation)
 ;:Reads an unpacked (`0b0000 0000 0XXX XXXX`) string from *inputLocation* of *inputLength* and outputs a packed (`0b0YYY YYYY 0XXX XXXX`) little-endian style string at *outputLocation*.
+;:
 
 :typ.pPack
 SET PUSH, I
@@ -82,6 +85,7 @@ SET PC, POP
 
 ;:## typ.pUnpack (inputPointer, inputLength, outputPoiner)
 ;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) in little-endian at *inputPointer* of *inputLength* and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*.
+;:
 
 :typ.pUnpack
 SET PUSH, I
