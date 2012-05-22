@@ -7,9 +7,11 @@
 ;:
 ;:**requires**
 ;:- crypt
+;:
 
 ;:## dl.searchValTable (searchTerm, location, length)
 ;:Performs a binary search on the table at *location* (with length *length*) for *searchTerm* and returns the location
+;:
 :dl.searchValTable
 SET PUSH, I
 
@@ -22,7 +24,7 @@ IFE [I], A
 SET PC, dl.searchValTable.found
 
 IFE C, 1
-SET PC, EXF
+SET PC, exf
 
 IFG A, [I]
 SET PC, dl.searchValTable.toolow
@@ -50,6 +52,7 @@ SET PC, POP
 
 ;:## dl.findInsertIndex (searchTerm, location, length)
 ;:Returns the index at which *searchTerm* should be inserted to keep the table at *location* with length *length* sorted
+;:
 :dl.findInsertIndex
 SET PUSH, PC
 SET PC, dl.searchValTable

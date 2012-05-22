@@ -23,10 +23,20 @@ SET PC, __BOOT
 ;:Initializes the kernel on startup
 ;:
 
+;:## __BOOT
+;:Invokes the boot loader
+;:
+;:1. Invoke *sv.init* to mount the screen at *videoRAM*.
+;:2. Invoke *cat.mountSystem* to initialize the file system with arguments `0x8000, 0x810, 128`.
+;:3. Invoke *p.init* to initialize the Dash Package Handler
+;:4. Invoke *s.instance* to intialize the DASH Shell
+;:
 :__BOOT
 
-SET A, videoram
-JSR sv.init
+;SHOULD MAP FONT
+
+SET A, videoRAM
+JSR sv.init ;set up boot screen and screen
 
 SET A, 0x8000
 SET B, 0x810
@@ -34,18 +44,22 @@ SET C, 128
 
 JSR cat.mountSystem ;initialize FS
 
-SET [0xB00], 0x293A
-JSR p.init
-JSR s.instance
+SET [0xB00], 0xF03A
+SET [0xB01], 0xF029 ;":)" in stdout
+
+JSR p.init ;initialize DPH
+
+JSR s.instance ;initialize DASH Shell
 
 SET PC, halt
 
 :pTitle DAT 0x7563, 0x6562, 0x534f
 
-:halt SET PC, halt
- ;;
+:halt SUB PC, 1
+ ;
+
 ;:## ext
-;:Exits a subroutine with A set to 0
+;:Exits a subroutine with A set to 0 (`TRUE`)
 ;:To use, do `SET PC, ext` instead of `SET PC, POP` at the end of a subroutine
 ;:
 :ext ; exit true
@@ -54,14 +68,15 @@ SET PC, POP
  ;
 
 ;:## exf
-;:Exits a subroutine with A set to 1
+;:Exits a subroutine with A set to 1 (`FALSE`)
 ;:To use, do `SET PC, exf` instead of `SET PC, POP` at the end of a subroutine
 ;:
 :exf ; exit false
 SET A, 1
 SET PC, POP
  ;
-;:
+ ;;
+ 
 ;;;;;;;;;;;;;;;;
 ; DASH ; Shell ;
 ;;;;;;;;;;;;;;;;
@@ -72,8 +87,19 @@ SET PC, POP
 :v.stdin DAT 0xA00 ;SHOULD NOT HARDCODE
 :v.stdout DAT 0xB00 ;SHOULD NOT HARDCODE
 
-:v.cmdmem DAT 1 ;reserve 8 words
+:v.cmdmem DAT 1 ;used in stupid way of "hashing" input
+;SHOULD USE FOR HASH INSTEAD, BUT ONLY IF NECESSARY
 
+;:## s.instance
+;:Prepares a new terminal session at the root directory.
+;:
+;:1. Set *env.cwds* to "/ " in packed form (`0x202F`)
+;:2. Clears the screen
+;:3. Calls *s.takeIn*
+;:4. Calls *s.parse*
+;:5. Calls *s.stdout* with the argument being the cursor location when the user pressed enter
+;:6. Loops nonendingly to 3
+;:
 :s.instance ;SHOULD PREPARE SDIN and SDOUT
 SET [env.cwds], 0x202F
 JSR sv.clear ;clear the screen
@@ -86,12 +112,15 @@ SET PUSH, A ;keep track of cursor location
 JSR s.parse
 
 SET A, POP ;restore cursor location for passing to s.stdout
-JSR s.stdout ;WRITES WITH STRANGE "p" CHARACTER AFTER EVERY PROPER ONE
+JSR s.stdout
 SET PC, s.instance.promptLoop
 
 SET PC, POP
  ;
 
+;:## s.parse
+;:It's not worth documenting this spaghetti code. It will be completely rewritten when *package* works.
+;:
 :s.parse
 SET PUSH, I
 SET I, [v.stdin]
@@ -121,7 +150,12 @@ IFE [A], 0 ;SHOULD EXIT WITH ERROR MESSAGE
 SET PC, [A] ;look up in table
  ;
 
-:s.takeIn ; (cursorLoc)
+;:## s.takeIn (cursorPointer)
+;:Writes a prompt to the screen using *v.sPrompt* and enters a loop to take ASCII input from the keyboard and write it to the screen at *cursorPointer*. It exits when the user presses `enter`.
+;:
+;:**returns** the cursor location on exit
+;:
+:s.takeIn
 SET PUSH, I
 SET I, 0
 
@@ -179,6 +213,11 @@ SET I, POP
 SET PC, POP
  ;
 
+;:## s.drawPrompt (pointer)
+;:Draws a prompt using *env.cwds* and *v.sPrompt* at *pointer* and sets *v.promptLoc* to the location following the prompt.
+;:
+;:**returns** the location following the prompt
+;:
 :s.drawPrompt ; (loc)
 
 JSR sv.getNewLine
@@ -186,19 +225,22 @@ JSR sv.getNewLine
 SET C, A
 SET A, env.cwds
 SET B, 1
-JSR p.uStr
+JSR typ.pUnpack
 
 SET C, A
 SET A, v.sPrompt
 SET B, 1
-JSR p.uStr
+JSR typ.pUnpack
 
 SET [v.promptLoc], A
 
 SET PC, POP
  ;
 
-:s.stdin ; (startLoc, stopLoc) ;NEED TO CALL THIS SUBROUTINE
+;:## s.stdin (startPointer, stopPointer)
+;:Copies the values between *startPointer* and *stopPointer* to *v.stdin*.
+;:
+:s.stdin
 SET PUSH, I
 SET I, A
 SET C, [v.stdin]
@@ -216,12 +258,14 @@ SET I, POP
 SET PC, POP
  ;
 
-:s.stdout ; (scrnLoc)
+;:## s.stdout (outputPointer)
+;:Does a C-style copy from *v.stdout* to *outputPointer*.
+:s.stdout
 JSR sv.getNewLine
 
 SET B, A ;output
 SET A, [v.stdout] ;location
-JSR p.C.copy ;copy literally and null-terminated
+JSR typ.cCopy ;copy literally and null-terminated
 
 SET PC, POP
  ;
@@ -366,13 +410,19 @@ SET PC, POP
 ;:Cryptography Library
 ;:
 
-;:##c.dshash (startLocation, length)
-;:Dead Simple Hash
+;:##crp.dsHash (inputPointer, inputLength)
+;:Reads data of *inputLength* from *inputPointer* and performs a hash function on it.
+;:
+;:**returns** the 16-bit hash
 ;:
 ;:For every value, shift the word *i* left and BOR with EX. XOR all of the resulting values together to produce the hash.
+;:```python
+;:for i in inputLength:
+;:	output ^ (inputPointer[i] << i)
+;:```
 ;:
 
-:c.dshash
+:crp.dsHash
 SET PUSH, I
 SET PUSH, J
 SET I, A
@@ -381,7 +431,7 @@ SET J, 0
 SET A, 0
 ADD B, I ;B becomes the exit location
 
-:c.dshash.loop
+:crp.dsHash.loop
 SET C, [I]
 SHL C, J
 BOR C, EX
@@ -389,7 +439,7 @@ XOR A, C
 
 STI C, 0 ;efficient I and J increment
 IFN I, B
-  SET PC, c.dshash.loop
+  SET PC, crp.dsHash.loop
 
 SET J, POP
 SET I, POP
@@ -430,19 +480,58 @@ SET PC, POP
 ;:
 ;:**requires**
 ;:- crypt
+;:
 
 ;:## dl.searchValTable (searchTerm, location, length)
+;:Performs a binary search on the table at *location* (with length *length*) for *searchTerm* and returns the location
 ;:
 :dl.searchValTable
 SET PUSH, I
 
+:dl.searchValTable.recheck
 SET I, C
 SHR I, 1 ;divide by 2
 ADD I, B
 
-IFG [I], A
+IFE [I], A
+SET PC, dl.searchValTable.found
 
-:dl.searchValTable.
+IFE C, 1
+SET PC, exf
+
+IFG A, [I]
+SET PC, dl.searchValTable.toolow
+
+IFG [I], A
+SET PC, dl.searchValTable.toohigh
+
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.toohigh
+SET C, I
+SUB C, B
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.toolow
+ADD C, B
+SUB C, I
+SET B, I
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.found
+SET A, I
+SET I, POP
+SET PC, POP
+
+;:## dl.findInsertIndex (searchTerm, location, length)
+;:Returns the index at which *searchTerm* should be inserted to keep the table at *location* with length *length* sorted
+;:
+:dl.findInsertIndex
+SET PUSH, PC
+SET PC, dl.searchValTable
+SET A, B
+ADD A, 1
+SET PC, POP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; HEAPMAN ; Heap Manager   ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -513,9 +602,19 @@ IFL I, C
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Monitor Preallocation ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;
+;:# Monitor Preallocation
+;:Functions as a reserved spot for the font and video RAM of the LEM1802.
+;:
+
+;:## fontRAM
+;:Currently empty (spilling over into videoRAM) <strike>Contains the default font shown [here](http://github.com/cubeOS/cubeOS-alpha/raw/master/font/defaultFont.png).</strike>
+;:
 
 :fontRAM
 
+;:## videoRAM
+;:Contains the cubeOS logo/splash screen, shown [here](https://github.com/cubeOS/cubeOS-alpha/raw/master/logo/cubeOSLogo.png).
+;:
 :videoRAM
 DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
 DAT 0,0,0xF01B,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F,  0xF01F,0xF01F,0xF01F,0xF01F, 0xF01F, 0xF01B,0,0
@@ -533,10 +632,26 @@ DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,
 ; PACKAGE ; Dash Package Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+:v.tableLen DAT 0 ;number of commands in the tables
+
+;:## p.init
+;:Places *pack.ls* at a specific place so that it can be accessed by the DASH Shell. <strike>Initializes all of the pre-defined packages and their respective commands so that they can be accessed in a table.</strike>
 :p.init
 SET [0x09E4], pack.ls
 SET PC, POP
+;HASH "ls" AND DO A SORTED ADD TO p.hashTable, ALONG WITH AN UNSORTED ADD OF "ls" TO p.cmdTable
  ;
+
+:p.hashTable ;(128)
+DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+:p.cmdTable ;(128)
+DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+;:## Commands
+
+;:### pack.ls
+;:Writes the name first link in the root directory to stdout. <strike>Writes the names all of the links (files and directories) in the current working directory to stdout.</strike>
 
 :pack.ls
 
@@ -556,14 +671,21 @@ ADD J, 4
 ;??? ADD I, 5 ;first letter of first link
 
 SET A, J
-SET B, 0xB00
+SET B, [v.stdout]
 
-JSR p.C.uStr
+JSR typ.cUnpack
 
 SET J, POP
 SET I, POP
 SET PC, POP
  ;
+ 
+:pack.inferno
+
+SET A, pack.inferno.text
+SET B, [v.stdout]
+
+:pack.inferno.text DAT 0xf04c, 0xf061, 0xf073, 0xf063, 0xf069, 0xf061, 0xf074, 0xf065, 0xf020, 0xf06f, 0xf067, 0xf06e, 0xf065, 0xf020, 0xf073, 0xf070, 0xf065, 0xf072, 0xf061, 0xf06e, 0xf07a, 0xf061, 0xf02c, 0xf020, 0xf076, 0xf06f, 0xf069, 0xf020, 0xf063, 0xf068, 0xf027, 0xf069, 0xf06e, 0xf074, 0xf072, 0xf061, 0xf074, 0xf065, 0
  ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; SIMVID ; Video Manager ;
@@ -741,73 +863,61 @@ IFN I, C ;add null termination if reached length end
 SET [I], 0
 
 :cstring.make.exit
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; PACKER ; Data Compressor ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; TYPER ; Data and String Handler ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;:## p.C.copy (inputPointer, outputPointer)
+;:## typ.cCopy (inputPointer, outputPointer)
 ;:Copies the null-terminated string at *inputPointer* to *outputPointer*.
+;:
 
-:p.C.copy
+:typ.cCopy
 SET PUSH, I
 SET PUSH, J
 SET I, A
 SET J, B
 
-:p.C.copy.loop
+:typ.cCopy.loop
 IFE [I], 0
-  SET PC, p.C.copy.exit
+  SET PC, typ.cCopy.exit
 
 STI [J], [I]
-SET PC, p.C.copy.loop
+SET PC, typ.cCopy.loop
 
-:p.C.copy.exit
+:typ.cCopy.exit
 SET J, POP
 SET I, POP
 SET PC, POP
 
-:p.uCol ; (packedCol, packedLen, outputChar)
+;:## typ.cUnpack (inputPointer, outputPointer)
+;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) null-terminated at *inputPointer* and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*.
+;:
+
+:typ.cUnpack
 SET PUSH, I
-SET PUSH, X
-SET PUSH, Y
-SET I, C
-ADD B, A
-SET Y, 0
+SET I, A
+SET C, B
 
-:p.uCol.selNibble
+:typ.cUnpack.loop
+IFE [I], 0
+  SET PC, typ.cUnpack.exit
+  
+ADD I, 1
+SET PC, typ.cUnpack.loop
 
-SET X, 0xF000
-SHR X, Y
-ADD Y, 4
-AND X, [A]
+:typ.cUnpack.exit
+SUB I, A
+SET B, I
 
-:p.uCol.shift
-IFB X, 0x0F00
-  SET PC, p.uCol.makeWord
-SHL X, 4
-XOR X, EX
-SET PC, p.uCol.shift
-
-:p.uCol.makeWord
-XOR X, 0x20
-STI [I], X
-
-IFL Y, 16 ;if should continue with this word
-  SET PC, p.uCol.selNibble
-;else, go to next word or exit
-SET Y, 0
-ADD A, 1
-
-IFN A, B ;
-  SET PC, p.uCol.selNibble
-
-SET Y, POP
-SET X, POP
 SET I, POP
-SET PC, POP
+SET PC, typ.pUnpack
  ;
 
-:p.pStr ; (fullStringLoc, fullStringLen, packedOut)
+;:## typ.pPack (inputLocation, inputLength, outputLocation)
+;:Reads an unpacked (`0b0000 0000 0XXX XXXX`) string from *inputLocation* of *inputLength* and outputs a packed (`0b0YYY YYYY 0XXX XXXX`) little-endian style string at *outputLocation*.
+;:
+
+:typ.pPack
 SET PUSH, I
 SET PUSH, X
 SET PUSH, Y
@@ -818,7 +928,7 @@ SET I, A
 ADD B, A
 
 
-:p.pStr.loop
+:typ.pPack.loop
 STI X, [I]
 AND X, Z
 SET [C], X
@@ -829,7 +939,7 @@ XOR [C], x
 
 ADD C, 1
 IFL I, B
-  SET PC, p.pStr.loop
+  SET PC, typ.pPack.loop
 
 SET Z, POP
 SET Y, POP
@@ -838,7 +948,11 @@ SET I, POP
 SET PC, POP
  ;
 
-:p.uStr ; (packedStringLoc, packedStringLen, output)
+;:## typ.pUnpack (inputPointer, inputLength, outputPoiner)
+;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) in little-endian at *inputPointer* of *inputLength* and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*.
+;:
+
+:typ.pUnpack
 SET PUSH, I
 SET PUSH, X
 SET PUSH, Y
@@ -849,7 +963,7 @@ ADD B, A
 SET Z, 0x007F
 SET Y, 0x7F00
 
-:p.uStr.loop
+:typ.pUnpack.loop
 SET X, [A]
 AND X, Z
 XOR X, 0xF000
@@ -863,7 +977,7 @@ STI [I], X
 
 ADD A, 1
 IFL A, B
-  SET PC, p.uStr.loop
+  SET PC, typ.pUnpack.loop
 
 SET A, I ;return in A
 
@@ -872,28 +986,5 @@ SET Y, POP
 SET X, POP
 SET I, POP
 SET PC, POP
- ;
-
-;:## p.C.uStr (packedStringPointer, outputPointer)
-;:Unpacks a *C-style* (null-terminated) string to the *outputPointer*.
-
-:p.C.uStr
-SET PUSH, I
-SET I, A
-SET C, B
-
-:p.C.uStr.loop
-IFE [I], 0
-  SET PC, p.C.uStr.exit
-  
-ADD I, 1
-SET PC, p.C.uSTR.loop
-
-:p.C.uStr.exit
-SUB I, A
-SET B, I
-
-SET I, POP
-SET PC, p.uStr
  ;
  ;;

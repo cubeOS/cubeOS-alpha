@@ -17,7 +17,7 @@
 
 ;SHOULD MAP FONT
 
-SET A, videoram
+SET A, videoRAM
 JSR sv.init ;set up boot screen and screen
 
 SET A, 0x8000

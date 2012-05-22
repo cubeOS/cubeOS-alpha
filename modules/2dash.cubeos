@@ -8,7 +8,8 @@
 :v.stdin DAT 0xA00 ;SHOULD NOT HARDCODE
 :v.stdout DAT 0xB00 ;SHOULD NOT HARDCODE
 
-;???:v.cmdmem DAT 1 ;reserve 8 words
+:v.cmdmem DAT 1 ;used in stupid way of "hashing" input
+;SHOULD USE FOR HASH INSTEAD, BUT ONLY IF NECESSARY
 
 ;:## s.instance
 ;:Prepares a new terminal session at the root directory.
@@ -185,7 +186,7 @@ JSR sv.getNewLine
 
 SET B, A ;output
 SET A, [v.stdout] ;location
-JSR p.C.copy ;copy literally and null-terminated
+JSR typ.cCopy ;copy literally and null-terminated
 
 SET PC, POP
  ;

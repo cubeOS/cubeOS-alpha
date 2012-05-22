@@ -14,10 +14,10 @@ SET J, B
 
 :typ.cCopy.loop
 IFE [I], 0
-  SET PC, typ.Ccopy.exit
+  SET PC, typ.cCopy.exit
 
 STI [J], [I]
-SET PC, typ.Ccopy.loop
+SET PC, typ.cCopy.loop
 
 :typ.cCopy.exit
 SET J, POP
