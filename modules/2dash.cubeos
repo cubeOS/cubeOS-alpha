@@ -8,8 +8,18 @@
 :v.stdin DAT 0xA00 ;SHOULD NOT HARDCODE
 :v.stdout DAT 0xB00 ;SHOULD NOT HARDCODE
 
-:v.cmdmem DAT 1 ;reserve 8 words
+;???:v.cmdmem DAT 1 ;reserve 8 words
 
+;:## s.instance
+;:Prepares a new terminal session at the root directory.
+;:
+;:1. Set *env.cwds* to "/ " in packed form (`0x202F`)
+;:2. Clears the screen
+;:3. Calls *s.takeIn*
+;:4. Calls *s.parse*
+;:5. Calls *s.stdout* with the argument being the cursor location when the user pressed enter
+;:6. Loops nonendingly to 3
+;:
 :s.instance ;SHOULD PREPARE SDIN and SDOUT
 SET [env.cwds], 0x202F
 JSR sv.clear ;clear the screen
@@ -22,12 +32,15 @@ SET PUSH, A ;keep track of cursor location
 JSR s.parse
 
 SET A, POP ;restore cursor location for passing to s.stdout
-JSR s.stdout ;WRITES WITH STRANGE "p" CHARACTER AFTER EVERY PROPER ONE
+JSR s.stdout
 SET PC, s.instance.promptLoop
 
 SET PC, POP
  ;
 
+;:## s.parse
+;:It's not worth documenting this spaghetti code. It will be completely rewritten when *package* works.
+;:
 :s.parse
 SET PUSH, I
 SET I, [v.stdin]
@@ -57,7 +70,12 @@ IFE [A], 0 ;SHOULD EXIT WITH ERROR MESSAGE
 SET PC, [A] ;look up in table
  ;
 
-:s.takeIn ; (cursorLoc)
+;:## s.takeIn (cursorPointer)
+;:Writes a prompt to the screen using *v.sPrompt* and enters a loop to take ASCII input from the keyboard and write it to the screen at *cursorPointer*. It exits when the user presses `enter`.
+;:
+;:**returns** the cursor location on exit
+;:
+:s.takeIn
 SET PUSH, I
 SET I, 0
 
@@ -115,6 +133,11 @@ SET I, POP
 SET PC, POP
  ;
 
+;:## s.drawPrompt (pointer)
+;:Draws a prompt using *env.cwds* and *v.sPrompt* at *pointer* and sets *v.promptLoc* to the location following the prompt.
+;:
+;:**returns** the location following the prompt
+;:
 :s.drawPrompt ; (loc)
 
 JSR sv.getNewLine
@@ -122,19 +145,22 @@ JSR sv.getNewLine
 SET C, A
 SET A, env.cwds
 SET B, 1
-JSR p.uStr
+JSR typ.pUnpack
 
 SET C, A
 SET A, v.sPrompt
 SET B, 1
-JSR p.uStr
+JSR typ.pUnpack
 
 SET [v.promptLoc], A
 
 SET PC, POP
  ;
 
-:s.stdin ; (startLoc, stopLoc) ;NEED TO CALL THIS SUBROUTINE
+;:## s.stdin (startPointer, stopPointer)
+;:Copies the values between *startPointer* and *stopPointer* to *v.stdin*.
+;:
+:s.stdin
 SET PUSH, I
 SET I, A
 SET C, [v.stdin]
@@ -152,7 +178,9 @@ SET I, POP
 SET PC, POP
  ;
 
-:s.stdout ; (scrnLoc)
+;:## s.stdout (outputPointer)
+;:Does a C-style copy from *v.stdout* to *outputPointer*.
+:s.stdout
 JSR sv.getNewLine
 
 SET B, A ;output
