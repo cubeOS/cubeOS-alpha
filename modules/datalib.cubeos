@@ -19,22 +19,31 @@ SHR I, 1 ;divide by 2
 ADD I, B
 
 IFE [I], A
-SET PC, dl.searchValTable.exit
+SET PC, dl.searchValTable.found
 
-IFG [I], A
-SET C, I
-IFG [I], A
-SUB C, B
+IFE C, 1
+SET PC, EXF
 
 IFG A, [I]
-SET B, I
+SET PC, dl.searchValTable.toolow
 
-IFE C, 0
-SET PC, EXF
+IFG [I], A
+SET PC, dl.searchValTable.toohigh
 
 SET PC, dl.searchValTable.recheck
 
-:dl.searchValTable.exit
+:dl.searchValTable.toohigh
+SET C, I
+SUB C, B
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.toolow
+ADD C, B
+SUB C, I
+SET B, I
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.found
 SET A, I
 SET I, POP
 SET PC, POP
