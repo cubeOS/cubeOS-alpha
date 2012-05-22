@@ -1,11 +1,17 @@
-SET A, 4
-SET B, table
-SET C, 13
-JSR dl.searchValTable
+;HAS A GREAT DEAL OF TROUBLE INITIALIZING TABLES. LENGTHS 0 AND 1 ARE VERY PROBLEMATIC, ENDING IN LOOPS OR IMPROPER JUMPS
+;REQUIRES IMMEDIATE ATTENTION
+
+SET A, hashTable
+SET B, 8
+SET C, 1
+JSR dl.makeHashTable
+
+SET A, 2
+SET B, 10
+SET C, hashTable
+JSR dl.hashInsert
 
 SUB PC, 1
-
-:table DAT 0, 1, 2, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0
 
 :exf
 SET A, 1
@@ -23,13 +29,38 @@ SET PC, POP
 ;:Subroutines for creating and searching hash tables, which are sorted tables that store values under names
 ;:
 
-;:### dl.makeHashTable (headerPointer, indicies)
-;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 2`, which includes the header, the lookup portion of the table, and the value portion of the table. 
+;:### dl.makeHashTable (headerPointer, indicies, startingLength)
+;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. 
 ;:
+:dl.makeHashTable
+SET [A], 0x5468 ;"hT" magic number
+SET [A+1], B ;indicies
+SET [A+2], C ;length
+SET [A+3], 0 ;reserved
+SET PC, POP
+ ;
 
 ;:### dl.hashInsert (lookupValue, insertValue, hashTablePointer)
-;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table.
+;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table. This is designed to work very well with the 16-bit hashing algorithm crp.dsHash.
 ;:
+:dl.hashInsert
+SET PUSH, [C+2] ;store *length* from header
+SET PUSH, B ;store *insertValue*
+SET PUSH, [C+1] ;store *indicies* from header
+
+SET B, C
+ADD B, 4 ;start of sortedTable (for lookups)
+SET C, [C+2] ;length of sortedTable
+
+JSR dl.sortedInsert
+
+ADD A, POP ;retrieve *indicies* from stack
+
+SET B, A
+SET A, POP ;retrieve *insertValue* from stack
+SET C, POP ;retrieve *length* from stack
+
+JSR dl.unsortedInsert
 
 ;:## Sorted Table
 ;:Subroutines for creating and searching sorted tables
@@ -55,6 +86,9 @@ SET PC, dl.unsortedInsert ;exit when this subroutine exits
 ;:Performs a binary search on the table at *tableLocation* (with length *tableLength*) for *searchTerm* and returns the memory location
 ;:
 :dl.searchValTable
+IFE C, 0 ;if *tableLength* is zero, return the tableLocation
+  SET PC, dl.searchValTable.noLength
+
 SET PUSH, I
 
 :dl.searchValTable.recheck
@@ -90,6 +124,10 @@ SET PC, dl.searchValTable.recheck
 :dl.searchValTable.found
 SET A, I
 SET I, POP
+SET PC, POP
+
+:dl.searchValTable.noLength
+SET A, B
 SET PC, POP
  ;
 
@@ -133,3 +171,6 @@ SET X, POP
 SET I, POP
 SET PC, POP
  ;
+ ;;
+
+:hashTable DAT 0, 0, 0, 0, 1
