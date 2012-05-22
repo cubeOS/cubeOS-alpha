@@ -2,31 +2,57 @@
 ; TYPER ; Data and String Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;:## p.C.copy (inputPointer, outputPointer)
+;:## typ.cCopy (inputPointer, outputPointer)
 ;:Copies the null-terminated string at *inputPointer* to *outputPointer*.
+;:
 
-:p.C.copy
+:typ.cCopy
 SET PUSH, I
 SET PUSH, J
 SET I, A
 SET J, B
 
-:p.C.copy.loop
+:typ.cCopy.loop
 IFE [I], 0
-  SET PC, p.C.copy.exit
+  SET PC, typ.Ccopy.exit
 
 STI [J], [I]
-SET PC, p.C.copy.loop
+SET PC, typ.Ccopy.loop
 
-:p.C.copy.exit
+:typ.cCopy.exit
 SET J, POP
 SET I, POP
 SET PC, POP
 
-;:## p.pStr (inputLocation, inputLength, outputLocation)
-;:Reads an unpacked (`0b0000 0000 0XXX XXXX`) string from *inputLocation* of *inputLength* and outputs a packed (`0b0YYY YYYY 0XXX XXXX`) little-endian style string at *outputLocation*.
+;:## typ.cUnpack (inputPointer, outputPointer)
+;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) null-terminated at *inputPointer* and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*.
+;:
 
-:p.pStr
+:typ.cUnpack
+SET PUSH, I
+SET I, A
+SET C, B
+
+:typ.cUnpack.loop
+IFE [I], 0
+  SET PC, typ.cUnpack.exit
+  
+ADD I, 1
+SET PC, typ.cUnpack.loop
+
+:typ.cUnpack.exit
+SUB I, A
+SET B, I
+
+SET I, POP
+SET PC, typ.pUnpack
+ ;
+
+;:## typ.pPack (inputLocation, inputLength, outputLocation)
+;:Reads an unpacked (`0b0000 0000 0XXX XXXX`) string from *inputLocation* of *inputLength* and outputs a packed (`0b0YYY YYYY 0XXX XXXX`) little-endian style string at *outputLocation*.
+;:
+
+:typ.pPack
 SET PUSH, I
 SET PUSH, X
 SET PUSH, Y
@@ -37,7 +63,7 @@ SET I, A
 ADD B, A
 
 
-:p.pStr.loop
+:typ.pPack.loop
 STI X, [I]
 AND X, Z
 SET [C], X
@@ -48,7 +74,7 @@ XOR [C], x
 
 ADD C, 1
 IFL I, B
-  SET PC, p.pStr.loop
+  SET PC, typ.pPack.loop
 
 SET Z, POP
 SET Y, POP
@@ -57,10 +83,11 @@ SET I, POP
 SET PC, POP
  ;
 
-;:## p.uStr (inputPointer, inputLength, outputPoiner)
+;:## typ.pUnpack (inputPointer, inputLength, outputPoiner)
 ;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) in little-endian at *inputPointer* of *inputLength* and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*.
+;:
 
-:p.uStr
+:typ.pUnpack
 SET PUSH, I
 SET PUSH, X
 SET PUSH, Y
@@ -71,7 +98,7 @@ ADD B, A
 SET Z, 0x007F
 SET Y, 0x7F00
 
-:p.uStr.loop
+:typ.pUnpack.loop
 SET X, [A]
 AND X, Z
 XOR X, 0xF000
@@ -85,7 +112,7 @@ STI [I], X
 
 ADD A, 1
 IFL A, B
-  SET PC, p.uStr.loop
+  SET PC, typ.pUnpack.loop
 
 SET A, I ;return in A
 
@@ -94,28 +121,5 @@ SET Y, POP
 SET X, POP
 SET I, POP
 SET PC, POP
- ;
-
-;:## p.C.uStr (inputPointer, outputPointer)
-;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) null-terminated at *inputPointer* and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*.
-
-:p.C.uStr
-SET PUSH, I
-SET I, A
-SET C, B
-
-:p.C.uStr.loop
-IFE [I], 0
-  SET PC, p.C.uStr.exit
-  
-ADD I, 1
-SET PC, p.C.uSTR.loop
-
-:p.C.uStr.exit
-SUB I, A
-SET B, I
-
-SET I, POP
-SET PC, p.uStr
  ;
  ;;
