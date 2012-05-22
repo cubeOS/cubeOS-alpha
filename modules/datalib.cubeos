@@ -1,3 +1,10 @@
+SET A, 0
+SET B, 0x0005
+SET C, 0x000A
+SET PC, dl.searchValTable
+
+DAT 0, 2, 16, 20, 25, 32, 64
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; DATALIB ; Data Managing Library ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -9,14 +16,34 @@
 ;:- crypt
 
 ;:## dl.searchValTable (searchTerm, location, length)
-;:
+;:Performs a binary search on the table at *location* (with length *length*) for *searchTerm* and returns the location
 :dl.searchValTable
 SET PUSH, I
 
+:dl.searchValTable.recheck
 SET I, C
 SHR I, 1 ;divide by 2
 ADD I, B
 
-IFG [I], A
+IFE [I], A
+SET PC, dl.searchValTable.exit
 
-:dl.searchValTable.
+IFG [I], A
+SET C, I
+IFG [I], A
+SUB C, B
+
+IFG A, [I]
+SET B, I
+
+IFE C, 0
+SET A, 1
+IFE C, 0
+SET PC, POP
+
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.exit
+SET A, I
+SET I, POP
+SET PC, POP
