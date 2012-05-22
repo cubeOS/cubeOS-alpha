@@ -41,12 +41,19 @@ ADD J, 4
 ;??? ADD I, 5 ;first letter of first link
 
 SET A, J
-SET B, 0xB00
+SET B, [v.stdout]
 
-JSR p.C.uStr
+JSR p.cUnpack
 
 SET J, POP
 SET I, POP
 SET PC, POP
  ;
+ 
+:pack.inferno
+
+SET A, pack.inferno.text
+SET B, [v.stdout]
+
+:pack.inferno.text DAT "Lasciate ogne speranza, voi ch'intrate", 0
  ;;
