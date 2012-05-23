@@ -14,10 +14,12 @@
 ;:4. Invoke *s.instance* to intialize the DASH Shell
 ;:
 :__BOOT
-
-;SHOULD MAP FONT
+SET A, 0
+SET B, 1
+HWI 0
 
 SET A, videoRAM
+SET B, fontRAM
 JSR sv.init ;set up boot screen and screen
 
 SET A, 0x8000

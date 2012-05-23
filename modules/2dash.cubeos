@@ -27,13 +27,13 @@ JSR sv.clear ;clear the screen
 SET A, [v.scrnLoc]
 
 :s.instance.promptLoop
-JSR s.takeIn
+JSR s.takeIn ;s.takeIn TAKES CURSOR ARGUMENT
 SET PUSH, A ;keep track of cursor location
 
 JSR s.parse
 
 SET A, POP ;restore cursor location for passing to s.stdout
-JSR s.stdout
+JSR s.stdout ;s.stdout MAY BE BREAKING THE CURSOR ARGUMENT FOR PASSING INTO s.takeIn THEREBY CAUSING THE STRANGE ONE-COMMAND-THEN-BREAK BUG
 SET PC, s.instance.promptLoop
 
 SET PC, POP
@@ -80,6 +80,7 @@ SET PC, [A] ;look up in table
 SET PUSH, I
 SET I, 0
 
+JSR sv.getNewLine
 JSR s.drawPrompt
 
 SET A, 1 ;HWI parameter
@@ -139,9 +140,7 @@ SET PC, POP
 ;:
 ;:**returns** the location following the prompt
 ;:
-:s.drawPrompt ; (loc)
-
-JSR sv.getNewLine
+:s.drawPrompt
 
 SET C, A
 SET A, env.cwds

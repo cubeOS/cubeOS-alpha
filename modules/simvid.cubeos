@@ -7,10 +7,21 @@
 :v.scrnHeight DAT 12
 :v.scrnWidth DAT 32
 
-:sv.init ; (location)
-SET B, A
+;:### sv.init (videoRAMPointer, fontRAMPointer)
+;:Maps the screen's font to *fontRAMPointer* and the screen's video ram to *videoRAMPointer* in that order.
+;:
+:sv.init
+
+;SHOULD DETECT SCREEN DEVICE
+
+SET PUSH, A
+SET A, 1
+HWI 1 ;MEM_MAP_FONT
+
+SET B, POP
 SET A, 0
-HWI 0
+HWI 1 ;MEM_MAP_SCREEN
+
 SET [v.scrnLoc], B
 ADD B, 0x180
 SET [v.scrnEnd], B
