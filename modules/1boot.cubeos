@@ -31,7 +31,8 @@ JSR cat.mountSystem ;initialize FS
 SET [0xB00], 0xF03A
 SET [0xB01], 0xF029 ;":)" in stdout
 
-JSR p.init ;initialize DPH
+;THE PACKAGE HANDLER IS CURRENTLY UNSTABLE
+;JSR p.init ;initialize DPH
 
 JSR s.instance ;initialize DASH Shell
 

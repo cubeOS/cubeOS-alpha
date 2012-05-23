@@ -5,7 +5,7 @@
 :v.tableLen DAT 0 ;number of commands in the tables
 
 ;:### p.init
-;:Places *pack.ls* at a specific place so that it can be accessed by the DASH Shell. <strike>Initializes all of the pre-defined packages and their respective commands so that they can be accessed in a table.</strike>
+;:Initializes all of the pre-defined packages and their respective commands so that they can be accessed in a table. **Currently unstable.**
 :p.init
 SET A, p.hashTable
 SET B, 128

@@ -88,10 +88,10 @@ SET A, 1 ;HWI parameter
 :s.takeIn.loop
 IFL I, [v.promptLoc]
   SET I, [v.promptLoc]
-SET [I], 0xF09D
+SET [I], 0xf09e ;cursor character
 
 :s.takeIn.wait
-HWI 1 ;KEYBOARD HARDWARE DEVICE
+HWI 2 ;KEYBOARD HARDWARE DEVICE
 
 IFG C, 0x1f
   IFL C, 0x80
