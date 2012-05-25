@@ -38,39 +38,7 @@ SET PC, s.instance.promptLoop
 
 SET PC, POP
  ;
-
-;:### s.parse
-;:It's not worth documenting this spaghetti code. It will be completely rewritten when *package* works.
-;:
-:s.parse
-SET PUSH, I
-SET I, [v.stdin]
-SET A, v.cmdmem
-SET [A], 1
-SET B, 0x1F ;last five bits
-
-:s.parse.trans
-IFE [I], 0
-  SET PC, s.parse.compare
-
-SET C, B
-AND C, [I]
-MUL [A], C
-ADD I, 1
-SET PC, s.parse.trans
-
-
-:s.parse.compare
-AND [A], 0xFF
-ADD [A], 0x900 ;MEMORY LOCATION
-
-SET A, [A]
-SET I, POP
-IFE [A], 0 ;SHOULD EXIT WITH ERROR MESSAGE
-  SET PC, exf
-SET PC, [A] ;look up in table
- ;
-
+ 
 ;:### s.takeIn (cursorPointer)
 ;:Writes a prompt to the screen using *v.sPrompt* and enters a loop to take ASCII input from the keyboard and write it to the screen at *cursorPointer*. It exits when the user presses `enter`.
 ;:
@@ -80,8 +48,8 @@ SET PC, [A] ;look up in table
 SET PUSH, I
 SET I, 0
 
-JSR sv.getNewLine
-JSR s.drawPrompt
+JSR sv.getNewLine ;get the next blank line after *cursorPointer*
+JSR s.drawPrompt ;draw the prompt using s.drawPrompt
 
 SET A, 1 ;HWI parameter
 
@@ -133,6 +101,41 @@ JSR s.stdin
 SET A, I;return location in A
 SET I, POP
 SET PC, POP
+ ;
+
+;:### s.parse
+;:It's not worth documenting this spaghetti code. It will be completely rewritten when *package* works.
+;:
+:s.parse
+
+
+:s.parse
+SET PUSH, I
+SET I, [v.stdin]
+SET A, v.cmdmem
+SET [A], 1
+SET B, 0x1F ;last five bits
+
+:s.parse.trans
+IFE [I], 0
+  SET PC, s.parse.compare
+
+SET C, B
+AND C, [I]
+MUL [A], C
+ADD I, 1
+SET PC, s.parse.trans
+
+
+:s.parse.compare
+AND [A], 0xFF
+ADD [A], 0x900 ;MEMORY LOCATION
+
+SET A, [A]
+SET I, POP
+IFE [A], 0 ;SHOULD EXIT WITH ERROR MESSAGE
+  SET PC, exf
+SET PC, [A] ;look up in table
  ;
 
 ;:### s.drawPrompt (pointer)

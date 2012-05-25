@@ -1,0 +1,78 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; PINKIEPIE ; Interrupt Handler ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;: **PinkiePie Interrupt Handler** is cubeOS's integrated software interrupt handler.
+;:
+
+
+;:## Software Interrupts
+;:A software interrupt is called in assembly by `INT a`, where `a` is a "message." Upon executing an interrupt, `PC` and `A` are pushed to the stack and replaced by the value in the register `IA` and the message, respectively. This forces the DCPU to begin executing code at whatever address `IA` was set to beforehand. That code can then exit by doing, after restoring other registers, `RFI 0`, which disables interrupt queueing, pops `A` from the stack, then pops `PC` from the stack. That will allow the DCPU to resume the code it was executing before the interrupt was called.
+;:In large operating environments, it makes sense to set `IA` to a constant value at the start of operation, before any interrupts are called. This allows for *interrupt handlers*, which are usually provided by operating systems. The start address of the interrupt handler is placed in `IA`, so it is invoked whenever an interrupt is called. This allows it to handle interrupts consistently, as based on the message.
+;:It also allows software not included in the kernal (and therefore not privvy to labels,) to make function calls defined by the interrupt handler. Furthermore, advanced enough interrupt handlers can allow an operating system to support multitasking.
+;:
+
+;:## Initialization
+;:To initialize PinkiePie, use `pih.init`. Changes to IA can be reset by performing this call again.
+;:
+;:### pih.init
+;:Does `IAS pih` to direct any interrupts to the interrupt handler.
+;:
+:pih.init
+IAS pih
+SET PC, POP
+ ;
+ 
+;:## Interrupt Handler
+;:The interrupt handler is located at the label `pih`. The subroutine `pih.init` makes this the active interrupt handler.
+;:PinkiePie's interrupt handling process is as follows.
+;:
+;:1. Trigger interrupt queueing with `IAQ 1`
+;:2. Push `B` and `C` to the stack, so they won't be lost by any other calls
+;:3. Checks if the message is greater than 127, and jumps to the handler for that if so
+;:4. Checks if the message is greater than 63, and jumps to the handler for that if so
+;:5. Begins checks for low-value messages
+;:
+
+;THIS WHOLE THING COULD USE HASHTABLES
+
+:pih
+IAQ 1 ;trigger interrupt queueing
+SET PUSH, B
+SET PUSH, C
+
+IFG A, 127
+  SET PC, pih128
+  
+IFG A, 63
+  SET PC, pih64
+
+;:### Messages
+;:Messages 0-63 are reserved for low-value calls, which are ones called frequently.
+;:Messages 64-127 are reserved for calls relating to the kernal which are not called frequently.
+;:Messages 128 and upward are reserved for calls that are neither directly related to the kernal, nor need to be called frequently.
+;:
+;:#### 0-63
+;:
+:pih0
+
+;THERE SHOULD BE AN EASTEREGG FOR PLAYING STILL ALIVE
+
+;:#### 64-127
+;:
+:pih64
+
+;:**64. RESTART**
+IFE A, 64
+  SET PC, SYSTEM-RESTART
+  
+;:#### 128+
+;:
+:pih128
+
+
+
+:pihExit
+SET C, POP
+SET B, POP
+RFI 0
+ ;

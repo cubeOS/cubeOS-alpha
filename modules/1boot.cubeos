@@ -42,6 +42,11 @@ SET PC, halt
 
 :halt SUB PC, 1
  ;
+ 
+;:### SYSTEM-RESTART
+;:Clears all registers, drops interrupt queue
+:SYSTEM-RESTART
+SET 
 
 ;:### ext
 ;:Exits a subroutine with A set to 0 (`TRUE`)
