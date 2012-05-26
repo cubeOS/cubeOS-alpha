@@ -61,10 +61,11 @@ SET PC, halt
 :halt SUB PC, 1
  ;
  
-;:### SYSTEM-RESTART
+;:### SYSTEM.RESTART
 ;:Clears all registers, drops interrupt queue
-:SYSTEM-RESTART
-SET 
+;:**under development**
+;:
+:SYSTEM.RESTART
 
 ;:### ext
 ;:Exits a subroutine with A set to 0 (`TRUE`)
@@ -193,8 +194,6 @@ SET PC, POP
 ;:### s.parse
 ;:It's not worth documenting this spaghetti code. It will be completely rewritten when *package* works.
 ;:
-:s.parse
-
 
 :s.parse
 SET PUSH, I
@@ -1001,7 +1000,7 @@ IFG A, 63
 
 ;:**64. RESTART**
 IFE A, 64
-  SET PC, SYSTEM-RESTART
+  SET PC, SYSTEM.RESTART
   
 ;:#### 128+
 ;:

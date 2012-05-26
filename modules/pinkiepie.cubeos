@@ -63,7 +63,7 @@ IFG A, 63
 
 ;:**64. RESTART**
 IFE A, 64
-  SET PC, SYSTEM-RESTART
+  SET PC, SYSTEM.RESTART
   
 ;:#### 128+
 ;:

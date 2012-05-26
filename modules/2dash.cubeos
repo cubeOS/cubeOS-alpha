@@ -106,8 +106,6 @@ SET PC, POP
 ;:### s.parse
 ;:It's not worth documenting this spaghetti code. It will be completely rewritten when *package* works.
 ;:
-:s.parse
-
 
 :s.parse
 SET PUSH, I
