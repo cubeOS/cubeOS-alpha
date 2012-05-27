@@ -35,7 +35,7 @@ SET PC, __BOOT
 JSR HWM
 
 SET A, 0
-SET B, 1
+SET B, 6
 HWI [HW.GenericClock]
 
 SET A, videoRAM
@@ -53,6 +53,12 @@ SET [0xB01], 0xF029 ;":)" in stdout
 
 ;THE PACKAGE HANDLER IS CURRENTLY UNSTABLE
 ;JSR p.init ;initialize DPH
+
+SET A, 1
+:__BOOT.bootscreenDisplayLoop
+HWI [HW.GenericClock]
+IFL C, 15
+  SET PC, __BOOT.bootscreenDisplayLoop
 
 JSR s.instance ;initialize DASH Shell
 
