@@ -1,27 +1,93 @@
+;MIT Open License
+;
+;Copyright (c) 2012 Sasha Crofter
+
+;Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+;The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+;THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+;
+;
+SET PC, __BOOT
+;;;;;;;
+; ENV ;
+;;;;;;;
+:env.cwds DAT 0
+:env.fs DAT 0
+ ;;
 ;;;;;;;;
 ; BOOT ;
 ;;;;;;;;
+;:# BOOT Loader
+;:Initializes the kernel on startup
+;:
 
-SET [0xB00], 0x293A
-JSR m.init
-JSR s.instance
+;:### __BOOT
+;:Invokes the boot loader
+;:
+;:1. Invoke *sv.init* to mount the screen at *videoRAM*.
+;:2. Invoke *cat.mountSystem* to initialize the file system with arguments `0x8000, 0x810, 128`.
+;:3. Invoke *p.init* to initialize the Dash Package Handler
+;:4. Invoke *s.instance* to intialize the DASH Shell
+;:
+:__BOOT
+JSR HWM
+
+SET A, 0
+SET B, 1
+HWI [HW.GenericClock]
+
+SET A, videoRAM
+SET B, fontRAM
+JSR sv.init ;set up boot screen and screen
+
+SET A, 0x8000
+SET B, 0x810
+SET C, 128
+
+JSR cat.mountSystem ;initialize FS
+
+SET [0xB00], 0xF03A
+SET [0xB01], 0xF029 ;":)" in stdout
+
+;THE PACKAGE HANDLER IS CURRENTLY UNSTABLE
+;JSR p.init ;initialize DPH
+
+JSR s.instance ;initialize DASH Shell
 
 SET PC, halt
 
 :pTitle DAT 0x7563, 0x6562, 0x534f
 
-:halt SET PC, halt
- ;;
-:exf ; EXitFalse
+:halt SUB PC, 1
+ ;
+ 
+;:### SYSTEM.RESTART
+;:Clears all registers, drops interrupt queue
+;:**under development**
+;:
+:SYSTEM.RESTART
+
+;:### ext
+;:Exits a subroutine with A set to 0 (`TRUE`)
+;:To use, do `SET PC, ext` instead of `SET PC, POP` at the end of a subroutine
+;:
+:ext ; exit true
 SET A, 0
 SET PC, POP
  ;
+
+;:### exf
+;:Exits a subroutine with A set to 1 (`FALSE`)
+;:To use, do `SET PC, exf` instead of `SET PC, POP` at the end of a subroutine
+;:
+:exf ; exit false
+SET A, 1
+SET PC, POP
+ ;
  ;;
-;;;;;;;
-; ENV ;
-;;;;;;;
-:env.cwds DAT 0
- ;;
+ 
 ;;;;;;;;;;;;;;;;
 ; DASH ; Shell ;
 ;;;;;;;;;;;;;;;;
@@ -29,28 +95,107 @@ SET PC, POP
 :v.sPrompt DAT 0x2024
 :v.promptLoc DAT 0
 
-:v.stdin DAT 0xA00
-:v.stdout DAT 0xB00
+:v.stdin DAT 0xA00 ;SHOULD NOT HARDCODE
+:v.stdout DAT 0xB00 ;SHOULD NOT HARDCODE
 
-:v.cmdmem DAT 1 ;reserve 8 words
+:v.cmdmem DAT 1 ;used in stupid way of "hashing" input
+;SHOULD USE FOR HASH INSTEAD, BUT ONLY IF NECESSARY
 
+;:### s.instance
+;:Prepares a new terminal session at the root directory.
+;:
+;:1. Set *env.cwds* to "/ " in packed form (`0x202F`)
+;:2. Clears the screen
+;:3. Calls *s.takeIn*
+;:4. Calls *s.parse*
+;:5. Calls *s.stdout* with the argument being the cursor location when the user pressed enter
+;:6. Loops nonendingly to 3
+;:
 :s.instance ;SHOULD PREPARE SDIN and SDOUT
 SET [env.cwds], 0x202F
-
+JSR sv.clear ;clear the screen
 SET A, [v.scrnLoc]
 
 :s.instance.promptLoop
-JSR s.takeIn
-SET PUSH, A
+JSR s.takeIn ;s.takeIn TAKES CURSOR ARGUMENT
+SET PUSH, A ;keep track of cursor location
 
-JSR s.parse ;outputs length for stdout
+JSR s.parse
 
-SET B, POP
-JSR s.stdout
+SET A, POP ;restore cursor location for passing to s.stdout
+JSR s.stdout ;s.stdout MAY BE BREAKING THE CURSOR ARGUMENT FOR PASSING INTO s.takeIn THEREBY CAUSING THE STRANGE ONE-COMMAND-THEN-BREAK BUG
 SET PC, s.instance.promptLoop
 
 SET PC, POP
  ;
+ 
+;:### s.takeIn (cursorPointer)
+;:Writes a prompt to the screen using *v.sPrompt* and enters a loop to take ASCII input from the keyboard and write it to the screen at *cursorPointer*. It exits when the user presses `enter`.
+;:
+;:**returns** the cursor location on exit
+;:
+:s.takeIn
+SET PUSH, I
+SET I, 0
+
+JSR sv.getNewLine ;get the next blank line after *cursorPointer*
+JSR s.drawPrompt ;draw the prompt using s.drawPrompt
+
+SET A, 1 ;HWI parameter
+
+:s.takeIn.loop
+IFL I, [v.promptLoc]
+  SET I, [v.promptLoc]
+SET [I], 0xf09e ;cursor character
+
+:s.takeIn.wait
+HWI [HW.GenericKeyboard] ;KEYBOARD HARDWARE DEVICE
+
+IFG C, 0x1f
+  IFL C, 0x80
+    SET PC, s.takeIn.write
+
+IFE C, 0x10
+  SET PC, s.takeIn.backspace
+
+IFE C, 0x11
+  SET PC, s.takeIn.enter
+SET PC, s.takeIn.wait
+
+
+:s.takeIn.write
+XOR C, 0xF000
+STI [I], C
+
+IFN I, [v.scrnEnd] ;write normally
+  SET PC, s.takeIn.loop
+
+:s.takeIn.write.scroll
+SUB [v.promptLoc], [v.scrnWidth] ;make prompt scroll, too
+JSR sv.scrollUp ;scroll everything up
+SET PC, s.takeIn.loop
+
+
+:s.takeIn.backspace
+STD [I], 0
+SET [I], 0
+SET PC, s.takeIn.loop
+
+
+:s.takeIn.enter
+SET [I], 0
+SET A, [v.promptLoc]
+SET B, I
+JSR s.stdin
+
+SET A, I;return location in A
+SET I, POP
+SET PC, POP
+ ;
+
+;:### s.parse
+;:It's not worth documenting this spaghetti code. It will be completely rewritten when *package* works.
+;:
 
 :s.parse
 SET PUSH, I
@@ -81,76 +226,32 @@ IFE [A], 0 ;SHOULD EXIT WITH ERROR MESSAGE
 SET PC, [A] ;look up in table
  ;
 
-:s.takeIn ; (cursorLoc)
-SET PUSH, I
-SET I, 0
-
-JSR s.drawPrompt
-
-SET A, 1 ;HWI parameter
-
-:s.takeIn.loop
-IFL I, [v.promptLoc]
-  SET I, [v.promptLoc]
-SET [I], 0xF09D
-
-:s.takeIn.wait
-HWI 1 ;KEYBOARD HARDWARE DEVICE
-
-IFG C, 0x1f
-  IFL C, 0x80
-    SET PC, s.takeIn.write
-
-IFE C, 0x10
-  SET PC, s.takeIn.backspace
-
-IFE C, 0x11
-  SET PC, s.takeIn.enter
-SET PC, s.takeIn.wait
-
-:s.takeIn.write
-XOR C, 0xF000
-STI [I], C
-IFE I, [v.scrnEnd]
-  JSR sv.scrollUp
-SET PC, s.takeIn.loop
-
-:s.takeIn.backspace
-STD [I], 0
-SET [I], 0
-SET PC, s.takeIn.loop
-
-:s.takeIn.enter
-SET [I], 0
-SET A, [v.promptLoc]
-SET B, I
-JSR s.stdin
-
-SET A, I;return location in A
-SET I, POP
-SET PC, POP
- ;
-
-:s.drawPrompt ; (loc)
-
-JSR sv.getNewLine
+;:### s.drawPrompt (pointer)
+;:Draws a prompt using *env.cwds* and *v.sPrompt* at *pointer* and sets *v.promptLoc* to the location following the prompt.
+;:
+;:**returns** the location following the prompt
+;:
+:s.drawPrompt
 
 SET C, A
 SET A, env.cwds
 SET B, 1
-JSR p.uStr
+JSR typ.pUnpack
 
 SET C, A
 SET A, v.sPrompt
 SET B, 1
-JSR p.uStr
+JSR typ.pUnpack
 
 SET [v.promptLoc], A
 
 SET PC, POP
  ;
 
-:s.stdin ; (startLoc, stopLoc) ;NEED TO CALL THIS SUBROUTINE
+;:### s.stdin (startPointer, stopPointer)
+;:Copies the values between *startPointer* and *stopPointer* to *v.stdin*.
+;:
+:s.stdin
 SET PUSH, I
 SET I, A
 SET C, [v.stdin]
@@ -168,155 +269,823 @@ SET I, POP
 SET PC, POP
  ;
 
-:s.stdout ; (stdoutlen, scrnLoc) ;NEED TO WRITE AND CALL THIS
-SET PUSH, A
-SET A, B
+;:### s.stdout (outputPointer)
+;:Does a C-style copy from *v.stdout* to *outputPointer*.
+:s.stdout
 JSR sv.getNewLine
 
-SET C, A ;output
-SET B, POP ;length
+SET B, A ;output
 SET A, [v.stdout] ;location
-JSR p.uStr
+JSR typ.cCopy ;copy literally and null-terminated
 
 SET PC, POP
  ;
  ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; MODULES ; Module Handler ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-:m.init
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; CAT ; CAT FileSystem         ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;:# CAT
+;:**CAT** is the default file system for cubeOS. It is based on the [Harry's Allocation Table](https://github.com/0x10cStandardsCommittee/0x10c-Standards/blob/master/FS/Draft_Harrys_Allocation_Table.txt) file system format. CubeOS uses hashes to identify links, in addition to fourteen character strings.
+;:
+;:**requires**
+;:
+;:- crypt
+;:
+;:**STILL UNDER HEAVY DEVELOPMENT. DO NOT USE**
 
-SET [0x09E4], mod.ls
+;:### cat.mountSystem (location, length, sectorSize)
+;:Mounts */* directory at *location*, reserving *length* words after it. It then initializes a cat filesystem with the given *sectorSize*.
+;:
+;:Currently unsafe if the number of sectors is greater than 16
+;:**returns** location of first word in header
+;:
 
+;SHOULD KEEP TRACK OF WHERE FILESYSTEM IS SO IT CAN ADD NEW STRIPS AND DO SEARCHES
+
+:cat.mountSystem
+SET [env.fs], A
+
+SET PUSH, I
+SET PUSH, J
+SET PUSH, X
+SET PUSH, A
+SET I, A
+DIV B, C ;make B the maximum number of sectors ;SHOULD 
+
+;should find the maximum number of sectors, but doesn't
+
+:cat.mountSystem.initHeader
+STI [I], 0xC001 ;magic number, cat v1.0
+STI [I], B ;number of sectors
+STI [I], 0 ;reserved for sector map start
+STI [I], 0 ;reserved for sector joins start
+STI [I], 0 ;reserved for sectors start
+STI [I], C ;sector size
+STI [I], 0 ;sectors in use
+
+:cat.mountSystem.initSectorMap
+SET [A+2], I ;sector map start
+SET PUSH, B ;store B
+SET C, B ;we will change B later
+DIV C, 16 ;find number of words needed to represent sector use states
+;OPTIMIZE DIV WITH SHR
+ADD C, I ;C becomes sector map end location
+
+:cat.mountSystem.initSectorMap.loop
+SET X, 0xFFFF ;make X initializer for sector map
+SHR X, B ;set only the excess sectors to used
+STI [I], X
+
+IFG X, 0 ;exit if that was enough bits to represent all sectors
+  SET PC, cat.mountSystem.initSectorMap.end
+
+SUB B, 16 ;CAN WRAP AND BE UNSAFE
+SET PC, cat.mountSystem.initSectorMap.loop ;COULD BE REORDERED MORE EFFICIENTLY
+
+:cat.mountSystem.initSectorMap.end
+SET B, POP ;restore number of sectors
+
+:cat.mountSystem.initSectorJoin
+SET [A+3], I ;sector join start
+ADD B, I ;make B the ending location of sector join
+
+:cat.mountSystem.initSectorJoin.loop
+STI [I], 0
+IFN I, B ;continue reserving until I reaches the end location
+  SET PC, cat.mountSystem.initSectorJoin.loop
+
+:cat.mountSystem.initSectors
+SET [A+4], I
+
+:cat.mountSystem.initializeRoot
+STI [I], 1 ;inode is a directory (root directory)
+STI [I], 0
+STI [I], 32
+
+STI [I], 0 ;link directs here
+STI [I], 0x202E ; "."
+STI [I], 0
+STI [I], 0 ;4
+STI [I], 0
+STI [I], 0
+STI [I], 0
+STI [I], 0 ;8
+STI [I], 0
+STI [I], 0
+STI [I], 0
+STI [I], 0 ;12
+STI [I], 0
+STI [I], 0
+STI [I], 0
+STI [I], 0 ;16
+
+:cat.mountSystem.exit
+SET A, POP ;return location
+
+SET X, POP
+SET J, POP
+SET I, POP
 SET PC, POP
  ;
 
-:mod.ls
-SET [0xB00], 0x443A ; ":D" > stdout
+;:### cat.findStrip (index)
+;:Finds the location in memory of the first word in a strip at the index given.
+;:
+;:**returns** first word of header inode of the strip at *index*
+;:
+
+:cat.findStrip
+
+
+;:### cat.newInode (location, type, length)
+;:Creates a new inode at *location*.
+;:Types are 0, for unused, 1, for directory, and 2, for file.
+;:
+;:**returns** location after inode
+
+:cat.newInode
+SET [A], B
+ADD A, 2
+SET [A], C
+ADD A, 2
+SET PC, POP
+ ;
+
+;:### cat.newLink (stripSource, stripTarg, nameLocation)
+:cat.newLink
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; CRYPT ; Cryptography Lib ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:# Crypt
+;:Cryptography Library
+;:
+
+;:##crp.dsHash (inputPointer, inputLength)
+;:Reads data of *inputLength* from *inputPointer* and performs a hash function on it.
+;:
+;:**returns** the 16-bit hash
+;:
+;:For every value, shift the word *i* left and BOR with EX. XOR all of the resulting values together to produce the hash.
+;:```python
+;:for i in inputLength:
+;:	output ^ (inputPointer[i] << i)
+;:```
+;:
+
+:crp.dsHash
+SET PUSH, I
+SET PUSH, J
+SET I, A
+SET J, 0
+
+SET A, 0
+ADD B, I ;B becomes the exit location
+
+:crp.dsHash.loop
+SET C, [I]
+SHL C, J
+BOR C, EX
+XOR A, C
+
+STI C, 0 ;efficient I and J increment
+IFN I, B
+  SET PC, crp.dsHash.loop
+
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; D32 ; 32-Bit Utility Set ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:# d32
+;:32-bit utility set
+;:
+
+;:### ifg32 (firstawordloc, firstbwordloc)
+;:- returns 0 if the first 32-bit word is greater than the second 32-bit word
+;:
+
+:ifg32
+SET C, A
+SET A, 0 ;return 0 if true
+
+IFG [C], [B] ;if the first is less than the second
+  SET PC, ext
+IFE [C], [B]
+  IFG [C+1], [B+1]
+    SET PC, ext
+
 SET A, 1
 SET PC, POP
  ;
- ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; PACKER ; Data Compressor ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;:
+;HAS A GREAT DEAL OF TROUBLE INITIALIZING TABLES. LENGTHS 0 AND 1 ARE VERY PROBLEMATIC, ENDING IN LOOPS OR IMPROPER JUMPS
+;REQUIRES IMMEDIATE ATTENTION
 
-:p.uCol ; (packedCol, packedLen, outputChar)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; DATALIB ; Data Managing Library ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:# DataLib
+;:DataLib is a library for managing arbitrary amounts of data with relative speed and efficiency.
+;:
+
+;:## Hash Table
+;:Subroutines for creating and searching hash tables, which are sorted tables that store values under names
+;:
+
+;:### dl.makeHashTable (headerPointer, indicies, startingLength)
+;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. 
+;:
+:dl.makeHashTable
+SET [A], 0x5468 ;"hT" magic number
+SET [A+1], B ;indicies
+SET [A+2], C ;length
+SET [A+3], 0 ;reserved
+SET PC, POP
+ ;
+
+;:### dl.hashGet (searchTerm, hashTablePointer)
+;:Searches the hash table at *hashTablePointer* for *searchTerm* in the lookup portion of it. It returns the value in the value portion associated with the searchTerm.
+;:
+;:**returns** value associated by the hash table with *searchTerm*, or 1 if it could not be found.
+;:**under development**
+;:
+
+;:### dl.hashInsert (lookupValue, insertValue, hashTablePointer)
+;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table. This is designed to work very well with the 16-bit hashing algorithm crp.dsHash.
+;:
+;:**under development**
+;:
+:dl.hashInsert
+SET PUSH, [C+2] ;store *length* from header
+SET PUSH, B ;store *insertValue*
+SET PUSH, [C+1] ;store *indicies* from header
+
+SET B, C
+ADD B, 4 ;start of sortedTable (for lookups)
+SET C, [C+2] ;length of sortedTable
+
+JSR dl.sortedInsert
+
+ADD A, POP ;retrieve *indicies* from stack
+
+SET B, A
+SET A, POP ;retrieve *insertValue* from stack
+SET C, POP ;retrieve *length* from stack
+
+JSR dl.unsortedInsert
+ ;
+
+;:## Sorted Table
+;:Subroutines for creating and searching sorted tables
+;:
+
+;:### dl.sortedInsert (insertValue, tableLocation, tableLength)
+;:Inserts *insertValue* into the sorted table at *tableLocation* of *tableLength*, maintaining the sortedness of the table.
+;:
+;:**returns** location of insert<strike>, or 1 if the value is already present in the table</strike>
+;:
+:dl.sortedInsert
+SET PUSH, A
+JSR dl.findInsertIndex
+
+;NEED TO HANDLE DUPLICATE ENTRY
+
+SET B, A
+SET A, POP
+SET PC, dl.unsortedInsert ;exit when this subroutine exits
+ ;
+
+;:### dl.searchValTable (searchTerm, tableLocation, tableLength)
+;:Performs a binary search on the table at *tableLocation* (with length *tableLength*) for *searchTerm* and returns the memory location
+;:
+:dl.searchValTable
+IFE C, 0 ;if *tableLength* is zero, return the tableLocation
+  SET PC, dl.searchValTable.noLength
+
 SET PUSH, I
-SET PUSH, X
-SET PUSH, Y
+
+:dl.searchValTable.recheck
 SET I, C
-ADD B, A
-SET Y, 0
+SHR I, 1 ;divide by 2
+ADD I, B
 
-:p.uCol.selNibble
+IFE [I], A
+SET PC, dl.searchValTable.found
 
-SET X, 0xF000
-SHR X, Y
-ADD Y, 4
-AND X, [A]
+IFE C, 1
+SET PC, exf
 
-:p.uCol.shift
-IFB X, 0x0F00
-  SET PC, p.uCol.makeWord
-SHL X, 4
-XOR X, EX
-SET PC, p.uCol.shift
+IFG A, [I]
+SET PC, dl.searchValTable.toolow
 
-:p.uCol.makeWord
-XOR X, 0x20
-STI [I], X
+IFG [I], A
+SET PC, dl.searchValTable.toohigh
 
-IFL Y, 16 ;if should continue with this word
-  SET PC, p.uCol.selNibble
-;else, go to next word or exit
-SET Y, 0
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.toohigh
+SET C, I
+SUB C, B
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.toolow
+ADD C, B
+SUB C, I
+SET B, I
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.found
+SET A, I
+SET I, POP
+SET PC, POP
+
+:dl.searchValTable.noLength
+SET A, B
+SET PC, POP
+ ;
+
+;:### dl.findInsertIndex (searchTerm, tableLocation, tableLength)
+;:Returns the index at which *searchTerm* should be inserted to keep the table at *tableLocation* with length *tableLength* sorted.
+;:
+:dl.findInsertIndex
+JSR dl.searchValTable
+
+IFN A, 1
+  SET PC, exf ;exit false if 
+  
+SET A, B
 ADD A, 1
+SET PC, POP
+ ;
+ 
+;:### dl.unsortedInsert (insertValue, insertLocation)
+;:Inserts *insertValue* at *insertLocation* and pushes the value it would replace upward in memory recursively until only a null is overwritten.
+;:
+:dl.unsortedInsert
+SET PUSH, I
+SET PUSH, X ;SHOULD JUST USE A
+SET PUSH, Y ;SHOULD JUST USE B
 
-IFN A, B ;
-  SET PC, p.uCol.selNibble
+SET I, B
+SET X, A
 
+:dl.unsortedInsert.loop
+IFE X, 0
+  SET PC, dl.unsortedInsert.exit
+SET Y, [I]
+STI [I], X
+SET X, Y
+
+SET PC, dl.unsortedInsert.loop
+
+:dl.unsortedInsert.exit
 SET Y, POP
 SET X, POP
 SET I, POP
 SET PC, POP
  ;
+ ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; HWMAN ; Hardware Manager ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-:p.pStr ; (fullStringLoc, fullStringLen, packedOut)
-SET PUSH, I
+;:The Hardware Manager is designed to be run to place a layer of abstraction between the software and connected hardware. HWM detects known hardware and maps their port numbers to memory locations, which are accessible through labels.
+;:For example, to send a hardware interrupt to a connected LEM1802, one might normally use the command `HWI 0`, or `HWI 1`. This might change between emulators and ingame, however. HWM allows such syntax as `HWI [LEM1802]`.
+;:
+;:## Supported Hardware
+;:*Items marked with an asterisk do not have intialization routines called automatically.
+;:- *[Generic Clock](http://dcpu.com/highnerd/rc_1/clock.txt)
+:HW.GenericClock DAT 0
+;:- *[LEM1802](http://dcpu.com/highnerd/rc_1/lem1802.txt)
+:HW.LEM1802 DAT 0
+;:
+:HW.GenericKeyboard DAT 0
+;:
+;:## Subroutines
+;:
+
+;:### HWM
+;:Maps the ports of all recognized hardware to specific points in memory, which are accessible through labels. Upon recognizing a piece of hardware, it will map it to a memory location and do an automatic `JSR` to a label of the form `HWinit.x`, where *x* is the name of the hardware recognized in either full form (`HWinit.LEM1802`) or definition camel case (`HWinit.GenericClock`) if the name of the hardware cannot be represented by labels in its full form.
+;:
+:HWM
+JSR pushReg
+
+HWN I ;I is the number of attached devices
+SET J, 0 ;J will be the iterator
+
+:HWM.loop
+HWQ J
+
+IFE A, 0xf615
+  IFE B, 0x7349
+    SET [HW.LEM1802], J
+
+IFE A, 0xb402
+  IFE B, 0x12d0
+    SET [HW.GenericClock], J
+    
+IFE A, 0x7406
+  IFE B, 0x30cf
+    SET [HW.GenericKeyboard], J
+
+ADD J, 1
+
+IFN I, J
+  SET PC, HWM.loop
+  
+SET PC, popReg
+ ;
+ 
+;:### HWF.LEM1802
+;:Finds the LEM1802 in as few cycles as possible and sets the memory location at the label *LEM1802* to its port number without mapping other hardware. This is intended to be run at boottime in order to quickly start the monitor and display a boot screen.
+;:**Under development**
+;:
+
+;:### pushReg
+;:Pushes all registers to the stack.
+;:
+:pushReg
+SET [pushReg.ReturnLocation], POP
+SET PUSH, A
+SET PUSH, B
+SET PUSH, C
 SET PUSH, X
 SET PUSH, Y
 SET PUSH, Z
+SET PUSH, I
+SET PUSH, J
+SET PC, [pushReg.ReturnLocation]
+:pushReg.ReturnLocation DAT 0 ;needed in order to return after pushing values
+ ;
 
-SET Z, 0x007F
+;:### popReg
+;:Pops all registers from the stack, then pops PC from the stack. **This must be called by `SET PC, popReg`.** Otherwise, the registers will be popped incorrectly.
+;:
+:popReg
+SET J, POP
+SET I, POP
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET C, POP
+SET B, POP
+SET A, POP
+SET PC, POP
+ ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; HEAPMAN ; Heap Manager   ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;:# Heap Manager
+:heap.loc DAT 0
+:heap.header DAT 0
+
+
+;:### heap.init
+;:(location, allocsize, length)
+;:heap.init reserves a 16 word header consisting of the following values.
+;:
+
+:heap.init ; (location, allocsize, length)
+SET PUSH, I
+SET PUSH, A
 SET I, A
-ADD B, A
+ADD A, 16 ;16 word header
+
+STI [I], 0x9EA9	;0
+;:1. **0x9EA9** magic word
+STI [I], A	;1
+;:1. first heap memory location
+STI [I], B	;2
+;:1. allocation size
+STI [I], C	;3
+;:1. length
+STI [I], 0	;4
+;:1. *reserved*
+STI [I], 0	;5
+;:1. *reserved*
+STI [I], 0	;6
+;:1. *reserved*
+STI [I], 0	;7
+;:1. *reserved*
+STI [I], 0	;8
+;:1. *reserved*
+STI [I], 0	;9
+;:1. *reserved*
+STI [I], 0	;A
+;:1. *reserved*
+STI [I], 0	;B
+;:1. *reserved*
+STI [I], 0	;C
+;:1. *reserved*
+STI [I], 0	;D
+;:1. *reserved*
+STI [I], 0	;E
+;:1. *reserved*
+STI [I], 0	;F
+;:1. *reserved*
 
 
-:p.pStr.loop
-STI X, [I]
-AND X, Z
-SET [C], X
-STI X, [I]
-AND X, Z
-SHL X, 8
-XOR [C], x
+ADD C, A ;create ending location
+SET A, I ;have another iterator
 
-ADD C, 1
-IFL I, B
-  SET PC, p.pStr.loop
+:heap.init.loop
+ADD A, B
+SET [I], A
 
-SET Z, POP
-SET Y, POP
-SET X, POP
-SET I, POP
-SET PC, POP
- ;
+ADD I, B
+IFL I, C
+  SET PC, heap.init.loop
 
-:p.uStr ; (packedStringLoc, packedStringLen, packedOut)
-SET PUSH, I
-SET PUSH, X
-SET PUSH, Y
-SET PUSH, Z
-
-SET I, C
-ADD B, A
-SET Z, 0x007F
-SET Y, 0x7F00
-
-:p.uStr.loop
-SET X, [A]
-AND X, Z
-XOR X, 0xF000
-STI [I], X
-
-SET X, [A]
-AND X, Y
-SHR X, 8
-XOR X, 0xF000
-STI [I], X
-
-ADD A, 1
-IFL A, B
-  SET PC, p.uStr.loop
-
-SET A, I ;return in A
-
-SET Z, POP
-SET Y, POP
-SET X, POP
-SET I, POP
-SET PC, POP
+;:**STILL IN DEVELOPMENT; DO NOT USE**
  ;
  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+; Monitor Preallocation ;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;:# Monitor Preallocation
+;:Functions as a reserved spot for the font and video RAM of the LEM1802.
+;:
+
+;:### fontRAM
+;:Contains the default font shown [here](http://github.com/cubeOS/cubeOS-alpha/raw/master/font/defaultFont.png).
+;:
+
+:fontRAM
+DAT 0xb79e, 0x388e, 0x722c, 0x75f4, 0x19bb, 0x7f8f, 0x85f9, 0xb158, 0x242e, 0x2400, 0x082a, 0x0800, 0x0008, 0x0000, 0x0808, 0x0808, 0x00ff, 0x0000, 0x00f8, 0x0808, 0x08f8, 0x0000, 0x080f, 0x0000, 0x000f, 0x0808, 0x00ff, 0x0808, 0x08f8, 0x0808, 0x08ff, 0x0000, 0x080f, 0x0808, 0x08ff, 0x0808, 0x6633, 0x99cc, 0x9933, 0x66cc, 0xfef8, 0xe080, 0x7f1f, 0x0701, 0x0107, 0x1f7f, 0x80e0, 0xf8fe, 0x5500, 0xaa00, 0x55aa, 0x55aa, 0xffaa, 0xff55, 0x0f0f, 0x0f0f, 0xf0f0, 0xf0f0, 0x0000, 0xffff, 0xffff, 0x0000, 0xffff, 0xffff, 0x0000, 0x0000, 0x005f, 0x0000, 0x0300, 0x0300, 0x3e14, 0x3e00, 0x266b, 0x3200, 0x611c, 0x4300, 0x3629, 0x7650, 0x0002, 0x0100, 0x1c22, 0x4100, 0x4122, 0x1c00, 0x1408, 0x1400, 0x081c, 0x0800, 0xC020, 0x0000, 0x0808, 0x0800, 0x0040, 0x0000, 0x601c, 0x0300, 0x3e49, 0x3e00, 0x427f, 0xC000, 0x6259, 0x4600, 0x2249, 0x3600, 0x0f08, 0x7f00, 0x2745, 0x3900, 0x3e49, 0x3200, 0x6119, 0x0700, 0x3649, 0x3600, 0x2649, 0x3e00, 0x0024, 0x0000, 0xC024, 0x0000, 0x0814, 0x2200, 0x1414, 0x1400, 0x2214, 0x0800, 0x0259, 0x0600, 0x3e59, 0x5e00, 0x7e09, 0x7e00, 0x7f49, 0x3600, 0x3e41, 0x2200, 0x7f41, 0x3e00, 0x7f49, 0x4100, 0x7f09, 0x0100, 0x3e41, 0x7a00, 0x7f08, 0x7f00, 0x417f, 0x4100, 0x2040, 0x3f00, 0x7f08, 0x7700, 0x7f40, 0xC000, 0x7f06, 0x7f00, 0x7f01, 0x7e00, 0x3e41, 0x3e00, 0x7f09, 0x0600, 0x3e61, 0x7e00, 0x7f09, 0x7600, 0x2649, 0x3200, 0x017f, 0x0100, 0x3f40, 0x7f00, 0x1f60, 0x1f00, 0x7f30, 0x7f00, 0x7708, 0x7700, 0x0778, 0x0700, 0x7149, 0x4700, 0x007f, 0x4100, 0x031c, 0x6000, 0x417f, 0x0000, 0x0201, 0x0200, 0x8080, 0x8000, 0x0001, 0x0200, 0x2454, 0x7800, 0x7f44, 0x3800, 0x3844, 0x2800, 0x3844, 0x7f00, 0x3854, 0x5800, 0x087e, 0x0900, 0x4854, 0x3c00, 0x7f04, 0x7800, 0x047d, 0x0000, 0x2040, 0x3d00, 0x7f10, 0x6c00, 0x017f, 0x0000, 0x7c18, 0x7c00, 0x7c04, 0x7800, 0x3844, 0x3800, 0x7c14, 0x0800, 0x0814, 0x7c00, 0x7c04, 0x0800, 0x4854, 0x2400, 0x043e, 0x4400, 0x3c40, 0x7c00, 0x1c60, 0x1c00, 0x7c30, 0x7c00, 0x6c10, 0x6c00, 0x4c50, 0x3c00, 0x6454, 0x4c00, 0x0836, 0x4100, 0x0077, 0x0000, 0x4136, 0x0800, 0x0201, 0x0201, 0x0205, 0x0200
+
+
+;:### videoRAM
+;:Contains the cubeOS logo/splash screen, shown [here](https://github.com/cubeOS/cubeOS-alpha/raw/master/logo/cubeOSLogo.png).
+;:
+:videoRAM
+DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
+DAT 0,0,0xF01F,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B, 0xF01B, 0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0xF057,0xF065,0,0,  0,0,0,0, 0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0xC01C,0xC01C,0,  0,0xC01C,0xC01C,0,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0xC01D,0xC01F,0xC01F,0xC01F,  0xC01F,0xC01F,0xC01F,0xC01E,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0xC01F,0x0C43,0x0C55,  0x0C42,0x0C45,0xC01F,0,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0,0xC01F,0xC01F,  0xC01F,0xC01F,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01F, 0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0,0,0xC01B,  0xC01B,0,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0xF053,0xF063,0xF069,0xF065,  0xF06E,0xF063,0xF065,0,  0,0,0,0,  0,0,0,0, 0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0xF01F,0,0
+DAT 0,0,0xF01F,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01F,0,0
+DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
+ ;
+ ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; PACKAGE ; Dash Package Handler ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+:v.tableLen DAT 0 ;number of commands in the tables
+
+;:### p.init
+;:Initializes all of the pre-defined packages and their respective commands so that they can be accessed in a table. **Currently unstable.**
+:p.init
+SET A, p.hashTable
+SET B, 128
+JSR dl.makeHashTable
+
+;>
+;LOAD CALLS BELOW ARE ADDED BY HAND. THEY SHOULD BE INSERTED PROGRAMMATICALLY DURING PRE-PROCESSING
+
+SET A, package.ls
+JSR p.loadPackage
+
+SET A, package.inferno
+JSR p.loadPackage
+
+SET PC, POP
+ ;
+ 
+;:### p.loadPackage (pointer)
+;:Loads a package by adding the *identifier*'s crp.dsHash value and a pointer to the first instruction to the hash table. See Packages for more details.
+;:
+;:**returns** 0 if successful, 1 if invalid package format
+;:
+:p.loadPackage
+IFN [A], 0xffab
+  IFN [A+1], 0xcdff ;check for valid magic word
+    SET PC, exf ;fail if not there
+
+ADD A, 2
+
+SET PUSH, I
+SET I, A
+
+:p.loadPackage.findNullinIdentifier
+ADD I, 1
+IFN [I], 0
+  SET PC, p.loadPackage.findNullinIdentifier
+
+SET B, I
+SUB B, A ;make B the length of the identifier
+
+ADD I, 1 ;I is a pointer to the first instruction now (for use later)
+
+;A is the start of the identifier
+
+JSR crp.dsHash
+
+;A is now the dsHash of the identifier
+SET B, I ;B is a pointer to the first instruction
+SET C, p.hashTable ;C is a pointer to the hash table
+SET PC, dl.hashInsert ;add the package to the table and exit with subroutine
+ ;
+
+:p.hashTable
+DAT 0, 0, 0, 0
+
+:p.hashTableLookup ;(128)
+DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+:p.hashTableValue ;(128)
+DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+;:## Packages
+;:Packages are loaded by the DASH Package Handler at boot time. Standard packages are included in the module, and other packages can be loaded by calling p.loadPackage with a pointer to the header of the package.
+;:Packages are identified by the magic number `0xffab cdff`, and contain a null-terminated string, the *identifier*. The index after the null in that string is the first instruction of the package.
+;:Packages are invoked in the DASH Shell by typing the *identifier*, letter for letter. Packages have by definition one modifier, and can hence have only one entry point. (A package cannot define two new top-level commands.) A package can, however, do its own parsing once it is invoked by reading `stdin`. This allows for such combinations as are seen in `git init`, `git pull`, `git push`, et cetera.
+;:
+
+;<
+
+;PACKAGES BELOW ARE INCLUDED BY HAND CURRENTLY. THEY SHOULD BE ADDED PROGRAMMATICALLY DURING PRE-PROCESSING
+
+;:### pack.ls
+;:Writes the name first link in the root directory to stdout. <strike>Writes the names all of the links (files and directories) in the current working directory to stdout.</strike>
+
+:package.ls
+
+DAT 0xffab, 0xcdff
+DAT "ls",0
+
+
+;0b00 is stdout
+
+SET PUSH, I
+SET PUSH, J
+
+;SHOULD LIST WHAT IS IN THE CURRENT DIRECTORY
+;SHOULD LIST MORE THAN ONE ITEM
+
+SET I, [env.fs]
+SET I, [I+4]
+SET J, I
+ADD J, 4
+;??? SET I, [J+1] ;track length of sector
+;??? ADD I, 5 ;first letter of first link
+
+SET A, J
+SET B, [v.stdout]
+
+JSR typ.cUnpack
+
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
+ 
+:package.inferno
+
+
+DAT 0xffab, 0xcdff
+DAT "inferno",0
+
+
+SET A, pack.inferno.text
+SET B, [v.stdout]
+
+:pack.inferno.text DAT 0xf04c, 0xf061, 0xf073, 0xf063, 0xf069, 0xf061, 0xf074, 0xf065, 0xf020, 0xf06f, 0xf067, 0xf06e, 0xf065, 0xf020, 0xf073, 0xf070, 0xf065, 0xf072, 0xf061, 0xf06e, 0xf07a, 0xf061, 0xf02c, 0xf020, 0xf076, 0xf06f, 0xf069, 0xf020, 0xf063, 0xf068, 0xf027, 0xf069, 0xf06e, 0xf074, 0xf072, 0xf061, 0xf074, 0xf065, 0
+ ;
+
+ ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; PINKIEPIE ; Interrupt Handler ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;: **PinkiePie Interrupt Handler** is cubeOS's integrated software interrupt handler.
+;:
+
+
+;:## Software Interrupts
+;:A software interrupt is called in assembly by `INT a`, where `a` is a "message." Upon executing an interrupt, `PC` and `A` are pushed to the stack and replaced by the value in the register `IA` and the message, respectively. This forces the DCPU to begin executing code at whatever address `IA` was set to beforehand. That code can then exit by doing, after restoring other registers, `RFI 0`, which disables interrupt queueing, pops `A` from the stack, then pops `PC` from the stack. That will allow the DCPU to resume the code it was executing before the interrupt was called.
+;:In large operating environments, it makes sense to set `IA` to a constant value at the start of operation, before any interrupts are called. This allows for *interrupt handlers*, which are usually provided by operating systems. The start address of the interrupt handler is placed in `IA`, so it is invoked whenever an interrupt is called. This allows it to handle interrupts consistently, as based on the message.
+;:It also allows software not included in the kernal (and therefore not privvy to labels,) to make function calls defined by the interrupt handler. Furthermore, advanced enough interrupt handlers can allow an operating system to support multitasking.
+;:
+
+;:## Initialization
+;:To initialize PinkiePie, use `pih.init`. Changes to IA can be reset by performing this call again.
+;:
+;:### pih.init
+;:Does `IAS pih` to direct any interrupts to the interrupt handler.
+;:
+:pih.init
+IAS pih
+SET PC, POP
+ ;
+ 
+;:## Interrupt Handler
+;:The interrupt handler is located at the label `pih`. The subroutine `pih.init` makes this the active interrupt handler.
+;:PinkiePie's interrupt handling process is as follows.
+;:
+;:1. Trigger interrupt queueing with `IAQ 1`
+;:2. Push `B` and `C` to the stack, so they won't be lost by any other calls
+;:3. Checks if the message is greater than 127, and jumps to the handler for that if so
+;:4. Checks if the message is greater than 63, and jumps to the handler for that if so
+;:5. Begins checks for low-value messages
+;:
+
+;THIS WHOLE THING COULD USE HASHTABLES
+
+:pih
+IAQ 1 ;trigger interrupt queueing
+SET PUSH, B
+SET PUSH, C
+
+IFG A, 127
+  SET PC, pih128
+  
+IFG A, 63
+  SET PC, pih64
+
+;:### Messages
+;:Messages 0-63 are reserved for low-value calls, which are ones called frequently.
+;:Messages 64-127 are reserved for calls relating to the kernal which are not called frequently.
+;:Messages 128 and upward are reserved for calls that are neither directly related to the kernal, nor need to be called frequently.
+;:
+;:#### 0-63
+;:
+:pih0
+
+;THERE SHOULD BE AN EASTEREGG FOR PLAYING STILL ALIVE
+
+;:#### 64-127
+;:
+:pih64
+
+;:**64. RESTART**
+IFE A, 64
+  SET PC, SYSTEM.RESTART
+  
+;:#### 128+
+;:
+:pih128
+
+
+
+:pihExit
+SET C, POP
+SET B, POP
+RFI 0
+ ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; SIMVID ; Video Manager ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-:v.scrnLoc DAT 0x8000
-:v.scrnEnd DAT 0x8180
+:v.scrnLoc DAT 0
+:v.scrnEnd DAT 0
 :v.scrnHeight DAT 12
 :v.scrnWidth DAT 32
+
+;:### sv.init (videoRAMPointer, fontRAMPointer)
+;:Maps the screen's font to *fontRAMPointer* and the screen's video ram to *videoRAMPointer* in that order.
+;:
+:sv.init
+
+SET PUSH, A
+SET A, 1
+HWI [HW.LEM1802] ;MEM_MAP_FONT
+
+SET B, POP
+SET A, 0
+HWI [HW.LEM1802] ;MEM_MAP_SCREEN
+
+SET [v.scrnLoc], B
+ADD B, 0x180
+SET [v.scrnEnd], B
+SET PC, POP
+ ;
+ 
+:sv.clear
+SET PUSH, I
+SET PUSH, J
+
+SET I, [v.scrnLoc]
+
+:sv.clear.loop
+STI [I], 0
+
+IFL I, [v.scrnEnd]
+  SET PC, sv.clear.loop
+
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
 
 :sv.getLoc ; (xOffset, yOffset)
 IFL A, [v.scrnWidth]
@@ -396,7 +1165,7 @@ SET I, POP
 SUB I, [v.scrnWidth] ;adjust I for caller, hopefully
 SET PC, POP
  ;
-
+ 
 :sv.getNewLine ; (currentLoc)
 SET PUSH, I
 SET I, [v.scrnLoc]
@@ -414,6 +1183,171 @@ IFE I, [v.scrnEnd]
   SUB I, [v.scrnWidth]
 
 SET A, I
+SET I, POP
+SET PC, POP
+ ;
+ ;;
+
+;;## cstring.make (sourcePointer, targetPointer, maxLength)
+;;returns B in A
+
+:cstring.make
+SET PUSH, I
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, B
+SET I, A
+ADD C, I
+
+:cstring.make.packloop
+STI X, [I]
+AND X, 0x7F
+SET [B], X ;
+
+IFE X, 0 ;just copied a 0, so the null termination is there already
+  SET PC, cstring.make.exit
+
+IFE I, C ;have to terminate with null
+  SET PC, cstring.make.exlen
+
+
+STI Y, [I]
+AND Y, 0x7F
+SHL Y, 8
+
+XOR [B], Y
+
+IFE Y, 0
+  SET PC, cstring.make.exit
+
+IFN I, C ;add null termination if reached length end
+  SET PC, cstring.make.packloop
+
+:cstring.make.exlen
+SET [I], 0
+
+:cstring.make.exit
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; TYPER ; Data and String Handler ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:### typ.cCopy (inputPointer, outputPointer)
+;:Copies the null-terminated string at *inputPointer* to *outputPointer*.
+;:
+
+:typ.cCopy
+SET PUSH, I
+SET PUSH, J
+SET I, A
+SET J, B
+
+:typ.cCopy.loop
+IFE [I], 0
+  SET PC, typ.cCopy.exit
+
+STI [J], [I]
+SET PC, typ.cCopy.loop
+
+:typ.cCopy.exit
+SET J, POP
+SET I, POP
+SET PC, POP
+
+;:### typ.cUnpack (inputPointer, outputPointer)
+;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) null-terminated at *inputPointer* and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*.
+;:
+
+:typ.cUnpack
+SET PUSH, I
+SET I, A
+SET C, B
+
+:typ.cUnpack.loop
+IFE [I], 0
+  SET PC, typ.cUnpack.exit
+  
+ADD I, 1
+SET PC, typ.cUnpack.loop
+
+:typ.cUnpack.exit
+SUB I, A
+SET B, I
+
+SET I, POP
+SET PC, typ.pUnpack
+ ;
+
+;:### typ.pPack (inputLocation, inputLength, outputLocation)
+;:Reads an unpacked (`0b0000 0000 0XXX XXXX`) string from *inputLocation* of *inputLength* and outputs a packed (`0b0YYY YYYY 0XXX XXXX`) little-endian style string at *outputLocation*.
+;:
+
+:typ.pPack
+SET PUSH, I
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+
+SET Z, 0x007F
+SET I, A
+ADD B, A
+
+
+:typ.pPack.loop
+STI X, [I]
+AND X, Z
+SET [C], X
+STI X, [I]
+AND X, Z
+SHL X, 8
+XOR [C], x
+
+ADD C, 1
+IFL I, B
+  SET PC, typ.pPack.loop
+
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET I, POP
+SET PC, POP
+ ;
+
+;:### typ.pUnpack (inputPointer, inputLength, outputPoiner)
+;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) in little-endian at *inputPointer* of *inputLength* and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*.
+;:
+
+:typ.pUnpack
+SET PUSH, I
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+
+SET I, C
+ADD B, A
+SET Z, 0x007F
+SET Y, 0x7F00
+
+:typ.pUnpack.loop
+SET X, [A]
+AND X, Z
+XOR X, 0xF000
+STI [I], X
+
+SET X, [A]
+AND X, Y
+SHR X, 8
+XOR X, 0xF000
+STI [I], X
+
+ADD A, 1
+IFL A, B
+  SET PC, typ.pUnpack.loop
+
+SET A, I ;return in A
+
+SET Z, POP
+SET Y, POP
+SET X, POP
 SET I, POP
 SET PC, POP
  ;

@@ -14,9 +14,11 @@
 ;:4. Invoke *s.instance* to intialize the DASH Shell
 ;:
 :__BOOT
+JSR HWM
+
 SET A, 0
 SET B, 1
-HWI 0
+HWI [HW.GenericClock]
 
 SET A, videoRAM
 SET B, fontRAM

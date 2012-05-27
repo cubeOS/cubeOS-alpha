@@ -59,7 +59,7 @@ IFL I, [v.promptLoc]
 SET [I], 0xf09e ;cursor character
 
 :s.takeIn.wait
-HWI 2 ;KEYBOARD HARDWARE DEVICE
+HWI [HW.GenericKeyboard] ;KEYBOARD HARDWARE DEVICE
 
 IFG C, 0x1f
   IFL C, 0x80
