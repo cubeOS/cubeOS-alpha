@@ -35,7 +35,7 @@ SET PC, __BOOT
 JSR HWM
 
 SET A, 0
-SET B, 1
+SET B, 6
 HWI [HW.GenericClock]
 
 SET A, videoRAM
@@ -53,6 +53,12 @@ SET [0xB01], 0xF029 ;":)" in stdout
 
 ;THE PACKAGE HANDLER IS CURRENTLY UNSTABLE
 ;JSR p.init ;initialize DPH
+
+SET A, 1
+:__BOOT.bootscreenDisplayLoop
+HWI [HW.GenericClock]
+IFL C, 15
+  SET PC, __BOOT.bootscreenDisplayLoop
 
 JSR s.instance ;initialize DASH Shell
 
@@ -111,7 +117,7 @@ SET PC, POP
 ;:5. Calls *s.stdout* with the argument being the cursor location when the user pressed enter
 ;:6. Loops nonendingly to 3
 ;:
-:s.instance ;SHOULD PREPARE SDIN and SDOUT
+:s.instance ;SHOULD PREPARE STDIN and STDOUT
 SET [env.cwds], 0x202F
 JSR sv.clear ;clear the screen
 SET A, [v.scrnLoc]
@@ -160,6 +166,7 @@ IFE C, 0x10
 
 IFE C, 0x11
   SET PC, s.takeIn.enter
+  
 SET PC, s.takeIn.wait
 
 
@@ -185,7 +192,7 @@ SET PC, s.takeIn.loop
 :s.takeIn.enter
 SET [I], 0
 SET A, [v.promptLoc]
-SET B, I
+SET B, I ;UNNECESSARY ASSIGNMENT OF CURSOR POSITION
 JSR s.stdin
 
 SET A, I;return location in A
@@ -248,23 +255,23 @@ SET [v.promptLoc], A
 SET PC, POP
  ;
 
-;:### s.stdin (startPointer, stopPointer)
-;:Copies the values between *startPointer* and *stopPointer* to *v.stdin*.
+;:### s.stdin (startPointer)
+;:Performs a C-style copy from *startPointer* to *v.stdin*.
 ;:
 :s.stdin
 SET PUSH, I
 SET I, A
-SET C, [v.stdin]
+SET B, [v.stdin]
 
 :s.stdin.loop
-STI [C], [I]
-AND [C], 0x007F
-ADD C, 1
+STI [B], [I]
+AND [B], 0x007F
+ADD B, 1
 
-IFN I, B
+IFN [I], 0
   SET PC, s.stdin.loop
 
-SET [C], 0
+SET [B], 0
 SET I, POP
 SET PC, POP
  ;
@@ -1249,6 +1256,7 @@ STI [J], [I]
 SET PC, typ.cCopy.loop
 
 :typ.cCopy.exit
+SET A, J
 SET J, POP
 SET I, POP
 SET PC, POP

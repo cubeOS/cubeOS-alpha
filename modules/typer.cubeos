@@ -4,6 +4,7 @@
 
 ;:### typ.cCopy (inputPointer, outputPointer)
 ;:Copies the null-terminated string at *inputPointer* to *outputPointer*.
+;:**returns** the location following the last character of the copy at the *outputPointer* location (?)
 ;:
 
 :typ.cCopy
@@ -20,6 +21,7 @@ STI [J], [I]
 SET PC, typ.cCopy.loop
 
 :typ.cCopy.exit
+SET A, J
 SET J, POP
 SET I, POP
 SET PC, POP
