@@ -6,7 +6,7 @@ Package-writing should be trivial for the cubeOS, and most assembly programs wil
 
 ## Usage
 
-Older versions of cubeOS were built on [deNULL's emulator](http://dcpu.ru), but as of May 22, 2012, an update made that emulator unusable. Any standard DCPU-16 emulator with at least the [Generic Clock](http://dcpu.com/highnerd/rc_1/clock.txt), [LEM1802](http://dcpu.com/highnerd/rc_1/lem1802.txt), and [Generic Keyboard](http://dcpu.com/highnerd/rc_1/keyboard.txt) attached should be able to run cubeOS. **Currently, those devices have to be attached in the above order, (*ports 0, 1, and 2*,) in order for cubeOS to run properly.**
+Older versions of cubeOS were built on [deNULL's emulator](http://dcpu.ru), but as of May 22, 2012, an update made that emulator unusable. Any standard DCPU-16 emulator with at least the [Generic Clock](http://dcpu.com/highnerd/rc_1/clock.txt), [LEM1802](http://dcpu.com/highnerd/rc_1/lem1802.txt), and [Generic Keyboard](http://dcpu.com/highnerd/rc_1/keyboard.txt) attached should be able to run cubeOS.
 
 The current version of cubeOS is built using the [das assembler](https://github.com/jonpovey/das) and run using [benedek's DCPU-16 emulator](https://bitbucket.org/benedek/dcpu-16). Binaries for current and stable releases should be provided regularly. Links to them are easy to get to at the GitHub Pages [page](http://cubeos.github.com/cubeOS-alpha/).
 
