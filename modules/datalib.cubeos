@@ -1,0 +1,168 @@
+;HAS A GREAT DEAL OF TROUBLE INITIALIZING TABLES. LENGTHS 0 AND 1 ARE VERY PROBLEMATIC, ENDING IN LOOPS OR IMPROPER JUMPS
+;REQUIRES IMMEDIATE ATTENTION
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; DATALIB ; Data Managing Library ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:# DataLib
+;:DataLib is a library for managing arbitrary amounts of data with relative speed and efficiency.
+;:
+
+;:## Hash Table
+;:Subroutines for creating and searching hash tables, which are sorted tables that store values under names
+;:
+
+;:### dl.makeHashTable (headerPointer, indicies, startingLength)
+;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. 
+;:
+:dl.makeHashTable
+SET [A], 0x5468 ;"hT" magic number
+SET [A+1], B ;indicies
+SET [A+2], C ;length
+SET [A+3], 0 ;reserved
+SET PC, POP
+ ;
+
+;:### dl.hashGet (searchTerm, hashTablePointer)
+;:Searches the hash table at *hashTablePointer* for *searchTerm* in the lookup portion of it. It returns the value in the value portion associated with the searchTerm.
+;:
+;:**returns** value associated by the hash table with *searchTerm*, or 1 if it could not be found.
+;:**under development**
+;:
+
+;:### dl.hashInsert (lookupValue, insertValue, hashTablePointer)
+;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table. This is designed to work very well with the 16-bit hashing algorithm crp.dsHash.
+;:
+;:**under development**
+;:
+:dl.hashInsert
+SET PUSH, [C+2] ;store *length* from header
+SET PUSH, B ;store *insertValue*
+SET PUSH, [C+1] ;store *indicies* from header
+
+SET B, C
+ADD B, 4 ;start of sortedTable (for lookups)
+SET C, [C+2] ;length of sortedTable
+
+JSR dl.sortedInsert
+
+ADD A, POP ;retrieve *indicies* from stack
+
+SET B, A
+SET A, POP ;retrieve *insertValue* from stack
+SET C, POP ;retrieve *length* from stack
+
+JSR dl.unsortedInsert
+ ;
+
+;:## Sorted Table
+;:Subroutines for creating and searching sorted tables
+;:
+
+;:### dl.sortedInsert (insertValue, tableLocation, tableLength)
+;:Inserts *insertValue* into the sorted table at *tableLocation* of *tableLength*, maintaining the sortedness of the table.
+;:
+;:**returns** location of insert<strike>, or 1 if the value is already present in the table</strike>
+;:
+:dl.sortedInsert
+SET PUSH, A
+JSR dl.findInsertIndex
+
+;NEED TO HANDLE DUPLICATE ENTRY
+
+SET B, A
+SET A, POP
+SET PC, dl.unsortedInsert ;exit when this subroutine exits
+ ;
+
+;:### dl.searchValTable (searchTerm, tableLocation, tableLength)
+;:Performs a binary search on the table at *tableLocation* (with length *tableLength*) for *searchTerm* and returns the memory location
+;:
+:dl.searchValTable
+IFE C, 0 ;if *tableLength* is zero, return the tableLocation
+  SET PC, dl.searchValTable.noLength
+
+SET PUSH, I
+
+:dl.searchValTable.recheck
+SET I, C
+SHR I, 1 ;divide by 2
+ADD I, B
+
+IFE [I], A
+SET PC, dl.searchValTable.found
+
+IFE C, 1
+SET PC, exf
+
+IFG A, [I]
+SET PC, dl.searchValTable.toolow
+
+IFG [I], A
+SET PC, dl.searchValTable.toohigh
+
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.toohigh
+SET C, I
+SUB C, B
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.toolow
+ADD C, B
+SUB C, I
+SET B, I
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.found
+SET A, I
+SET I, POP
+SET PC, POP
+
+:dl.searchValTable.noLength
+SET A, B
+SET PC, POP
+ ;
+
+;:### dl.findInsertIndex (searchTerm, tableLocation, tableLength)
+;:Returns the index at which *searchTerm* should be inserted to keep the table at *tableLocation* with length *tableLength* sorted.
+;:
+:dl.findInsertIndex
+JSR dl.searchValTable
+
+IFN A, 1
+  SET PC, exf ;exit false if 
+  
+SET A, B
+ADD A, 1
+SET PC, POP
+ ;
+ 
+;:### dl.unsortedInsert (insertValue, insertLocation)
+;:Inserts *insertValue* at *insertLocation* and pushes the value it would replace upward in memory recursively until only a null is overwritten.
+;:
+:dl.unsortedInsert
+SET PUSH, I
+SET PUSH, X ;SHOULD JUST USE A
+SET PUSH, Y ;SHOULD JUST USE B
+
+SET I, B
+SET X, A
+
+:dl.unsortedInsert.loop
+IFE X, 0
+  SET PC, dl.unsortedInsert.exit
+SET Y, [I]
+STI [I], X
+SET X, Y
+
+SET PC, dl.unsortedInsert.loop
+
+:dl.unsortedInsert.exit
+SET Y, POP
+SET X, POP
+SET I, POP
+SET PC, POP
+ ;
+ ;;

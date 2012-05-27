@@ -1,0 +1,87 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; HWMAN ; Hardware Manager ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:The Hardware Manager is designed to be run to place a layer of abstraction between the software and connected hardware. HWM detects known hardware and maps their port numbers to memory locations, which are accessible through labels.
+;:For example, to send a hardware interrupt to a connected LEM1802, one might normally use the command `HWI 0`, or `HWI 1`. This might change between emulators and ingame, however. HWM allows such syntax as `HWI [LEM1802]`.
+;:
+;:## Supported Hardware
+;:*Items marked with an asterisk do not have intialization routines called automatically.
+;:- *[Generic Clock](http://dcpu.com/highnerd/rc_1/clock.txt)
+:HW.GenericClock DAT 0
+;:- *[LEM1802](http://dcpu.com/highnerd/rc_1/lem1802.txt)
+:HW.LEM1802 DAT 0
+;:
+:HW.GenericKeyboard DAT 0
+;:
+;:## Subroutines
+;:
+
+;:### HWM
+;:Maps the ports of all recognized hardware to specific points in memory, which are accessible through labels. Upon recognizing a piece of hardware, it will map it to a memory location and do an automatic `JSR` to a label of the form `HWinit.x`, where *x* is the name of the hardware recognized in either full form (`HWinit.LEM1802`) or definition camel case (`HWinit.GenericClock`) if the name of the hardware cannot be represented by labels in its full form.
+;:
+:HWM
+JSR pushReg
+
+HWN I ;I is the number of attached devices
+SET J, 0 ;J will be the iterator
+
+:HWM.loop
+HWQ J
+
+IFE A, 0xf615
+  IFE B, 0x7349
+    SET [HW.LEM1802], J
+
+IFE A, 0xb402
+  IFE B, 0x12d0
+    SET [HW.GenericClock], J
+    
+IFE A, 0x7406
+  IFE B, 0x30cf
+    SET [HW.GenericKeyboard], J
+
+ADD J, 1
+
+IFN I, J
+  SET PC, HWM.loop
+  
+SET PC, popReg
+ ;
+ 
+;:### HWF.LEM1802
+;:Finds the LEM1802 in as few cycles as possible and sets the memory location at the label *LEM1802* to its port number without mapping other hardware. This is intended to be run at boottime in order to quickly start the monitor and display a boot screen.
+;:**Under development**
+;:
+
+;:### pushReg
+;:Pushes all registers to the stack.
+;:
+:pushReg
+SET [pushReg.ReturnLocation], POP
+SET PUSH, A
+SET PUSH, B
+SET PUSH, C
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+SET PUSH, I
+SET PUSH, J
+SET PC, [pushReg.ReturnLocation]
+:pushReg.ReturnLocation DAT 0 ;needed in order to return after pushing values
+ ;
+
+;:### popReg
+;:Pops all registers from the stack, then pops PC from the stack. **This must be called by `SET PC, popReg`.** Otherwise, the registers will be popped incorrectly.
+;:
+:popReg
+SET J, POP
+SET I, POP
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET C, POP
+SET B, POP
+SET A, POP
+SET PC, POP
+ ;

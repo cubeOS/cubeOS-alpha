@@ -1,0 +1,33 @@
+;:### pack.ls
+;:Writes the name first link in the root directory to stdout. <strike>Writes the names all of the links (files and directories) in the current working directory to stdout.</strike>
+
+:package.ls
+
+DAT 0xffab, 0xcdff
+DAT "ls",0
+
+
+;0b00 is stdout
+
+SET PUSH, I
+SET PUSH, J
+
+;SHOULD LIST WHAT IS IN THE CURRENT DIRECTORY
+;SHOULD LIST MORE THAN ONE ITEM
+
+SET I, [env.fs]
+SET I, [I+4]
+SET J, I
+ADD J, 4
+;??? SET I, [J+1] ;track length of sector
+;??? ADD I, 5 ;first letter of first link
+
+SET A, J
+SET B, [v.stdout]
+
+JSR typ.cUnpack
+
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
