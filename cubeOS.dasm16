@@ -52,7 +52,7 @@ SET [0xB00], 0xF03A
 SET [0xB01], 0xF029 ;":)" in stdout
 
 ;THE PACKAGE HANDLER IS CURRENTLY UNSTABLE
-JSR p.init ;initialize DPH
+;JSR p.init ;initialize DPH
 
 SET A, 1
 :__BOOT.bootscreenDisplayLoop
@@ -421,7 +421,6 @@ SET PC, POP
 
 ;:##crp.dsHash (inputPointer, inputLength)
 ;:Reads data of *inputLength* from *inputPointer* and performs a hash function on it.
-;:
 ;:**returns** the 16-bit hash
 ;:
 ;:For every value, shift the word *i* left and BOR with EX. XOR all of the resulting values together to produce the hash.
@@ -482,6 +481,7 @@ SET PC, POP
 ;:
 ;HAS A GREAT DEAL OF TROUBLE INITIALIZING TABLES. LENGTHS 0 AND 1 ARE VERY PROBLEMATIC, ENDING IN LOOPS OR IMPROPER JUMPS
 ;REQUIRES IMMEDIATE ATTENTION
+;REQUIRES IMMEDIATE ATTENTION, AGAIN, SEEMINGLY IN SEARCHVALTABLE, OR SOMETHING WRONG WITH THE REST OF HASHINSERT WITH LENGTH 0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; DATALIB ; Data Managing Library ;
@@ -879,7 +879,7 @@ SET PC, POP
 ;:
 :p.loadPackage
 IFN [A], 0xffab
-  IFN [A+1], 0xcdff ;check for valid magic word
+  IFN [A+1], 0xcdff ;DOES NOT CHECK FOR VALID PACKAGE
     SET PC, exf ;fail if not there
 
 ADD A, 2
