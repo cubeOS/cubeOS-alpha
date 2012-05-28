@@ -5,7 +5,9 @@
 :v.tableLen DAT 0 ;number of commands in the tables
 
 ;:### p.init
-;:Initializes all of the pre-defined packages and their respective commands so that they can be accessed in a table. **Currently unstable.**
+;:Initializes all of the pre-defined packages and their respective commands so that they can be accessed in a table.
+;:**Currently unstable.**
+;:
 :p.init
 SET A, p.hashTable
 SET B, 128
@@ -30,30 +32,27 @@ SET PC, POP
 ;:
 :p.loadPackage
 IFN [A], 0xffab
-  IFN [A+1], 0xcdff ;check for valid magic word
+  IFN [A+1], 0xcdff ;DOES NOT CHECK FOR VALID PACKAGE
     SET PC, exf ;fail if not there
 
 ADD A, 2
 
-SET PUSH, I
-SET I, A
+SET B, A
 
 :p.loadPackage.findNullinIdentifier
-ADD I, 1
-IFN [I], 0
+ADD B, 1
+IFN [B], 0
   SET PC, p.loadPackage.findNullinIdentifier
 
-SET B, I
+SET PUSH, B ;store the location of the null before instructions
 SUB B, A ;make B the length of the identifier
-
-ADD I, 1 ;I is a pointer to the first instruction now (for use later)
-
 ;A is the start of the identifier
 
 JSR crp.dsHash
 
 ;A is now the dsHash of the identifier
-SET B, I ;B is a pointer to the first instruction
+SET B, POP ;B is a pointer the null
+ADD B, 1 ;B is now a pointer to the first instruction
 SET C, p.hashTable ;C is a pointer to the hash table
 SET PC, dl.hashInsert ;add the package to the table and exit with subroutine
  ;

@@ -52,7 +52,7 @@ SET [0xB00], 0xF03A
 SET [0xB01], 0xF029 ;":)" in stdout
 
 ;THE PACKAGE HANDLER IS CURRENTLY UNSTABLE
-;JSR p.init ;initialize DPH
+JSR p.init ;initialize DPH
 
 SET A, 1
 :__BOOT.bootscreenDisplayLoop
@@ -486,8 +486,6 @@ SET PC, POP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; DATALIB ; Data Managing Library ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;:# DataLib
 ;:DataLib is a library for managing arbitrary amounts of data with relative speed and efficiency.
 ;:
 
@@ -496,7 +494,8 @@ SET PC, POP
 ;:
 
 ;:### dl.makeHashTable (headerPointer, indicies, startingLength)
-;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. 
+;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. *length* is not the total length of the table, but rather the number of occupied indicies.
+;:**returns** *headerPointer*
 ;:
 :dl.makeHashTable
 SET [A], 0x5468 ;"hT" magic number
@@ -509,9 +508,20 @@ SET PC, POP
 ;:### dl.hashGet (searchTerm, hashTablePointer)
 ;:Searches the hash table at *hashTablePointer* for *searchTerm* in the lookup portion of it. It returns the value in the value portion associated with the searchTerm.
 ;:
-;:**returns** value associated by the hash table with *searchTerm*, or 1 if it could not be found.
-;:**under development**
+;:**returns** value associated by the hash table with *searchTerm*.
+;:**development version** 
 ;:
+:dl.hashGet
+SET PUSH, [B+1] ;store the number of indicies
+
+SET C, [B+2] ;length
+ADD B, 4 ;location
+JSR dl.searchValTable
+
+ADD A, POP ;make A an index in the value table
+SET A, [A] ;return the value, rather than the index
+SET PC, POP
+ ;
 
 ;:### dl.hashInsert (lookupValue, insertValue, hashTablePointer)
 ;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table. This is designed to work very well with the 16-bit hashing algorithm crp.dsHash.
@@ -535,7 +545,7 @@ SET B, A
 SET A, POP ;retrieve *insertValue* from stack
 SET C, POP ;retrieve *length* from stack
 
-JSR dl.unsortedInsert
+SET PC, dl.unsortedInsert
  ;
 
 ;:## Sorted Table
@@ -842,7 +852,9 @@ DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,
 :v.tableLen DAT 0 ;number of commands in the tables
 
 ;:### p.init
-;:Initializes all of the pre-defined packages and their respective commands so that they can be accessed in a table. **Currently unstable.**
+;:Initializes all of the pre-defined packages and their respective commands so that they can be accessed in a table.
+;:**Currently unstable.**
+;:
 :p.init
 SET A, p.hashTable
 SET B, 128
@@ -872,25 +884,22 @@ IFN [A], 0xffab
 
 ADD A, 2
 
-SET PUSH, I
-SET I, A
+SET B, A
 
 :p.loadPackage.findNullinIdentifier
-ADD I, 1
-IFN [I], 0
+ADD B, 1
+IFN [B], 0
   SET PC, p.loadPackage.findNullinIdentifier
 
-SET B, I
+SET PUSH, B ;store the location of the null before instructions
 SUB B, A ;make B the length of the identifier
-
-ADD I, 1 ;I is a pointer to the first instruction now (for use later)
-
 ;A is the start of the identifier
 
 JSR crp.dsHash
 
 ;A is now the dsHash of the identifier
-SET B, I ;B is a pointer to the first instruction
+SET B, POP ;B is a pointer the null
+ADD B, 1 ;B is now a pointer to the first instruction
 SET C, p.hashTable ;C is a pointer to the hash table
 SET PC, dl.hashInsert ;add the package to the table and exit with subroutine
  ;

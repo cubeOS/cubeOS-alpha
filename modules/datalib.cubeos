@@ -1,5 +1,6 @@
 ;HAS A GREAT DEAL OF TROUBLE INITIALIZING TABLES. LENGTHS 0 AND 1 ARE VERY PROBLEMATIC, ENDING IN LOOPS OR IMPROPER JUMPS
 ;REQUIRES IMMEDIATE ATTENTION
+;REQUIRES IMMEDIATE ATTENTION, AGAIN, SEEMINGLY IN SEARCHVALTABLE, OR SOMETHING WRONG WITH THE REST OF HASHINSERT WITH LENGTH 0
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; DATALIB ; Data Managing Library ;
@@ -13,6 +14,7 @@
 
 ;:### dl.makeHashTable (headerPointer, indicies, startingLength)
 ;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. *length* is not the total length of the table, but rather the number of occupied indicies.
+;:**returns** *headerPointer*
 ;:
 :dl.makeHashTable
 SET [A], 0x5468 ;"hT" magic number
@@ -62,7 +64,7 @@ SET B, A
 SET A, POP ;retrieve *insertValue* from stack
 SET C, POP ;retrieve *length* from stack
 
-JSR dl.unsortedInsert
+SET PC, dl.unsortedInsert
  ;
 
 ;:## Sorted Table
