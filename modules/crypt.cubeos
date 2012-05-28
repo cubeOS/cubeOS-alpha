@@ -8,7 +8,6 @@
 
 ;:##crp.dsHash (inputPointer, inputLength)
 ;:Reads data of *inputLength* from *inputPointer* and performs a hash function on it.
-;:
 ;:**returns** the 16-bit hash
 ;:
 ;:For every value, shift the word *i* left and BOR with EX. XOR all of the resulting values together to produce the hash.
