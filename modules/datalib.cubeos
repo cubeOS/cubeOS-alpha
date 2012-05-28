@@ -4,8 +4,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; DATALIB ; Data Managing Library ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;:# DataLib
 ;:DataLib is a library for managing arbitrary amounts of data with relative speed and efficiency.
 ;:
 
@@ -14,7 +12,7 @@
 ;:
 
 ;:### dl.makeHashTable (headerPointer, indicies, startingLength)
-;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. 
+;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. *length* is not the total length of the table, but rather the number of occupied indicies.
 ;:
 :dl.makeHashTable
 SET [A], 0x5468 ;"hT" magic number
@@ -27,9 +25,20 @@ SET PC, POP
 ;:### dl.hashGet (searchTerm, hashTablePointer)
 ;:Searches the hash table at *hashTablePointer* for *searchTerm* in the lookup portion of it. It returns the value in the value portion associated with the searchTerm.
 ;:
-;:**returns** value associated by the hash table with *searchTerm*, or 1 if it could not be found.
-;:**under development**
+;:**returns** value associated by the hash table with *searchTerm*.
+;:**development version** 
 ;:
+:dl.hashGet
+SET PUSH, [B+1] ;store the number of indicies
+
+SET C, [B+2] ;length
+ADD B, 4 ;location
+JSR dl.searchValTable
+
+ADD A, POP ;make A an index in the value table
+SET A, [A] ;return the value, rather than the index
+SET PC, POP
+ ;
 
 ;:### dl.hashInsert (lookupValue, insertValue, hashTablePointer)
 ;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table. This is designed to work very well with the 16-bit hashing algorithm crp.dsHash.
