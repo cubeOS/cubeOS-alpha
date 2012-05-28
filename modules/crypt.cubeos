@@ -34,7 +34,7 @@ BOR C, EX
 XOR A, C
 
 STI C, 0 ;efficient I and J increment
-IFN I, B
+IFL I, B
   SET PC, crp.dsHash.loop
 
 SET J, POP
