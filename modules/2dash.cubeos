@@ -27,13 +27,14 @@ JSR sv.clear ;clear the screen
 SET A, [v.scrnLoc]
 
 :s.instance.promptLoop
-JSR s.takeIn ;s.takeIn TAKES CURSOR ARGUMENT
+JSR s.takeIn
 SET PUSH, A ;keep track of cursor location
 
 JSR s.parse
 
 SET A, POP ;restore cursor location for passing to s.stdout
-JSR s.stdout ;s.stdout MAY BE BREAKING THE CURSOR ARGUMENT FOR PASSING INTO s.takeIn THEREBY CAUSING THE STRANGE ONE-COMMAND-THEN-BREAK BUG
+JSR s.stdout
+
 SET PC, s.instance.promptLoop
 
 SET PC, POP
@@ -59,7 +60,7 @@ IFL I, [v.promptLoc]
 SET [I], 0xf09e ;cursor character
 
 :s.takeIn.wait
-HWI [HW.GenericKeyboard] ;KEYBOARD HARDWARE DEVICE
+HWI [HW.GenericKeyboard]
 
 IFG C, 0x1f
   IFL C, 0x80
@@ -70,6 +71,11 @@ IFE C, 0x10
 
 IFE C, 0x11
   SET PC, s.takeIn.enter
+  
+;INSERT (0x12)
+  
+IFE C, 0x13
+  SET PC, s.takeIn.delete
   
 SET PC, s.takeIn.wait
 
@@ -91,7 +97,19 @@ SET PC, s.takeIn.loop
 STD [I], 0
 SET [I], 0
 SET PC, s.takeIn.loop
+ ;
 
+:s.takeIn.delete
+SET A, 2 ;changes interrupt action, so must be reset afterward
+SET B, 0x91 ;sets B to the *Control* key
+HWI [HW.GenericKeyboard] ;C becomes 1 if *Control* is pressed
+
+IFE C, 1 ;exit if 
+  SET PC, s.instance
+
+SET A, 1 ;reset interrupt action
+SET PC, s.takeIn.loop
+ ;
 
 :s.takeIn.enter
 SET [I], 0
