@@ -1,6 +1,17 @@
 ;;;;;;;;;;;;;;;;
 ; DASH ; Shell ;
 ;;;;;;;;;;;;;;;;
+;:The DASH Shell is essential to cubeOS's function. It acts as an interpreter for ASCII commands, <strike>which are passed to the package manager in order to directly execute subroutines,</strike> and also handles keyboard input.
+;:
+;:## Usage
+;:At the prompt, which is of the form "*CWD*$", the user can use an attached Generic Keyboard to input ASCII and control characters. 
+;:
+;:## Control Characters
+;:
+;:### Control + Delete
+;:Restarts the DASH Shell by calling *s.instance*.
+;:
+;:## Subroutines
 
 :v.sPrompt DAT 0x2024
 :v.promptLoc DAT 0
