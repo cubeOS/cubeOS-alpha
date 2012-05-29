@@ -24,6 +24,8 @@ SET A, videoRAM
 SET B, fontRAM
 JSR sv.init ;set up boot screen and screen
 
+JSR pih.init
+
 SET A, 0x8000
 SET B, 0x810
 SET C, 128
@@ -56,6 +58,17 @@ SET PC, halt
 ;:**under development**
 ;:
 :SYSTEM.RESTART
+SET A, 0
+SET B, 0
+SET C, 0
+SET X, 0
+SET Y, 0
+SET Z, 0
+SET I, 0
+SET J, 0
+SET SP, 0
+IAS 0
+SET PC, 0
 
 
 ;:### ext
