@@ -1,7 +1,4 @@
-;HAS A GREAT DEAL OF TROUBLE INITIALIZING TABLES. LENGTHS 0 AND 1 ARE VERY PROBLEMATIC, ENDING IN LOOPS OR IMPROPER JUMPS
-;REQUIRES IMMEDIATE ATTENTION
-;REQUIRES IMMEDIATE ATTENTION, AGAIN, SEEMINGLY IN SEARCHVALTABLE, OR SOMETHING WRONG WITH THE REST OF HASHINSERT WITH LENGTH 0
-;STACK CORRUPTION
+;RETURNS INCORRECT VALUE IF DOING HASHGET ON AN UNPRESENT VALUE
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; DATALIB ; Data Managing Library ;
@@ -49,9 +46,9 @@ SET PC, POP
 ;:**under development**
 ;:
 :dl.hashInsert
-SET PUSH, [C+2] ;store *length* from header
 SET PUSH, B ;store *insertValue*
 SET PUSH, [C+1] ;store *indicies* from header
+SET PUSH, C ;store pointer to header
 
 SET B, C
 ADD B, 4 ;start of sortedTable (for lookups)
@@ -59,11 +56,13 @@ SET C, [C+2] ;length of sortedTable
 
 JSR dl.sortedInsert
 
+SET C, POP
+ADD [C+2], 1 ;add one to the length
+
 ADD A, POP ;retrieve *indicies* from stack
 
 SET B, A
 SET A, POP ;retrieve *insertValue* from stack
-SET C, POP ;retrieve *length* from stack
 
 SET PC, dl.unsortedInsert
  ;
@@ -95,6 +94,9 @@ SET PC, dl.unsortedInsert ;exit when this subroutine exits
 IFE C, 0 ;if *tableLength* is zero, return the tableLocation
   SET PC, dl.searchValTable.noLength
 
+IFE C, 1
+  SET PC, dl.searchValTable.lengthOne
+
 SET PUSH, I
 
 :dl.searchValTable.recheck
@@ -106,13 +108,13 @@ IFE [I], A
 SET PC, dl.searchValTable.found
 
 IFE C, 1
-SET PC, exf
+  SET PC, dl.searchValTable.exf
 
 IFG A, [I]
-SET PC, dl.searchValTable.toolow
+  SET PC, dl.searchValTable.toolow
 
-IFG [I], A
-SET PC, dl.searchValTable.toohigh
+IFL A, [I]
+  SET PC, dl.searchValTable.toohigh
 
 SET PC, dl.searchValTable.recheck
 
@@ -135,6 +137,18 @@ SET PC, POP
 :dl.searchValTable.noLength
 SET A, B
 SET PC, POP
+
+:dl.searchValTable.lengthOne
+IFG A, [B] ;if *insertValue* is greater than the existing value
+  ADD B, 1 ;look at the second value
+
+SET A, B ;return B
+SET PC, POP
+
+:dl.searchValTable.exf
+SET A, 1
+SET I, POP
+SET PC, POP
  ;
 
 ;:### dl.findInsertIndex (searchTerm, tableLocation, tableLength)
@@ -143,22 +157,24 @@ SET PC, POP
 :dl.findInsertIndex
 JSR dl.searchValTable
 
-IFN A, 1
-  SET PC, exf ;exit false if 
+IFE A, 1 ;if the value isn't there
+  ADD A, B ;add B to make it the index to insert at
+
+;DO SOMETHING IF A != 1 AND LENGTH ISN'T LOW
   
-SET A, B
-ADD A, 1
 SET PC, POP
  ;
  
 ;:### dl.unsortedInsert (insertValue, insertLocation)
 ;:Inserts *insertValue* at *insertLocation* and pushes the value it would replace upward in memory recursively until only a null is overwritten.
+;:**returns** *insertLocation*
 ;:
 :dl.unsortedInsert
 SET PUSH, I
 SET PUSH, X ;SHOULD JUST USE A
 SET PUSH, Y ;SHOULD JUST USE B
 
+SET PUSH, B
 SET I, B
 SET X, A
 
@@ -172,9 +188,14 @@ SET X, Y
 SET PC, dl.unsortedInsert.loop
 
 :dl.unsortedInsert.exit
+SET A, POP
 SET Y, POP
 SET X, POP
 SET I, POP
 SET PC, POP
  ;
  ;;
+ 
+
+:screendata
+:ht dat 0,0,0,0
