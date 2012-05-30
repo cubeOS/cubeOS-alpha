@@ -53,8 +53,7 @@ JSR cat.mountSystem ;initialize FS
 SET [0xB00], 0xF03A
 SET [0xB01], 0xF029 ;":)" in stdout
 
-;THE PACKAGE HANDLER IS CURRENTLY UNSTABLE
-;JSR p.init ;initialize DPH
+JSR p.init ;initialize DPH
 
 SET A, 1
 :__BOOT.bootscreenDisplayLoop
@@ -111,6 +110,17 @@ SET PC, POP
 ;;;;;;;;;;;;;;;;
 ; DASH ; Shell ;
 ;;;;;;;;;;;;;;;;
+;:The DASH Shell is essential to cubeOS's function. It acts as an interpreter for ASCII commands, <strike>which are passed to the package manager in order to directly execute subroutines,</strike> and also handles keyboard input.
+;:
+;:## Usage
+;:At the prompt, which is of the form "*CWD*$", the user can use an attached Generic Keyboard to input ASCII and control characters. 
+;:
+;:## Control Characters
+;:
+;:### Control + Delete
+;:Restarts the DASH Shell by calling *s.instance*.
+;:
+;:## Subroutines
 
 :v.sPrompt DAT 0x2024
 :v.promptLoc DAT 0
@@ -215,8 +225,7 @@ SET B, 0x91 ;sets B to the *Control* key
 HWI [HW.GenericKeyboard] ;C becomes 1 if *Control* is pressed
 
 IFE C, 1 ;exit if 
-  INT 64 ;SYSTEM.RESTART
-  ;SET PC, s.instance
+  SET PC, s.instance
 
 SET A, 1 ;reset interrupt action
 SET PC, s.takeIn.loop
@@ -250,11 +259,11 @@ SET PC, s.parse.getFirstArg
 SUB B, A ;make B the length of the first argument
 JSR crp.dsHash ;returns the hashvalue in A
 
-;LOOK UP A IN THE HASHTABLE, RETURN IN A
+JSR p.lookup
 
 ;MAYBE SET B AND C TO 0?
-;SET PC, A
-SET PC, POP
+
+SET PC, A ;calls the subroutine returned by *p.lookup*
  ;
 
 ;:### s.drawPrompt (pointer)
@@ -512,10 +521,7 @@ SET A, 1
 SET PC, POP
  ;
 ;:
-;HAS A GREAT DEAL OF TROUBLE INITIALIZING TABLES. LENGTHS 0 AND 1 ARE VERY PROBLEMATIC, ENDING IN LOOPS OR IMPROPER JUMPS
-;REQUIRES IMMEDIATE ATTENTION
-;REQUIRES IMMEDIATE ATTENTION, AGAIN, SEEMINGLY IN SEARCHVALTABLE, OR SOMETHING WRONG WITH THE REST OF HASHINSERT WITH LENGTH 0
-;STACK CORRUPTION
+;RETURNS INCORRECT VALUE IF DOING HASHGET ON AN UNPRESENT VALUE
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; DATALIB ; Data Managing Library ;
@@ -563,9 +569,9 @@ SET PC, POP
 ;:**under development**
 ;:
 :dl.hashInsert
-SET PUSH, [C+2] ;store *length* from header
 SET PUSH, B ;store *insertValue*
 SET PUSH, [C+1] ;store *indicies* from header
+SET PUSH, C ;store pointer to header
 
 SET B, C
 ADD B, 4 ;start of sortedTable (for lookups)
@@ -573,11 +579,13 @@ SET C, [C+2] ;length of sortedTable
 
 JSR dl.sortedInsert
 
+SET C, POP
+ADD [C+2], 1 ;add one to the length
+
 ADD A, POP ;retrieve *indicies* from stack
 
 SET B, A
 SET A, POP ;retrieve *insertValue* from stack
-SET C, POP ;retrieve *length* from stack
 
 SET PC, dl.unsortedInsert
  ;
@@ -609,6 +617,9 @@ SET PC, dl.unsortedInsert ;exit when this subroutine exits
 IFE C, 0 ;if *tableLength* is zero, return the tableLocation
   SET PC, dl.searchValTable.noLength
 
+IFE C, 1
+  SET PC, dl.searchValTable.lengthOne
+
 SET PUSH, I
 
 :dl.searchValTable.recheck
@@ -620,13 +631,13 @@ IFE [I], A
 SET PC, dl.searchValTable.found
 
 IFE C, 1
-SET PC, exf
+  SET PC, dl.searchValTable.exf
 
 IFG A, [I]
-SET PC, dl.searchValTable.toolow
+  SET PC, dl.searchValTable.toolow
 
-IFG [I], A
-SET PC, dl.searchValTable.toohigh
+IFL A, [I]
+  SET PC, dl.searchValTable.toohigh
 
 SET PC, dl.searchValTable.recheck
 
@@ -649,6 +660,18 @@ SET PC, POP
 :dl.searchValTable.noLength
 SET A, B
 SET PC, POP
+
+:dl.searchValTable.lengthOne
+IFG A, [B] ;if *insertValue* is greater than the existing value
+  ADD B, 1 ;look at the second value
+
+SET A, B ;return B
+SET PC, POP
+
+:dl.searchValTable.exf
+SET A, 1
+SET I, POP
+SET PC, POP
  ;
 
 ;:### dl.findInsertIndex (searchTerm, tableLocation, tableLength)
@@ -657,22 +680,24 @@ SET PC, POP
 :dl.findInsertIndex
 JSR dl.searchValTable
 
-IFN A, 1
-  SET PC, exf ;exit false if 
+IFE A, 1 ;if the value isn't there
+  ADD A, B ;add B to make it the index to insert at
+
+;DO SOMETHING IF A != 1 AND LENGTH ISN'T LOW
   
-SET A, B
-ADD A, 1
 SET PC, POP
  ;
  
 ;:### dl.unsortedInsert (insertValue, insertLocation)
 ;:Inserts *insertValue* at *insertLocation* and pushes the value it would replace upward in memory recursively until only a null is overwritten.
+;:**returns** *insertLocation*
 ;:
 :dl.unsortedInsert
 SET PUSH, I
 SET PUSH, X ;SHOULD JUST USE A
 SET PUSH, Y ;SHOULD JUST USE B
 
+SET PUSH, B
 SET I, B
 SET X, A
 
@@ -686,12 +711,17 @@ SET X, Y
 SET PC, dl.unsortedInsert.loop
 
 :dl.unsortedInsert.exit
+SET A, POP
 SET Y, POP
 SET X, POP
 SET I, POP
 SET PC, POP
  ;
  ;;
+ 
+
+:screendata
+:ht dat 0,0,0,0
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; HWMAN ; Hardware Manager ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -846,6 +876,33 @@ IFL I, C
 ;:**STILL IN DEVELOPMENT; DO NOT USE**
  ;
  ;;
+;;;;;;;;;;;;;;;;;;
+; KeyboardDaemon ;
+;;;;;;;;;;;;;;;;;;
+;:KeyboardDaemon should be invoked by the interrupt handler whenever a keypress is detected. It has a number of variables that must be set at compile time, but those important for ASCII input should be set per keyboard session.
+;:
+
+
+:v.kd.modeflag DAT 0
+:v.kd.writePointer DAT 0
+:v.kd.effect DAT 0
+:v.kd.enterPointer DAT 0
+
+;:### kd.setup (A=, B=mode, C=effect, I=writePointer, J=enterPointer)
+;:
+:kd.setup
+SET [v.kd.modeflag], B
+SET [v.kd.effect], C
+SET [v.kd.writePointer], I
+SET [v.kd.enterPointer], J
+SET PC, POP
+
+;:### kd.handle
+;:This subroutine should be called by an interrupt triggered by a keypress.
+;:
+:kd.handle
+HWI [HW.GenericKeyboard]
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Monitor Preallocation ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -936,6 +993,16 @@ SET B, POP ;B is a pointer the null
 ADD B, 1 ;B is now a pointer to the first instruction
 SET C, p.hashTable ;C is a pointer to the hash table
 SET PC, dl.hashInsert ;add the package to the table and exit with subroutine
+ ;
+ 
+;:### p.lookup (key)
+;:Looks up a package in *p.hashTable* with *key*.
+;:**returns** a pointer to the main subroutine of the package
+;:
+:p.lookup
+SET B, p.hashTable
+JSR dl.hashGet ;returns value in A
+SET PC, POP
  ;
 
 :p.hashTable

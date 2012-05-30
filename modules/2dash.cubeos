@@ -150,11 +150,11 @@ SET PC, s.parse.getFirstArg
 SUB B, A ;make B the length of the first argument
 JSR crp.dsHash ;returns the hashvalue in A
 
-;LOOK UP A IN THE HASHTABLE, RETURN IN A
+JSR p.lookup
 
 ;MAYBE SET B AND C TO 0?
-;SET PC, A
-SET PC, POP
+
+SET PC, A ;calls the subroutine returned by *p.lookup*
  ;
 
 ;:### s.drawPrompt (pointer)

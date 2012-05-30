@@ -56,6 +56,16 @@ ADD B, 1 ;B is now a pointer to the first instruction
 SET C, p.hashTable ;C is a pointer to the hash table
 SET PC, dl.hashInsert ;add the package to the table and exit with subroutine
  ;
+ 
+;:### p.lookup (key)
+;:Looks up a package in *p.hashTable* with *key*.
+;:**returns** a pointer to the main subroutine of the package
+;:
+:p.lookup
+SET B, p.hashTable
+JSR dl.hashGet ;returns value in A
+SET PC, POP
+ ;
 
 :p.hashTable
 DAT 0, 0, 0, 0
