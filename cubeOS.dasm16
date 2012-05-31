@@ -548,7 +548,7 @@ SET PC, POP
 ;:### dl.hashGet (searchTerm, hashTablePointer)
 ;:Searches the hash table at *hashTablePointer* for *searchTerm* in the lookup portion of it. It returns the value in the value portion associated with the searchTerm.
 ;:
-;:**returns** value associated by the hash table with *searchTerm*.
+;:**returns** value associated by the hash table with *searchTerm*, or 1 if it could not be found
 ;:**development version** 
 ;:
 :dl.hashGet
@@ -558,8 +558,16 @@ SET C, [B+2] ;length
 ADD B, 4 ;location
 JSR dl.searchValTable
 
+IFE A, 1
+  SET PC, dl.hashGet.exf
+
 ADD A, POP ;make A an index in the value table
 SET A, [A] ;return the value, rather than the index
+SET PC, POP
+
+:dl.hashGet.exf
+;A is 1
+SET B, POP
 SET PC, POP
  ;
 
@@ -954,6 +962,9 @@ JSR dl.makeHashTable
 ;>
 ;LOAD CALLS BELOW ARE ADDED BY HAND. THEY SHOULD BE INSERTED PROGRAMMATICALLY DURING PRE-PROCESSING
 
+;SET A, package.nocmd
+;JSR p.loadPackage
+
 SET A, package.ls
 JSR p.loadPackage
 
@@ -1002,6 +1013,10 @@ SET PC, dl.hashInsert ;add the package to the table and exit with subroutine
 :p.lookup
 SET B, p.hashTable
 JSR dl.hashGet ;returns value in A
+
+;IFE A, 1
+;  SET PC, p.lookup.failed
+
 SET PC, POP
  ;
 
@@ -1023,6 +1038,18 @@ DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 ;<
 
 ;PACKAGES BELOW ARE INCLUDED BY HAND CURRENTLY. THEY SHOULD BE ADDED PROGRAMMATICALLY DURING PRE-PROCESSING
+
+;:package.nocmd
+
+DAT 0xffab, 0xcdff
+DAT 0,0
+
+SET A, package.nocmd.text
+SET B, [v.stdout]
+JSR typ.cCopy
+
+:package.nocmd.text
+DAT 0xf03a, 0xf028, 0
 
 ;:### pack.ls
 ;:Writes the name first link in the root directory to stdout. <strike>Writes the names all of the links (files and directories) in the current working directory to stdout.</strike>

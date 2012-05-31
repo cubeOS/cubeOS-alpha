@@ -25,7 +25,7 @@ SET PC, POP
 ;:### dl.hashGet (searchTerm, hashTablePointer)
 ;:Searches the hash table at *hashTablePointer* for *searchTerm* in the lookup portion of it. It returns the value in the value portion associated with the searchTerm.
 ;:
-;:**returns** value associated by the hash table with *searchTerm*.
+;:**returns** value associated by the hash table with *searchTerm*, or 1 if it could not be found
 ;:**development version** 
 ;:
 :dl.hashGet
@@ -35,8 +35,16 @@ SET C, [B+2] ;length
 ADD B, 4 ;location
 JSR dl.searchValTable
 
+IFE A, 1
+  SET PC, dl.hashGet.exf
+
 ADD A, POP ;make A an index in the value table
 SET A, [A] ;return the value, rather than the index
+SET PC, POP
+
+:dl.hashGet.exf
+;A is 1
+SET B, POP
 SET PC, POP
  ;
 
