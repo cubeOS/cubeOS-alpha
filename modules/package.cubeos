@@ -31,12 +31,12 @@ SET PC, POP
 ;:### p.loadPackage (pointer)
 ;:Loads a package by adding the *identifier*'s crp.dsHash value and a pointer to the first instruction to the hash table. See Packages for more details.
 ;:
-;:**returns** 0 if successful, 1 if invalid package format
+;:**returns** <strike>0 if successful,</strike> 1 if invalid package format
 ;:
 :p.loadPackage
-IFN [A], 0xffab
-  IFN [A+1], 0xcdff ;DOES NOT CHECK FOR VALID PACKAGE
-    SET PC, exf ;fail if not there
+IFN [A], 0xffab ;ONLY CHECKS FIRST WORD
+  IFN [A+1], 0xcdff
+    SET PC, exf ;fail if not invalid header
 
 ADD A, 2
 
@@ -64,18 +64,13 @@ SET PC, dl.hashInsert ;add the package to the table and exit with subroutine
 ;:Looks up a package in *p.hashTable* with *key*.
 ;:**returns** a pointer to the main subroutine of the package
 ;:
-;BREAKS WHEN CANNOT FIND VALUE, OR SOMETHING
+;REBOOTS WHEN CANNOT FIND KEY
 :p.lookup
 SET B, p.hashTable
 JSR dl.hashGet ;returns value in A
-<<<<<<< HEAD
 
-;IFE A, 1
-;  SET PC, p.lookup.failed
+SET X, A ;for debugging
 
-=======
-SET X, A
->>>>>>> 3eba8672e09170fc589c185997b499bb3fd969a9
 SET PC, POP
  ;
 
@@ -105,7 +100,7 @@ DAT 0,0
 
 SET A, package.nocmd.text
 SET B, [v.stdout]
-JSR typ.cCopy
+SET PC, typ.cCopy
 
 :package.nocmd.text
 DAT 0xf03a, 0xf028, 0
@@ -153,6 +148,7 @@ DAT "inferno",0
 
 SET A, pack.inferno.text
 SET B, [v.stdout]
+SET PC, typ.cCopy
 
 :pack.inferno.text DAT 0xf04c, 0xf061, 0xf073, 0xf063, 0xf069, 0xf061, 0xf074, 0xf065, 0xf020, 0xf06f, 0xf067, 0xf06e, 0xf065, 0xf020, 0xf073, 0xf070, 0xf065, 0xf072, 0xf061, 0xf06e, 0xf07a, 0xf061, 0xf02c, 0xf020, 0xf076, 0xf06f, 0xf069, 0xf020, 0xf063, 0xf068, 0xf027, 0xf069, 0xf06e, 0xf074, 0xf072, 0xf061, 0xf074, 0xf065, 0
  ;
