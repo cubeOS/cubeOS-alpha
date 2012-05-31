@@ -1,4 +1,4 @@
-;:### pack.ls
+;:### package.ls
 ;:Writes the name first link in the root directory to stdout. <strike>Writes the names all of the links (files and directories) in the current working directory to stdout.</strike>
 
 :package.ls

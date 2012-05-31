@@ -42,6 +42,8 @@ SET A, videoRAM
 SET B, fontRAM
 JSR sv.init ;set up boot screen and screen
 
+JSR pih.init
+
 SET A, 0x8000
 SET B, 0x810
 SET C, 128
@@ -51,8 +53,7 @@ JSR cat.mountSystem ;initialize FS
 SET [0xB00], 0xF03A
 SET [0xB01], 0xF029 ;":)" in stdout
 
-;THE PACKAGE HANDLER IS CURRENTLY UNSTABLE
-;JSR p.init ;initialize DPH
+JSR p.init ;initialize DPH
 
 SET A, 1
 :__BOOT.bootscreenDisplayLoop
@@ -74,6 +75,18 @@ SET PC, halt
 ;:**under development**
 ;:
 :SYSTEM.RESTART
+SET A, 0
+SET B, 0
+SET C, 0
+SET X, 0
+SET Y, 0
+SET Z, 0
+SET I, 0
+SET J, 0
+SET SP, 0
+IAS 0
+SET PC, 0
+
 
 ;:### ext
 ;:Exits a subroutine with A set to 0 (`TRUE`)
@@ -97,6 +110,17 @@ SET PC, POP
 ;;;;;;;;;;;;;;;;
 ; DASH ; Shell ;
 ;;;;;;;;;;;;;;;;
+;:The DASH Shell is essential to cubeOS's function. It acts as an interpreter for ASCII commands, <strike>which are passed to the package manager in order to directly execute subroutines,</strike> and also handles keyboard input.
+;:
+;:## Usage
+;:At the prompt, which is of the form "*CWD*$", the user can use an attached Generic Keyboard to input ASCII and control characters. 
+;:
+;:## Control Characters
+;:
+;:### Control + Delete
+;:Restarts the DASH Shell by calling *s.instance*.
+;:
+;:## Subroutines
 
 :v.sPrompt DAT 0x2024
 :v.promptLoc DAT 0
@@ -123,13 +147,14 @@ JSR sv.clear ;clear the screen
 SET A, [v.scrnLoc]
 
 :s.instance.promptLoop
-JSR s.takeIn ;s.takeIn TAKES CURSOR ARGUMENT
+JSR s.takeIn
 SET PUSH, A ;keep track of cursor location
 
 JSR s.parse
 
 SET A, POP ;restore cursor location for passing to s.stdout
-JSR s.stdout ;s.stdout MAY BE BREAKING THE CURSOR ARGUMENT FOR PASSING INTO s.takeIn THEREBY CAUSING THE STRANGE ONE-COMMAND-THEN-BREAK BUG
+JSR s.stdout
+
 SET PC, s.instance.promptLoop
 
 SET PC, POP
@@ -155,7 +180,7 @@ IFL I, [v.promptLoc]
 SET [I], 0xf09e ;cursor character
 
 :s.takeIn.wait
-HWI [HW.GenericKeyboard] ;KEYBOARD HARDWARE DEVICE
+HWI [HW.GenericKeyboard]
 
 IFG C, 0x1f
   IFL C, 0x80
@@ -166,6 +191,11 @@ IFE C, 0x10
 
 IFE C, 0x11
   SET PC, s.takeIn.enter
+  
+;INSERT (0x12)
+  
+IFE C, 0x13
+  SET PC, s.takeIn.delete
   
 SET PC, s.takeIn.wait
 
@@ -187,7 +217,19 @@ SET PC, s.takeIn.loop
 STD [I], 0
 SET [I], 0
 SET PC, s.takeIn.loop
+ ;
 
+:s.takeIn.delete
+SET A, 2 ;changes interrupt action, so must be reset afterward
+SET B, 0x91 ;sets B to the *Control* key
+HWI [HW.GenericKeyboard] ;C becomes 1 if *Control* is pressed
+
+IFE C, 1 ;exit if 
+  SET PC, s.instance
+
+SET A, 1 ;reset interrupt action
+SET PC, s.takeIn.loop
+ ;
 
 :s.takeIn.enter
 SET [I], 0
@@ -203,34 +245,25 @@ SET PC, POP
 ;:### s.parse
 ;:It's not worth documenting this spaghetti code. It will be completely rewritten when *package* works.
 ;:
-
 :s.parse
-SET PUSH, I
-SET I, [v.stdin]
-SET A, v.cmdmem
-SET [A], 1
-SET B, 0x1F ;last five bits
+SET A, [v.stdin]
+SET B, A
 
-:s.parse.trans
-IFE [I], 0
-  SET PC, s.parse.compare
+:s.parse.getFirstArg
+IFC [B], 0x20 ;if [B] is 0x0000 or 0x0020
+  SET PC, s.parse.exit
+ADD B, 1
+SET PC, s.parse.getFirstArg
 
-SET C, B
-AND C, [I]
-MUL [A], C
-ADD I, 1
-SET PC, s.parse.trans
+:s.parse.exit
+SUB B, A ;make B the length of the first argument
+JSR crp.dsHash ;returns the hashvalue in A
 
+JSR p.lookup
 
-:s.parse.compare
-AND [A], 0xFF
-ADD [A], 0x900 ;MEMORY LOCATION
+;MAYBE SET B AND C TO 0?
 
-SET A, [A]
-SET I, POP
-IFE [A], 0 ;SHOULD EXIT WITH ERROR MESSAGE
-  SET PC, exf
-SET PC, [A] ;look up in table
+SET PC, A ;calls the subroutine returned by *p.lookup*
  ;
 
 ;:### s.drawPrompt (pointer)
@@ -430,7 +463,6 @@ SET PC, POP
 
 ;:##crp.dsHash (inputPointer, inputLength)
 ;:Reads data of *inputLength* from *inputPointer* and performs a hash function on it.
-;:
 ;:**returns** the 16-bit hash
 ;:
 ;:For every value, shift the word *i* left and BOR with EX. XOR all of the resulting values together to produce the hash.
@@ -456,7 +488,7 @@ BOR C, EX
 XOR A, C
 
 STI C, 0 ;efficient I and J increment
-IFN I, B
+IFL I, B
   SET PC, crp.dsHash.loop
 
 SET J, POP
@@ -489,14 +521,11 @@ SET A, 1
 SET PC, POP
  ;
 ;:
-;HAS A GREAT DEAL OF TROUBLE INITIALIZING TABLES. LENGTHS 0 AND 1 ARE VERY PROBLEMATIC, ENDING IN LOOPS OR IMPROPER JUMPS
-;REQUIRES IMMEDIATE ATTENTION
+;RETURNS INCORRECT VALUE IF DOING HASHGET ON AN UNPRESENT VALUE
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; DATALIB ; Data Managing Library ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;:# DataLib
 ;:DataLib is a library for managing arbitrary amounts of data with relative speed and efficiency.
 ;:
 
@@ -505,7 +534,8 @@ SET PC, POP
 ;:
 
 ;:### dl.makeHashTable (headerPointer, indicies, startingLength)
-;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. 
+;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. *length* is not the total length of the table, but rather the number of occupied indicies.
+;:**returns** *headerPointer*
 ;:
 :dl.makeHashTable
 SET [A], 0x5468 ;"hT" magic number
@@ -518,9 +548,28 @@ SET PC, POP
 ;:### dl.hashGet (searchTerm, hashTablePointer)
 ;:Searches the hash table at *hashTablePointer* for *searchTerm* in the lookup portion of it. It returns the value in the value portion associated with the searchTerm.
 ;:
-;:**returns** value associated by the hash table with *searchTerm*, or 1 if it could not be found.
-;:**under development**
+;:**returns** value associated by the hash table with *searchTerm*, or 1 if it could not be found
+;:**development version** 
 ;:
+:dl.hashGet
+SET PUSH, [B+1] ;store the number of indicies
+
+SET C, [B+2] ;length
+ADD B, 4 ;location
+JSR dl.searchValTable
+
+IFE A, 1
+  SET PC, dl.hashGet.exf
+
+ADD A, POP ;make A an index in the value table
+SET A, [A] ;return the value, rather than the index
+SET PC, POP
+
+:dl.hashGet.exf
+;A is 1
+SET B, POP
+SET PC, POP
+ ;
 
 ;:### dl.hashInsert (lookupValue, insertValue, hashTablePointer)
 ;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table. This is designed to work very well with the 16-bit hashing algorithm crp.dsHash.
@@ -528,9 +577,9 @@ SET PC, POP
 ;:**under development**
 ;:
 :dl.hashInsert
-SET PUSH, [C+2] ;store *length* from header
 SET PUSH, B ;store *insertValue*
 SET PUSH, [C+1] ;store *indicies* from header
+SET PUSH, C ;store pointer to header
 
 SET B, C
 ADD B, 4 ;start of sortedTable (for lookups)
@@ -538,13 +587,15 @@ SET C, [C+2] ;length of sortedTable
 
 JSR dl.sortedInsert
 
+SET C, POP
+ADD [C+2], 1 ;add one to the length
+
 ADD A, POP ;retrieve *indicies* from stack
 
 SET B, A
 SET A, POP ;retrieve *insertValue* from stack
-SET C, POP ;retrieve *length* from stack
 
-JSR dl.unsortedInsert
+SET PC, dl.unsortedInsert
  ;
 
 ;:## Sorted Table
@@ -574,6 +625,9 @@ SET PC, dl.unsortedInsert ;exit when this subroutine exits
 IFE C, 0 ;if *tableLength* is zero, return the tableLocation
   SET PC, dl.searchValTable.noLength
 
+IFE C, 1
+  SET PC, dl.searchValTable.lengthOne
+
 SET PUSH, I
 
 :dl.searchValTable.recheck
@@ -585,13 +639,13 @@ IFE [I], A
 SET PC, dl.searchValTable.found
 
 IFE C, 1
-SET PC, exf
+  SET PC, dl.searchValTable.exf
 
 IFG A, [I]
-SET PC, dl.searchValTable.toolow
+  SET PC, dl.searchValTable.toolow
 
-IFG [I], A
-SET PC, dl.searchValTable.toohigh
+IFL A, [I]
+  SET PC, dl.searchValTable.toohigh
 
 SET PC, dl.searchValTable.recheck
 
@@ -614,6 +668,18 @@ SET PC, POP
 :dl.searchValTable.noLength
 SET A, B
 SET PC, POP
+
+:dl.searchValTable.lengthOne
+IFG A, [B] ;if *insertValue* is greater than the existing value
+  ADD B, 1 ;look at the second value
+
+SET A, B ;return B
+SET PC, POP
+
+:dl.searchValTable.exf
+SET A, 1
+SET I, POP
+SET PC, POP
  ;
 
 ;:### dl.findInsertIndex (searchTerm, tableLocation, tableLength)
@@ -622,22 +688,24 @@ SET PC, POP
 :dl.findInsertIndex
 JSR dl.searchValTable
 
-IFN A, 1
-  SET PC, exf ;exit false if 
+IFE A, 1 ;if the value isn't there
+  ADD A, B ;add B to make it the index to insert at
+
+;DO SOMETHING IF A != 1 AND LENGTH ISN'T LOW
   
-SET A, B
-ADD A, 1
 SET PC, POP
  ;
  
 ;:### dl.unsortedInsert (insertValue, insertLocation)
 ;:Inserts *insertValue* at *insertLocation* and pushes the value it would replace upward in memory recursively until only a null is overwritten.
+;:**returns** *insertLocation*
 ;:
 :dl.unsortedInsert
 SET PUSH, I
 SET PUSH, X ;SHOULD JUST USE A
 SET PUSH, Y ;SHOULD JUST USE B
 
+SET PUSH, B
 SET I, B
 SET X, A
 
@@ -651,12 +719,17 @@ SET X, Y
 SET PC, dl.unsortedInsert.loop
 
 :dl.unsortedInsert.exit
+SET A, POP
 SET Y, POP
 SET X, POP
 SET I, POP
 SET PC, POP
  ;
  ;;
+ 
+
+:screendata
+:ht dat 0,0,0,0
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; HWMAN ; Hardware Manager ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -811,6 +884,33 @@ IFL I, C
 ;:**STILL IN DEVELOPMENT; DO NOT USE**
  ;
  ;;
+;;;;;;;;;;;;;;;;;;
+; KeyboardDaemon ;
+;;;;;;;;;;;;;;;;;;
+;:KeyboardDaemon should be invoked by the interrupt handler whenever a keypress is detected. It has a number of variables that must be set at compile time, but those important for ASCII input should be set per keyboard session.
+;:
+
+
+:v.kd.modeflag DAT 0
+:v.kd.writePointer DAT 0
+:v.kd.effect DAT 0
+:v.kd.enterPointer DAT 0
+
+;:### kd.setup (A=, B=mode, C=effect, I=writePointer, J=enterPointer)
+;:
+:kd.setup
+SET [v.kd.modeflag], B
+SET [v.kd.effect], C
+SET [v.kd.writePointer], I
+SET [v.kd.enterPointer], J
+SET PC, POP
+
+;:### kd.handle
+;:This subroutine should be called by an interrupt triggered by a keypress.
+;:
+:kd.handle
+HWI [HW.GenericKeyboard]
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Monitor Preallocation ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -851,7 +951,9 @@ DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,
 :v.tableLen DAT 0 ;number of commands in the tables
 
 ;:### p.init
-;:Initializes all of the pre-defined packages and their respective commands so that they can be accessed in a table. **Currently unstable.**
+;:Initializes all of the pre-defined packages and their respective commands so that they can be accessed in a table.
+;:**Currently unstable.**
+;:
 :p.init
 SET A, p.hashTable
 SET B, 128
@@ -859,6 +961,9 @@ JSR dl.makeHashTable
 
 ;>
 ;LOAD CALLS BELOW ARE ADDED BY HAND. THEY SHOULD BE INSERTED PROGRAMMATICALLY DURING PRE-PROCESSING
+
+;SET A, package.nocmd
+;JSR p.loadPackage
 
 SET A, package.ls
 JSR p.loadPackage
@@ -872,36 +977,47 @@ SET PC, POP
 ;:### p.loadPackage (pointer)
 ;:Loads a package by adding the *identifier*'s crp.dsHash value and a pointer to the first instruction to the hash table. See Packages for more details.
 ;:
-;:**returns** 0 if successful, 1 if invalid package format
+;:**returns** <strike>0 if successful,</strike> 1 if invalid package format
 ;:
 :p.loadPackage
-IFN [A], 0xffab
-  IFN [A+1], 0xcdff ;check for valid magic word
-    SET PC, exf ;fail if not there
+IFN [A], 0xffab ;ONLY CHECKS FIRST WORD
+  IFN [A+1], 0xcdff
+    SET PC, exf ;fail if not invalid header
 
 ADD A, 2
 
-SET PUSH, I
-SET I, A
+SET B, A
 
 :p.loadPackage.findNullinIdentifier
-ADD I, 1
-IFN [I], 0
+ADD B, 1
+IFN [B], 0
   SET PC, p.loadPackage.findNullinIdentifier
 
-SET B, I
+SET PUSH, B ;store the location of the null before instructions
 SUB B, A ;make B the length of the identifier
-
-ADD I, 1 ;I is a pointer to the first instruction now (for use later)
-
 ;A is the start of the identifier
 
 JSR crp.dsHash
 
 ;A is now the dsHash of the identifier
-SET B, I ;B is a pointer to the first instruction
+SET B, POP ;B is a pointer the null
+ADD B, 1 ;B is now a pointer to the first instruction
 SET C, p.hashTable ;C is a pointer to the hash table
 SET PC, dl.hashInsert ;add the package to the table and exit with subroutine
+ ;
+ 
+;:### p.lookup (key)
+;:Looks up a package in *p.hashTable* with *key*.
+;:**returns** a pointer to the main subroutine of the package
+;:
+;REBOOTS WHEN CANNOT FIND KEY
+:p.lookup
+SET B, p.hashTable
+JSR dl.hashGet ;returns value in A
+
+SET X, A ;for debugging
+
+SET PC, POP
  ;
 
 :p.hashTable
@@ -923,7 +1039,19 @@ DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 ;PACKAGES BELOW ARE INCLUDED BY HAND CURRENTLY. THEY SHOULD BE ADDED PROGRAMMATICALLY DURING PRE-PROCESSING
 
-;:### pack.ls
+;:package.nocmd
+
+DAT 0xffab, 0xcdff
+DAT 0,0
+
+SET A, package.nocmd.text
+SET B, [v.stdout]
+SET PC, typ.cCopy
+
+:package.nocmd.text
+DAT 0xf03a, 0xf028, 0
+
+;:### package.ls
 ;:Writes the name first link in the root directory to stdout. <strike>Writes the names all of the links (files and directories) in the current working directory to stdout.</strike>
 
 :package.ls
@@ -966,6 +1094,7 @@ DAT "inferno",0
 
 SET A, pack.inferno.text
 SET B, [v.stdout]
+SET PC, typ.cCopy
 
 :pack.inferno.text DAT 0xf04c, 0xf061, 0xf073, 0xf063, 0xf069, 0xf061, 0xf074, 0xf065, 0xf020, 0xf06f, 0xf067, 0xf06e, 0xf065, 0xf020, 0xf073, 0xf070, 0xf065, 0xf072, 0xf061, 0xf06e, 0xf07a, 0xf061, 0xf02c, 0xf020, 0xf076, 0xf06f, 0xf069, 0xf020, 0xf063, 0xf068, 0xf027, 0xf069, 0xf06e, 0xf074, 0xf072, 0xf061, 0xf074, 0xf065, 0
  ;
@@ -1240,6 +1369,7 @@ SET [I], 0
 
 ;:### typ.cCopy (inputPointer, outputPointer)
 ;:Copies the null-terminated string at *inputPointer* to *outputPointer*.
+;:**returns** the location following the last character of the copy at the *outputPointer* location (?)
 ;:
 
 :typ.cCopy
