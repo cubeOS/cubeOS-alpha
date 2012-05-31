@@ -106,7 +106,8 @@ SET PC, typ.cCopy
 DAT 0xf03a, 0xf028, 0
 
 ;:### package.ls
-;:Writes the name first link in the root directory to stdout. <strike>Writes the names all of the links (files and directories) in the current working directory to stdout.</strike>
+;:Writes the names all of the links (files and directories) in the current working directory to stdout. **Output is currently somewhat garbled.**
+;:
 
 :package.ls
 
@@ -118,22 +119,29 @@ DAT "ls",0
 
 SET PUSH, I
 SET PUSH, J
+SET PUSH, X
 
-;SHOULD LIST WHAT IS IN THE CURRENT DIRECTORY
-;SHOULD LIST MORE THAN ONE ITEM
+;SHOULD NOT ALWAYS LIST ROOT
 
 SET I, [env.fs]
-SET I, [I+4]
-SET J, I
-ADD J, 4
-;??? SET I, [J+1] ;track length of sector
-;??? ADD I, 5 ;first letter of first link
+SET I, [I+4] ;I is the start of the first inode now
+SET J, [I+2] ;J is the length of the first inode now
+ADD J, I ;J is the stop location now
+ADD I, 3 ;I is the start of the first link now
 
-SET A, J
-SET B, [v.stdout]
+SET X, [v.stdout]
 
-JSR typ.cUnpack
+:package.ls.loop
+SET A, I
+SET B, X
+JSR typ.cUnpack ;UNPACKS WITH COLOR SUPPLIED BY SUBROUTINE; SHOULD UNPACK LITERALLY AND ALLOW SHELL TO HANDLE COLOR
 
+ADD I, 16
+ADD X, 2 ;SHOULD PUT TAB OR NEWLINE CHARACTER AFTER FILENAME INSTEAD OF JUST ADDING 2 TO DISPLAY POSITION
+IFL I, J
+  SET PC, package.ls.loop
+
+SET X, POP
 SET J, POP
 SET I, POP
 SET PC, POP

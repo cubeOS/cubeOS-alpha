@@ -2,7 +2,7 @@
 ; CAT ; CAT FileSystem         ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;:# CAT
-;:**CAT** is the default file system for cubeOS. It is based on the [Harry's Allocation Table](https://github.com/0x10cStandardsCommittee/0x10c-Standards/blob/master/FS/Draft_Harrys_Allocation_Table.txt) file system format. CubeOS uses hashes to identify links, in addition to fourteen character strings.
+;:**CAT** is the default file system for cubeOS. It is based on the [Harry's Allocation Table](https://github.com/0x10cStandardsCommittee/0x10c-Standards/blob/master/FS/Draft_Harrys_Allocation_Table.txt) file system format. cubeOS uses hashes to identify links, in addition to fourteen character strings.
 ;:
 ;:**requires**
 ;:
@@ -95,6 +95,43 @@ STI [I], 0
 STI [I], 0
 STI [I], 0
 STI [I], 0 ;16
+
+STI [I], 1 ;link directs to a inode 1 (text file)
+STI [I], 0x6574 ; "test"
+STI [I], 0x7473 ;
+STI [I], 0 ;4
+STI [I], 0
+STI [I], 0
+STI [I], 0
+STI [I], 0 ;8
+STI [I], 0
+STI [I], 0
+STI [I], 0
+STI [I], 0 ;12
+STI [I], 0
+STI [I], 0
+STI [I], 0
+STI [I], 0 ;16
+
+STI [I], 2
+STI [I], 0
+STI [I], 16
+
+STI [I], 0x54
+STI [I], 0x68
+STI [I], 0x69
+STI [I], 0x73
+STI [I], 0x20
+STI [I], 0x69
+STI [I], 0x73
+STI [I], 0x20
+STI [I], 0x61
+STI [I], 0x20
+STI [I], 0x74
+STI [I], 0x65
+STI [I], 0x73
+STI [I], 0x74
+STI [I], 0x2e
 
 :cat.mountSystem.exit
 SET A, POP ;return location
