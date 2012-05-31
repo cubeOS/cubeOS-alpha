@@ -180,7 +180,7 @@ SET PC, POP
  ;
 
 ;:### s.stdin (startPointer)
-;:Performs a C-style copy from *startPointer* to *v.stdin*.
+;:Performs a C-style copy from *startPointer* to *v.stdin*, replacing un-(single)quoted spaces with zeros.
 ;:
 :s.stdin
 SET PUSH, I
@@ -190,6 +190,14 @@ SET B, [v.stdin]
 :s.stdin.loop
 STI [B], [I]
 AND [B], 0x007F
+
+IFE [B], 0x27 ;single quote
+  XOR [s.stdin.quoteflag], 1 ;flip state
+  
+IFN [s.stdin.quoteflag], 1 ;unless they're quoted
+  IFE [B], 0x20 ;set spaces
+    JSR s.stdin.newarg
+
 ADD B, 1
 
 IFN [I], 0
@@ -198,6 +206,18 @@ IFN [I], 0
 SET [B], 0
 SET I, POP
 SET PC, POP
+
+:s.stdin.newarg
+SET [B], 0
+;ADD A POINTER TO THE ARGUMENT TO s.stdin.args
+SET PC, POP
+
+
+:s.stdin.quoteflag DAT 0 ;is 1 if iterator is inside quotes
+;:s.stdin.escflag DAT 0 ;is 1 if "\" was the most recent character
+
+;:s.stdin.args ;for handling arguments
+;DAT 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
  ;
 
 ;:### s.stdout (outputPointer)
