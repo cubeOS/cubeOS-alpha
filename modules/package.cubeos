@@ -61,9 +61,11 @@ SET PC, dl.hashInsert ;add the package to the table and exit with subroutine
 ;:Looks up a package in *p.hashTable* with *key*.
 ;:**returns** a pointer to the main subroutine of the package
 ;:
+;BREAKS WHEN CANNOT FIND VALUE, OR SOMETHING
 :p.lookup
 SET B, p.hashTable
 JSR dl.hashGet ;returns value in A
+SET X, A
 SET PC, POP
  ;
 
