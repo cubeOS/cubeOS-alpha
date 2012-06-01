@@ -129,12 +129,14 @@ ADD J, I ;J is the stop location now
 ADD I, 3 ;I is the start of the first link now
 
 SET B, [v.stdout]
+SET [B], 0xF001
+ADD B, 1
 
 :package.ls.loop ;DOES NOT LIST . PROPERLY
 SET A, I
 JSR typ.cCopy
 
-SET B, A;SHOULD PUT TAB OR NEWLINE CHARACTER AFTER FILENAME INSTEAD OF JUST ADDING 2 TO DISPLAY POSITION
+SET B, A;SHOULD PUT TAB OR NEWLINE CHARACTER AFTER FILENAME 
 ADD I, 16
 IFL I, J
   SET PC, package.ls.loop

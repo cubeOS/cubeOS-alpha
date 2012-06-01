@@ -80,7 +80,7 @@ STI [I], 0
 STI [I], 32
 
 STI [I], 0 ;link directs here
-STI [I], 0xf02E ; "."
+STI [I], 0x2E ; "."
 STI [I], 0
 STI [I], 0 ;4
 STI [I], 0
@@ -97,10 +97,10 @@ STI [I], 0
 STI [I], 0 ;16
 
 STI [I], 1 ;link directs to a inode 1 (text file)
-STI [I], 0xf074 ; "test"
-STI [I], 0xf065 ;
-STI [I], 0xf073 ;4
-STI [I], 0xf074
+STI [I], 0x74 ; "test"
+STI [I], 0x65 ;
+STI [I], 0x73 ;4
+STI [I], 0x74
 STI [I], 0
 STI [I], 0
 STI [I], 0 ;8
@@ -117,21 +117,21 @@ STI [I], 2
 STI [I], 0
 STI [I], 16
 
-STI [I], 0xf054
-STI [I], 0xf068
-STI [I], 0xf069
-STI [I], 0xf073
-STI [I], 0xf020
-STI [I], 0xf069
-STI [I], 0xf073
-STI [I], 0xf020
-STI [I], 0xf061
-STI [I], 0xf020
-STI [I], 0xf074
-STI [I], 0xf065
-STI [I], 0xf073
-STI [I], 0xf074
-STI [I], 0xf02e
+STI [I], 0x54
+STI [I], 0x68
+STI [I], 0x69
+STI [I], 0x73
+STI [I], 0x20
+STI [I], 0x69
+STI [I], 0x73
+STI [I], 0x20
+STI [I], 0x61
+STI [I], 0x20
+STI [I], 0x74
+STI [I], 0x65
+STI [I], 0x73
+STI [I], 0x74
+STI [I], 0x2e
 STI [I], 0
 
 :cat.mountSystem.exit
