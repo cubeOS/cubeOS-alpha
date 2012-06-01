@@ -22,3 +22,5 @@ then
 	cp $binT $binK
 	cp $binT $binS
 fi
+
+dcpu-16 $binT
