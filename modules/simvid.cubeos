@@ -26,6 +26,53 @@ SET [v.scrnEnd], B
 SET PC, POP
  ;
  
+;:### sv.write (inputPointer, outputPointer)
+;:Writes ASCII to the screen using special characters to act as directives. (This does not perform preprocessing such as translating normal ASCII into those special characters.) Special characters are as follows.
+;:**returns** the location of the null following the written text
+;:
+;:#### Color `0x01`
+;:Substitutes the first nine bits of every word following this with the first nine bits of this word.
+;:
+;:
+;:
+:sv.write
+SET PUSH, I
+SET PUSH, J
+
+SET I, A
+SET J, B
+SET [sv.write.v.color], 0xF000 ;default to white on black
+
+:sv.write.loop
+SET A, [I]
+AND A, 0x007F
+
+IFE A, 0x01
+  SET PC, sv.write.s.color
+
+BOR A, [sv.write.v.color]
+
+STI [J], A ;set the destination to the processed source and increment destination pointer and source pointer
+
+IFN [I], 0
+  SET PC, sv.write.loop
+  
+SET [J], [I] ;write the terminating null
+
+SET A, J
+SET J, POP
+SET I, POP
+SET PC, POP
+
+:sv.write.s.color
+SET [sv.write.v.color], [I]
+AND [sv.write.v.color], 0xFF80 ;first 9 bits
+ADD I, 1 ;increment the source, but not the destination
+SET PC, sv.write.loop
+
+:sv.write.v.color DAT 0
+ ;
+ 
 :sv.clear
 SET PUSH, I
 SET PUSH, J

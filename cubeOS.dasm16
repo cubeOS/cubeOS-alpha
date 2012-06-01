@@ -334,11 +334,13 @@ SET PC, POP
 :s.stdout
 JSR sv.getNewLine
 
-SET B, A ;output
-SET A, [v.stdout] ;location
-JSR typ.cCopy ;copy literally and null-terminated
+SET X, 1
 
-SET PC, POP
+SET B, A ;output
+SET A, [v.stdout] ;input
+JSR sv.write ;process to screen (null-terminated)
+
+SET X, 2
  ;
  ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1123,7 +1125,6 @@ DAT "ls",0
 
 SET PUSH, I
 SET PUSH, J
-SET PUSH, X
 
 ;SHOULD NOT ALWAYS LIST ROOT
 
@@ -1135,7 +1136,7 @@ ADD I, 3 ;I is the start of the first link now
 
 SET B, [v.stdout]
 
-:package.ls.loop
+:package.ls.loop ;DOES NOT LIST . PROPERLY
 SET A, I
 JSR typ.cCopy
 
@@ -1144,7 +1145,6 @@ ADD I, 16
 IFL I, J
   SET PC, package.ls.loop
 
-SET X, POP
 SET J, POP
 SET I, POP
 SET PC, POP
@@ -1161,7 +1161,7 @@ SET A, pack.inferno.text
 SET B, [v.stdout]
 SET PC, typ.cCopy
 
-:pack.inferno.text DAT 0xf04c, 0xf061, 0xf073, 0xf063, 0xf069, 0xf061, 0xf074, 0xf065, 0xf020, 0xf06f, 0xf067, 0xf06e, 0xf065, 0xf020, 0xf073, 0xf070, 0xf065, 0xf072, 0xf061, 0xf06e, 0xf07a, 0xf061, 0xf02c, 0xf020, 0xf076, 0xf06f, 0xf069, 0xf020, 0xf063, 0xf068, 0xf027, 0xf069, 0xf06e, 0xf074, 0xf072, 0xf061, 0xf074, 0xf065, 0
+:pack.inferno.text DAT 0xF001, 0x4c, 0x61, 0x73, 0x63, 0x69, 0x61, 0x74, 0x65, 0x20, 0x6f, 0x67, 0x6e, 0x65, 0x20, 0x73, 0x70, 0x65, 0x72, 0x61, 0x6e, 0x7a, 0x61, 0x2c, 0x20, 0x76, 0x6f, 0x69, 0x20, 0x63, 0x68, 0x27, 0x69, 0x6e, 0x74, 0x72, 0x61, 0x74, 0x65, 0
  ;
 
  ;;
@@ -1269,6 +1269,53 @@ SET [v.scrnLoc], B
 ADD B, 0x180
 SET [v.scrnEnd], B
 SET PC, POP
+ ;
+ 
+;:### sv.write (inputPointer, outputPointer)
+;:Writes ASCII to the screen using special characters to act as directives. (This does not perform preprocessing such as translating normal ASCII into those special characters.) Special characters are as follows.
+;:**returns** the location of the null following the written text
+;:
+;:#### Color `0x01`
+;:Substitutes the first nine bits of every word following this with the first nine bits of this word.
+;:
+;:
+;:
+:sv.write
+SET PUSH, I
+SET PUSH, J
+
+SET I, A
+SET J, B
+SET [sv.write.v.color], 0xF000 ;default to white on black
+
+:sv.write.loop
+SET A, [I]
+AND A, 0x007F
+
+IFE A, 0x01
+  SET PC, sv.write.s.color
+
+BOR A, [sv.write.v.color]
+
+STI [J], A ;set the destination to the processed source and increment destination pointer and source pointer
+
+IFN [I], 0
+  SET PC, sv.write.loop
+  
+SET [J], [I] ;write the terminating null
+
+SET A, J
+SET J, POP
+SET I, POP
+SET PC, POP
+
+:sv.write.s.color
+SET [sv.write.v.color], [I]
+AND [sv.write.v.color], 0xFF80 ;first 9 bits
+ADD I, 1 ;increment the source, but not the destination
+SET PC, sv.write.loop
+
+:sv.write.v.color DAT 0
  ;
  
 :sv.clear
