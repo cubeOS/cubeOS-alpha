@@ -30,10 +30,7 @@ SET A, 0x8000
 SET B, 0x810
 SET C, 128
 
-JSR cat.mountSystem ;initialize FS
-
-SET [0xB00], 0xF03A
-SET [0xB01], 0xF029 ;":)" in stdout
+;JSR cat.mountSystem ;initialize FS
 
 JSR p.init ;initialize DPH
 
