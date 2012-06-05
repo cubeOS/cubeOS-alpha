@@ -356,6 +356,19 @@ DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 ;:
 ;:**STILL UNDER HEAVY DEVELOPMENT. DO NOT USE**
 
+:cat.def.curDir DAT ".", 0 ;stock current directory name
+:cat.def.parDir DAT "..", 0 ;stock parent directory name
+
+;:## High-level Commands
+;:The high-level commands provide a smooth interface with the filesystem that can be used easily by modules and the rest of the operating system.
+;:
+
+
+
+;:## Low-level Commands
+;:The low-level commands are used by the high level commands to provide fast and efficient access to the framework of the filesystem itself.
+;:
+
 ;:### cat.mountSystem (location, length, sectorSize)
 ;:Mounts */* directory at *location*, reserving *length* words after it. It then initializes a cat filesystem with the given *sectorSize*.
 ;:
@@ -371,7 +384,7 @@ SET [env.fs], A
 SET PUSH, I
 SET PUSH, J
 SET PUSH, X
-SET PUSH, A
+SET PUSH, A ;store location for retrieval at the end
 SET I, A
 DIV B, C ;make B the maximum number of sectors ;SHOULD 
 
@@ -382,7 +395,7 @@ STI [I], 0xC001 ;magic number, cat v1.0
 STI [I], B ;number of sectors
 STI [I], 0 ;reserved for sector map start
 STI [I], 0 ;reserved for sector joins start
-STI [I], 0 ;reserved for sectors start
+STI [I], 0 ;reserved for sector start
 STI [I], C ;sector size
 STI [I], 0 ;sectors in use
 
@@ -396,13 +409,13 @@ ADD C, I ;C becomes sector map end location
 
 :cat.mountSystem.initSectorMap.loop
 SET X, 0xFFFF ;make X initializer for sector map
-SHR X, B ;set only the excess sectors to used
+SHR X, B ;set only the excess bits to used
 STI [I], X
 
 IFG X, 0 ;exit if that was enough bits to represent all sectors
   SET PC, cat.mountSystem.initSectorMap.end
 
-SUB B, 16 ;CAN WRAP AND BE UNSAFE
+SUB B, 16
 SET PC, cat.mountSystem.initSectorMap.loop ;COULD BE REORDERED MORE EFFICIENTLY
 
 :cat.mountSystem.initSectorMap.end
@@ -421,64 +434,28 @@ IFN I, B ;continue reserving until I reaches the end location
 SET [A+4], I
 
 :cat.mountSystem.initializeRoot
-STI [I], 1 ;inode is a directory (root directory)
-STI [I], 0
-STI [I], 32
+SET A, 0
+SET B, 1
+JSR cat.newInode
 
-STI [I], 0 ;link directs here
-STI [I], 0x2E ; "."
-STI [I], 0
-STI [I], 0 ;4
-STI [I], 0
-STI [I], 0
-STI [I], 0
-STI [I], 0 ;8
-STI [I], 0
-STI [I], 0
-STI [I], 0
-STI [I], 0 ;12
-STI [I], 0
-STI [I], 0
-STI [I], 0
-STI [I], 0 ;16
+SET A, 0
+SET B, 0
+SET C, cat.def.curDir
+JSR cat.newLink
 
-STI [I], 1 ;link directs to a inode 1 (text file)
-STI [I], 0x74 ; "test"
-STI [I], 0x65 ;
-STI [I], 0x73 ;4
-STI [I], 0x74
-STI [I], 0
-STI [I], 0
-STI [I], 0 ;8
-STI [I], 0
-STI [I], 0
-STI [I], 0
-STI [I], 0 ;12
-STI [I], 0
-STI [I], 0
-STI [I], 0
-STI [I], 0 ;16
+SET A, 0
+SET B, 1
+SET C, temp.cat.directoryName
+JSR cat.newLink
 
-STI [I], 2
-STI [I], 0
-STI [I], 16
+SET A, 1
+SET B, 2
+JSR cat.newInode
 
-STI [I], 0x54
-STI [I], 0x68
-STI [I], 0x69
-STI [I], 0x73
-STI [I], 0x20
-STI [I], 0x69
-STI [I], 0x73
-STI [I], 0x20
-STI [I], 0x61
-STI [I], 0x20
-STI [I], 0x74
-STI [I], 0x65
-STI [I], 0x73
-STI [I], 0x74
-STI [I], 0x2e
-STI [I], 0
+SET PC, cat.mountSystem.exit
+
+:temp.cat.directoryName DAT "test"
+:temp.cat.fileContent DAT "This is a test."
 
 :cat.mountSystem.exit
 SET A, POP ;return location
@@ -489,31 +466,88 @@ SET I, POP
 SET PC, POP
  ;
 
-;:### cat.findStrip (index)
-;:Finds the location in memory of the first word in a strip at the index given.
+;:### cat.getOpenSector ()
+;:Finds the first open sector in the filesystem
+;:**modifies** A
+;:**returns** sector number
 ;:
-;:**returns** first word of header inode of the strip at *index*
+:cat.getOpenSector
+SET PUSH, B
+SET PUSH, C
+SET PUSH, I
+
+SET A, [env.fs]
+SET B, [A+2] ;starting location
+SET C, [A+3] ;ending location
+
+:cat.getOpenSector.wordloop
+SET A, [C]
+
+;CHECK THROUGH AND FIND THE FIRST OPEN SECTOR
+
+SET I, POP
+SET C, POP
+SET B, POP
+
+;:### cat.getSectorPointer (sector)
+;:**modifies** A
+;:**returns** a pointer to the location of the given sector in memory
 ;:
-
-:cat.findStrip
-
-
-;:### cat.newInode (location, type, length)
-;:Creates a new inode at *location*.
-;:Types are 0, for unused, 1, for directory, and 2, for file.
-;:
-;:**returns** location after inode
-
-:cat.newInode
-SET [A], B
-ADD A, 2
-SET [A], C
-ADD A, 2
+:cat.getSectorPointer
+SET PUSH, B
+SET B, [env.fs]
+MUL A, [B+5] ;multiply by sector size
+ADD A, [B+4] ;add sector offset
+SET B, POP
 SET PC, POP
  ;
 
-;:### cat.newLink (stripSource, stripTarg, nameLocation)
+;:### cat.newInode (sector, type)
+;:Creates a new inode of *type* and length 0 at *sector*. It also marks the corresponding sector in sector map as used.
+;:Types are 0, for unused, 1, for directory, and 2, for file.
+;:**modifies** A, B
+;:**returns** sector of inode
+
+:cat.newInode
+SET PUSH, A ;store A for returning
+JSR cat.getSectorPointer ;make A a pointer to the start of that sector
+
+SET [A], B
+SET [A+1], 0 ;the number of links pointing to the inode
+SET [A+2], 0 ;the number content size
+SET [A+3], 0 ;reserved
+
+SET A, POP
+SET PC, POP
+ ;
+
+;:### cat.newLink (sector, targetSector, namePointer)
+;:Creates a new link under the given sector, extending the length of the inode automatically <strike>and overflowing to the next open sector (updating sector usage and linking) if necessary</strike>.
+;:The first word is the *targetSector*, and the remaining fifteen words are copied literally <strike>(maximum length fourteen)</strike> from the null-terminated word at *namePointer*.
+;:**returns** 0 if successful, and 1 if the given sector does not contain a directory
+;:
 :cat.newLink
+JSR cat.getSectorPointer ;get the memory location 
+
+IFN [A], 1 ;if the sector does not contain a directory
+  SET PC, exf ;exit false
+
+SET PUSH, A ;store A for later
+
+ADD A, [A+2] ;add the length of the existing links
+ADD A, 4 ;add the length of the inode
+;SHOULD CHECK TO SEE IF IT IS OUT OF BOUNDS OF THE SECTOR; IF SO, IT MUST CONTINUE ON TO EITHER THE LINKED SECTOR OR LINK ANOTHER
+
+SET [A], B ;set the link target
+ADD A, 1
+SET B, C
+
+JSR typ.cCopy ;SHOULD IMPOSE MAXIMUM LENGTH
+
+SET A, POP
+ADD [A+2], 16 ;add the length of the link (always 16) to the length of the inode
+SET PC, ext ;exit successful
+ ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; CRYPT ; Cryptography Lib ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
