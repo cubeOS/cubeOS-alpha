@@ -27,49 +27,45 @@ SET PC, POP
 ;:PinkiePie's interrupt handling process is as follows.
 ;:
 ;:1. Trigger interrupt queueing with `IAQ 1`
-;:2. Push `B` and `C` to the stack, so they won't be lost by any other calls
-;:3. Checks if the message is greater than 127, and jumps to the handler for that if so
-;:4. Checks if the message is greater than 63, and jumps to the handler for that if so
-;:5. Begins checks for low-value messages
+;:2. Drops the interrupt and returns with `RFI` if the message is greater than 128.
+;:3. Looks up the message in `pih.cmdtable`.
+;:4. If the value is `0xFFFF`, then return with `RFI`.
+;:5. Push `B` and `C` to the stack, so they will be preserved.
+;:6. `JSR` to the value returned by the table.
+;:7. Pop `C` and `B` from the stack, and do `RFI`.
+;:
+;:If the interrupt is actually an API call, (i.e. A call made to the OS with arguments.) then the receiving subroutine must pop arguments from the stack in order to retrieve them. This is necessary, but **be careful**.
 ;:
 
 ;THIS WHOLE THING COULD USE HASHTABLES
 
 :pih
 IAQ 1 ;trigger interrupt queueing
+
+IFG A, 128 ;If the message is too great
+  RFI 1
+
+SET A, [A+pih.cmdtable]
+
+IFE A, 0xffff
+  RFI 1
+
 SET PUSH, B
 SET PUSH, C
 
-IFG A, 127
-  SET PC, pih128
-  
-IFG A, 63
-  SET PC, pih64
+JSR A
+
+SET C, POP
+SET B, POP
+RFI 1
 
 ;:### Messages
-;:Messages 0-63 are reserved for low-value calls, which are ones called frequently.
-;:Messages 64-127 are reserved for calls relating to the kernal which are not called frequently.
-;:Messages 128 and upward are reserved for calls that are neither directly related to the kernal, nor need to be called frequently.
-;:
-;:#### 0-63
-;:
-:pih0
-
-;THERE SHOULD BE AN EASTEREGG FOR PLAYING STILL ALIVE
-
-;:#### 64-127
-;:
-:pih64
-
-;:**64. RESTART**
-IFE A, 64
-  SET PC, SYSTEM.RESTART
-  
-;:#### 128+
-;:
-:pih128
+;:Messages 0-63 are reserved for calls reagarding the OS.
+;:Messages 64-127 are reserved for programs.
 
 
+:pih.cmdtable
+DAT 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff
 
 :pihExit
 SET C, POP

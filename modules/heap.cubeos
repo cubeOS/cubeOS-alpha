@@ -7,48 +7,22 @@
 
 
 ;:### heap.init
-;:(location, allocsize, length)
-;:heap.init reserves a 16 word header consisting of the following values.
+;:(location, maxlength, blocksize)
+;:heap.init reserves a 4 word header followed by a bit map of all blocks. The size of the bit map is (*maxlength*/*blocksize* - *number of blocks taken up by the header and map*).
+;:
+;:The header consists of a magic word, **0x9ea9**, the location of the first block in memory, the size of each block, and the maximum length of the heap.
 ;:
 
-:heap.init ; (location, allocsize, length)
+:heap.init
 SET PUSH, I
 SET PUSH, A
 SET I, A
-ADD A, 16 ;16 word header
+SET A, 
 
 STI [I], 0x9EA9	;0
-;:1. **0x9EA9** magic word
-STI [I], A	;1
-;:1. first heap memory location
-STI [I], B	;2
-;:1. allocation size
-STI [I], C	;3
-;:1. length
-STI [I], 0	;4
-;:1. *reserved*
-STI [I], 0	;5
-;:1. *reserved*
-STI [I], 0	;6
-;:1. *reserved*
-STI [I], 0	;7
-;:1. *reserved*
-STI [I], 0	;8
-;:1. *reserved*
-STI [I], 0	;9
-;:1. *reserved*
-STI [I], 0	;A
-;:1. *reserved*
-STI [I], 0	;B
-;:1. *reserved*
-STI [I], 0	;C
-;:1. *reserved*
-STI [I], 0	;D
-;:1. *reserved*
-STI [I], 0	;E
-;:1. *reserved*
-STI [I], 0	;F
-;:1. *reserved*
+STI [I], POP
+STI [I], C
+STI [I], B
 
 
 ADD C, A ;create ending location
