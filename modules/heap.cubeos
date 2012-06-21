@@ -13,14 +13,23 @@
 ;:The header consists of a magic word, **0x9ea9**, the location of the first block in memory, the size of each block, and the maximum length of the heap.
 ;:
 
+;BROKEN IF THE HEADER AND MAP TAKE UP MORE THAN ONE BLOCK
+
 :heap.init
 SET PUSH, I
-SET PUSH, A
 SET I, A
-SET A, 
+SET A, PUSH
+SET A, B
+
+DIV A, C
+SUB A, 1 ;SHOULD SUBTRACT THE NUMBER OF BLOCKS THE HEADER AND MAP TAKE UP
+DIV A, 16 ;OPTIMIZE WITH SHR
+
+ADD A, POP
+ADD A, 4 ;make A the location of the start of the first block
 
 STI [I], 0x9EA9	;0
-STI [I], POP
+STI [I], A
 STI [I], C
 STI [I], B
 
