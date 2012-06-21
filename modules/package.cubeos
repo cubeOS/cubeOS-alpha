@@ -11,6 +11,7 @@
 :p.init
 SET A, p.hashTable
 SET B, 128
+SET C, 0
 JSR dl.makeHashTable
 
 ;>

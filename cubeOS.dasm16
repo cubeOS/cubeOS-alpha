@@ -48,7 +48,7 @@ SET A, 0x8000
 SET B, 0x810
 SET C, 128
 
-;JSR cat.mountSystem ;initialize FS
+JSR cat.mountSystem ;initialize FS
 
 JSR p.init ;initialize DPH
 
@@ -587,32 +587,6 @@ SET J, POP
 SET I, POP
 SET PC, POP
  ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; D32 ; 32-Bit Utility Set ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;:# d32
-;:32-bit utility set
-;:
-
-;:### ifg32 (firstawordloc, firstbwordloc)
-;:- returns 0 if the first 32-bit word is greater than the second 32-bit word
-;:
-
-:ifg32
-SET C, A
-SET A, 0 ;return 0 if true
-
-IFG [C], [B] ;if the first is less than the second
-  SET PC, ext
-IFE [C], [B]
-  IFG [C+1], [B+1]
-    SET PC, ext
-
-SET A, 1
-SET PC, POP
- ;
-;:
 ;RETURNS INCORRECT VALUE IF DOING HASHGET ON AN UNPRESENT VALUE
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1049,6 +1023,7 @@ DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,
 :p.init
 SET A, p.hashTable
 SET B, 128
+SET C, 0
 JSR dl.makeHashTable
 
 ;>

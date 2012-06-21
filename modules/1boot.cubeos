@@ -30,7 +30,7 @@ SET A, 0x8000
 SET B, 0x810
 SET C, 128
 
-;JSR cat.mountSystem ;initialize FS
+JSR cat.mountSystem ;initialize FS
 
 JSR p.init ;initialize DPH
 
