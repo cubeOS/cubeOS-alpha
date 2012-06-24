@@ -23,6 +23,7 @@ STI [J], [I]
 SET PC, typ.cCopy.loop
 
 :typ.cCopy.exit
+SET [J], 0
 SET A, J
 SET J, POP
 SET I, POP
