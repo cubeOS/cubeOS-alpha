@@ -892,48 +892,31 @@ SET PC, POP
 
 
 ;:### heap.init
-;:(location, allocsize, length)
-;:heap.init reserves a 16 word header consisting of the following values.
+;:(location, maxlength, blocksize)
+;:heap.init reserves a 4 word header followed by a bit map of all blocks. The size of the bit map is (*maxlength*/*blocksize* - *number of blocks taken up by the header and map*).
+;:
+;:The header consists of a magic word, **0x9ea9**, the location of the first block in memory, the size of each block, and the maximum length of the heap.
 ;:
 
-:heap.init ; (location, allocsize, length)
+;BROKEN IF THE HEADER AND MAP TAKE UP MORE THAN ONE BLOCK
+
+:heap.init
 SET PUSH, I
-SET PUSH, A
 SET I, A
-ADD A, 16 ;16 word header
+SET A, PUSH
+SET A, B
+
+DIV A, C
+SUB A, 1 ;SHOULD SUBTRACT THE NUMBER OF BLOCKS THE HEADER AND MAP TAKE UP
+DIV A, 16 ;OPTIMIZE WITH SHR
+
+ADD A, POP
+ADD A, 4 ;make A the location of the start of the first block
 
 STI [I], 0x9EA9	;0
-;:1. **0x9EA9** magic word
-STI [I], A	;1
-;:1. first heap memory location
-STI [I], B	;2
-;:1. allocation size
-STI [I], C	;3
-;:1. length
-STI [I], 0	;4
-;:1. *reserved*
-STI [I], 0	;5
-;:1. *reserved*
-STI [I], 0	;6
-;:1. *reserved*
-STI [I], 0	;7
-;:1. *reserved*
-STI [I], 0	;8
-;:1. *reserved*
-STI [I], 0	;9
-;:1. *reserved*
-STI [I], 0	;A
-;:1. *reserved*
-STI [I], 0	;B
-;:1. *reserved*
-STI [I], 0	;C
-;:1. *reserved*
-STI [I], 0	;D
-;:1. *reserved*
-STI [I], 0	;E
-;:1. *reserved*
-STI [I], 0	;F
-;:1. *reserved*
+STI [I], A
+STI [I], C
+STI [I], B
 
 
 ADD C, A ;create ending location
@@ -1447,46 +1430,6 @@ SET I, POP
 SET PC, POP
  ;
  ;;
-
-;;## cstring.make (sourcePointer, targetPointer, maxLength)
-;;returns B in A
-
-:cstring.make
-SET PUSH, I
-SET PUSH, X
-SET PUSH, Y
-SET PUSH, B
-SET I, A
-ADD C, I
-
-:cstring.make.packloop
-STI X, [I]
-AND X, 0x7F
-SET [B], X ;
-
-IFE X, 0 ;just copied a 0, so the null termination is there already
-  SET PC, cstring.make.exit
-
-IFE I, C ;have to terminate with null
-  SET PC, cstring.make.exlen
-
-
-STI Y, [I]
-AND Y, 0x7F
-SHL Y, 8
-
-XOR [B], Y
-
-IFE Y, 0
-  SET PC, cstring.make.exit
-
-IFN I, C ;add null termination if reached length end
-  SET PC, cstring.make.packloop
-
-:cstring.make.exlen
-SET [I], 0
-
-:cstring.make.exit
 ;TYPE.CUNPACK NEEDS TO BE REWRITTEN
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
