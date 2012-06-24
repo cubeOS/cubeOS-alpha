@@ -1,5 +1,5 @@
 ;:### package.ls
-;:Writes the names all of the links (files and directories) in the current working directory to stdout. **Output is currently somewhat garbled.**
+;:Writes the names all of the links (files and directories) in the current working directory to stdout.
 ;:
 
 :package.ls
