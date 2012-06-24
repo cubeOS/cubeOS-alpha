@@ -2,30 +2,31 @@
 ; HEAPMAN ; Heap Manager   ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;:# Heap Manager
+;:
 :heap.loc DAT 0
-:heap.header DAT 0
-
 
 ;:### heap.init
-;:(location, maxlength, blocksize)
-;:heap.init reserves a 4 word header followed by a bit map of all blocks. The size of the bit map is (*maxlength*/*blocksize* - *number of blocks taken up by the header and map*).
+;:(location, length, blocksize)
+;:heap.init reserves a 4 word header followed by a bit map of all blocks. The size of the bit map is (*maxlength*/*blocksize*). *length* is actually the length of the heap, excluding the header and bit map.
 ;:
 ;:The header consists of a magic word, **0x9ea9**, the location of the first block in memory, the size of each block, and the maximum length of the heap.
 ;:
-
-;BROKEN IF THE HEADER AND MAP TAKE UP MORE THAN ONE BLOCK
+;:**This subroutine clears all of the space given to it.**
+;:
+;:**returns** location of header
+;:
 
 :heap.init
 SET PUSH, I
-SET I, A
+SET PUSH, J
+
 SET A, PUSH
 SET A, B
 
 DIV A, C
-SUB A, 1 ;SHOULD SUBTRACT THE NUMBER OF BLOCKS THE HEADER AND MAP TAKE UP
 DIV A, 16 ;OPTIMIZE WITH SHR
 
-ADD A, POP
+ADD A, PEEK
 ADD A, 4 ;make A the location of the start of the first block
 
 STI [I], 0x9EA9	;0
@@ -34,16 +35,20 @@ STI [I], C
 STI [I], B
 
 
-ADD C, A ;create ending location
-SET A, I ;have another iterator
+SET I, A
+ADD I, B ;create ending location
 
-:heap.init.loop
-ADD A, B
-SET [I], A
+:heap.init.loop ;clear backwards
+IFE I, A
+  SET PC, heap.init.exit
+STD [I], 0
+SET PC, heap.init.loop
 
-ADD I, B
-IFL I, C
-  SET PC, heap.init.loop
+:heap.init.exit
+SET A, POP
+SET J, POP
+SET I, POP
+SET PC, POP
 
 ;:**STILL IN DEVELOPMENT; DO NOT USE**
  ;
