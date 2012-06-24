@@ -1,0 +1,7 @@
+:package.heaptest
+
+DAT 0xffab, 0xcdff
+DAT "heaptest", 0
+
+SET A, 16
+JSR 

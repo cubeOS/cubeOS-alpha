@@ -1,4 +1,4 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+`;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; HEAPMAN ; Heap Manager   ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;:# Heap Manager
@@ -49,7 +49,13 @@ SET A, POP
 SET J, POP
 SET I, POP
 SET PC, POP
-
-;:**STILL IN DEVELOPMENT; DO NOT USE**
  ;
+
+;:### heap.alloc (length)
+;:Reserves the first consecutive *length* of memory in the heap.
+;:
+;:**returns** the location of the reserved memory, or 1 if no such block of memory is available
+;:**UNDER DEVELOPMENT; DO NOT USE**
+;:
+
  ;;
