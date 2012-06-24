@@ -74,7 +74,7 @@ SET [C], X
 STI X, [I]
 AND X, Z
 SHL X, 8
-XOR [C], x
+XOR [C], X
 
 ADD C, 1
 IFL I, B
