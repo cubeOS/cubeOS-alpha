@@ -14,4 +14,5 @@ Feel free to contact me for any requests using a GitHub issue on the repository.
 
 ## Questions or Requests
 
-Most questions or requests can be addressed within GitHub, through the issue opening feature. However, it may be desirable to contact me (Sasha Crofter) with, say, an interest in joining the GitHub team. CubeOS is open source because I love the idea of anyone liking my idea so much to actually put time and effort into developing it. Join me in the cubeOS Jabber chatroom **cubeos@conference.jabber.org**.
+Most questions or requests can be addressed within GitHub, through the issue opening feature. However, it may be desirable to contact me (Sasha Crofter) with, say, an interest in joining the GitHub team. CubeOS is open source because I love the idea of anyone liking my idea so much to actually put time and effort into developing it. Join me in the cubeOS Jabber chatroom **cubeos@conference.jabber.org**. If
+*I don't respond, send a message such as "SashaCrofter: Are you there?" It should get my attenion if I am at my computer.*
