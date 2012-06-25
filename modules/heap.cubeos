@@ -79,10 +79,39 @@ SET PC, POP
 ;:**returns** the location of the reserved memory, <strike>or 1 if no such block of memory is available</strike>
 ;:**UNDER DEVELOPMENT; DO NOT USE**
 ;:
+:heap.alloc
+SET PUSH, I
+SET PUSH, J
+
 SET B, [env.heap+2] ;make B the length of the blocks
 DIV A, B ;make A the number of blocks needed
+SET I, A
 
 SET B, env.heap+4 ;make B the location of the map
+
+SET J, 0
+:heap.alloc.checkbits
 SET C, [B]
-;NEED TO FIND CONSECUTIVE OPEN BLOCKS
+SHR C, J
+
+ADD J, 1
+IFN J, 16
+  SET PC, heap.alloc.checkbits.checks
+
+ADD B, 1 ;SHOULD CHECK FOR THE END OF THE USAGEMAP
+SET J, 0
+
+:heap.alloc.checkbits.checks
+
+IFC C, 0x8000	;if the leftmost bit is 0,
+  SUB I, 1		;subtract one from the number of blocks remaining
+
+IFB C, 0x8000	;if the leftmost bit in 1,
+  SET I, A		;reset the counter
+
+IFN I, 0		;continue scanning
+  SET PC, heap.alloc.checkbits
+
+;NEED TO FIND THE LOCATION OF THE FIRST BLOCK
+;NEED TO RESERVE THOSE BLOCKS
  ;;
