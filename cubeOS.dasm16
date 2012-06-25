@@ -44,7 +44,7 @@ SET B, fontRAM
 JSR sv.init ;set up boot screen and screen
 
 SET A, 0x2000 ;heap location
-SET B, 0x0F00 ;length
+SET B, 0x1000 ;length
 SET C, 0x0100 ;block size (16 blocks)
 JSR heap.init
 
@@ -950,9 +950,14 @@ SET A, 0xFFFF
 SHR A, X
 STI [I], A
 
+IFL X, 16
+  SET PC, heap.init.map.exit
+
 SUB X, 16
 IFN X, 0
   SET PC, heap.init.map
+
+:heap.init.map.exit
 
 SET A, POP
 SET I, A
