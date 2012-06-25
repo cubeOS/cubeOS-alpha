@@ -15,6 +15,7 @@ SET PC, __BOOT
 ;;;;;;;
 :env.cwds DAT 0
 :env.fs DAT 0
+:env.heap DAT 0
  ;;
 ;;;;;;;;
 ; BOOT ;
@@ -43,7 +44,7 @@ SET B, fontRAM
 JSR sv.init ;set up boot screen and screen
 
 SET A, 0x2000 ;heap location
-SET B, 0x1000 ;length
+SET B, 0x0F00 ;length
 SET C, 0x0100 ;block size (16 blocks)
 JSR heap.init
 
@@ -906,11 +907,10 @@ SET PC, POP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;:# Heap Manager
 ;:
-:heap.loc DAT 0
 
 ;:### heap.init
 ;:(location, length, blocksize)
-;:heap.init reserves a 4 word header followed by a bit map of all blocks. The size of the bit map is (*maxlength*/*blocksize*). *length* is actually the length of the heap, excluding the header and bit map.
+;:heap.init reserves a 4 word header followed by a bit map of all blocks. The size of the bit map is (*maxlength*/*blocksize*)/16. *length* is actually the length of the heap, excluding the header and bit map.
 ;:
 ;:The header consists of a magic word, **0x9ea9**, the location of the first block in memory, the size of each block, and the maximum length of the heap.
 ;:
@@ -922,11 +922,16 @@ SET PC, POP
 :heap.init
 SET PUSH, I
 SET PUSH, J
+SET PUSH, X
 
-SET A, PUSH
+SET [env.heap], A
+
+SET I, A
+SET PUSH, A
 SET A, B
 
 DIV A, C
+SET X, A ;store the number of blocks
 DIV A, 16 ;OPTIMIZE WITH SHR
 
 ADD A, PEEK
@@ -937,9 +942,21 @@ STI [I], A
 STI [I], C
 STI [I], B
 
+SET PUSH, B
+SET PUSH, A
 
+:heap.init.map
+SET A, 0xFFFF
+SHR A, X
+STI [I], A
+
+SUB X, 16
+IFN X, 0
+  SET PC, heap.init.map
+
+SET A, POP
 SET I, A
-ADD I, B ;create ending location
+ADD I, POP ;create ending location
 
 :heap.init.loop ;clear backwards
 IFE I, A
@@ -949,6 +966,7 @@ SET PC, heap.init.loop
 
 :heap.init.exit
 SET A, POP
+SET X, POP
 SET J, POP
 SET I, POP
 SET PC, POP
@@ -957,12 +975,14 @@ SET PC, POP
 ;:### heap.alloc (length)
 ;:Reserves the first consecutive *length* of memory in the heap.
 ;:
-;:**returns** the location of the reserved memory, or 1 if no such block of memory is available
+;:**returns** the location of the reserved memory, <strike>or 1 if no such block of memory is available</strike>
 ;:**UNDER DEVELOPMENT; DO NOT USE**
 ;:
-SET B, [heap.loc+2] ;make B the length of the blocks
+SET B, [env.heap+2] ;make B the length of the blocks
 DIV A, B ;make A the number of blocks needed
 
+SET B, env.heap+4 ;make B the location of the map
+SET C, [B]
 ;NEED TO FIND CONSECUTIVE OPEN BLOCKS
  ;;
 ;;;;;;;;;;;;;;;;;;

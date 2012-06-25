@@ -4,4 +4,5 @@ SET PC, __BOOT
 ;;;;;;;
 :env.cwds DAT 0
 :env.fs DAT 0
+:env.heap DAT 0
  ;;
