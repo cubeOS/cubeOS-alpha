@@ -57,5 +57,8 @@ SET PC, POP
 ;:**returns** the location of the reserved memory, or 1 if no such block of memory is available
 ;:**UNDER DEVELOPMENT; DO NOT USE**
 ;:
+SET B, [heap.loc+2] ;make B the length of the blocks
+DIV A, B ;make A the number of blocks needed
 
+;NEED TO FIND CONSECUTIVE OPEN BLOCKS
  ;;

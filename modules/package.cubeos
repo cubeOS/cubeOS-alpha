@@ -26,8 +26,8 @@ JSR p.loadPackage
 SET A, package.inferno
 JSR p.loadPackage
 
-SET A, package.etype ;by NOTENCORE
-JSR p.loadPackage
+;SET A, package.etype ;by NOTENCORE
+;JSR p.loadPackage
 
 SET PC, POP
  ;
