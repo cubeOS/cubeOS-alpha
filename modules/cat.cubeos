@@ -156,6 +156,17 @@ SET B, POP
 SET PC, POP
  ;
 
+;:### cat.getInodePointer (inodeNumber)
+;:Obeys sector links to find pointer to inode.
+;:**returns** pointer to the location of the given inode in memory
+;:**UNDER DEVELOPMENT**
+;:
+:cat.getInodePointer
+SET PUSH, I
+
+SET B, [env.fs+3] ;make B a pointer to the sector joins start
+
+
 ;:### cat.newInode (sector, type)
 ;:Creates a new inode of *type* and length 0 at *sector*. It also marks the corresponding sector in sector map as used.
 ;:Types are 0, for unused, 1, for directory, and 2, for file.
