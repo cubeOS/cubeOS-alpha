@@ -134,7 +134,9 @@ SET PC, POP
  ;
 
 ;:### s.parse
-;:It's not worth documenting this spaghetti code. It will be completely rewritten when *package* works.
+;:This subroutine isolates the first argument in *v.stdin* by scanning through, then stopping on null or 0x20. Then, it gets the *crp.dshash* of the string. Then, it calls *p.lookup* to invoke the command.
+;:
+;:This should also point the process to the starts of the remaining arguments.
 ;:
 :s.parse
 SET A, [v.stdin]
