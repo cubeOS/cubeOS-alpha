@@ -17,9 +17,6 @@ JSR dl.makeHashTable
 ;>
 ;LOAD CALLS BELOW ARE ADDED BY HAND. THEY SHOULD BE INSERTED PROGRAMMATICALLY DURING PRE-PROCESSING
 
-;SET A, package.nocmd
-;JSR p.loadPackage
-
 SET A, package.ls
 JSR p.loadPackage
 
@@ -68,12 +65,12 @@ SET PC, dl.hashInsert ;add the package to the table and exit with subroutine
 ;:Looks up a package in *p.hashTable* with *key*.
 ;:**returns** a pointer to the main subroutine of the package
 ;:
-;REBOOTS WHEN CANNOT FIND KEY
 :p.lookup
 SET B, p.hashTable
 JSR dl.hashGet ;returns value in A
 
-SET X, A ;for debugging
+IFE A, 1 ;If the value is not found,
+  SET A, p.nocmd ;print "invalid command" statement
 
 SET PC, POP
  ;
@@ -87,6 +84,14 @@ DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 :p.hashTableValue ;(128)
 DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
+:p.nocmd
+SET A, p.nocmd.text
+SET B, [v.stdout]
+SET PC, typ.cCopy
+
+:p.nocmd.text
+DAT 0x7001, "Invalid command.", 0 ;THIS SHOULD BE PACKED TEXT
+
 ;:## Packages
 ;:Packages are loaded by the DASH Package Handler at boot time. Standard packages are included in the module, and other packages can be loaded by calling p.loadPackage with a pointer to the header of the package.
 ;:Packages are identified by the magic number `0xffab cdff`, and contain a null-terminated string, the *identifier*. The index after the null in that string is the first instruction of the package.
@@ -97,20 +102,9 @@ DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 ;PACKAGES BELOW ARE INCLUDED BY HAND CURRENTLY. THEY SHOULD BE ADDED PROGRAMMATICALLY DURING PRE-PROCESSING
 
-;:package.nocmd
-
-DAT 0xffab, 0xcdff
-DAT 0,0
-
-SET A, package.nocmd.text
-SET B, [v.stdout]
-SET PC, typ.cCopy
-
-:package.nocmd.text
-DAT 0xf03a, 0xf028, 0
-
 ;:### package.ls
-;:Writes the names all of the links (files and directories) in the current working directory to stdout. **Output is currently somewhat garbled.**
+;:Writes the names all of the links (files and directories) in the current working directory to stdout.
+;:**Under development**
 ;:
 
 :package.ls
@@ -145,7 +139,7 @@ ADD B, 1
 SET A, I
 JSR typ.cCopy
 
-SET B, A;SHOULD PUT TAB OR NEWLINE CHARACTER AFTER FILENAME 
+SET B, A ;SHOULD PUT TAB OR NEWLINE CHARACTER AFTER FILENAME 
 ADD I, 16
 IFL I, J
   SET PC, package.ls.loop
@@ -156,7 +150,6 @@ SET PC, POP
  ;
  
 :package.inferno
-
 
 DAT 0xffab, 0xcdff
 DAT "inferno",0
