@@ -14,7 +14,7 @@ SET B, 128
 SET C, 0
 JSR dl.makeHashTable
 
-;>
+;>loadcalls
 ;LOAD CALLS BELOW ARE ADDED BY HAND. THEY SHOULD BE INSERTED PROGRAMMATICALLY DURING PRE-PROCESSING
 
 SET A, package.ls
@@ -98,7 +98,7 @@ DAT 0x7001, "Invalid command.", 0 ;THIS SHOULD BE PACKED TEXT
 ;:Packages are invoked in the DASH Shell by typing the *identifier*, letter for letter. Packages have by definition one modifier, and can hence have only one entry point. (A package cannot define two new top-level commands.) A package can, however, do its own parsing once it is invoked by reading `stdin`. This allows for such combinations as are seen in `git init`, `git pull`, `git push`, et cetera.
 ;:
 
-;<
+;>packages
 
 ;PACKAGES BELOW ARE INCLUDED BY HAND CURRENTLY. THEY SHOULD BE ADDED PROGRAMMATICALLY DURING PRE-PROCESSING
 
