@@ -30,7 +30,7 @@ SET I, POP
 SET PC, POP
 
 ;:### typ.cUnpack (inputPointer, outputPointer)
-;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) null-terminated at *inputPointer* and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*.
+;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) null-terminated at *inputPointer*(A) and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*(B).
 ;:
 
 :typ.cUnpack
@@ -41,17 +41,29 @@ SET C, B
 :typ.cUnpack.loop
 IFE [I], 0
   SET PC, typ.cUnpack.exit
-  
+ 
+set push, [I]
+and [I], 0x007F
+IFE [I], 0
+  SET PC, typ.cUnpack.exit
+set [C], [I]
+set [I], pop
+add c, 1
+set push, [I]
+shr [I], 8
+and [I], 0x007F
+IFE [I], 0
+  SET PC, typ.cUnpack.exit
+set [C], [I]
+set [I], pop
 ADD I, 1
+add C, 1
 SET PC, typ.cUnpack.loop
 
 :typ.cUnpack.exit
-SUB I, A
-SET B, I
-
+set [c], 0
 SET I, POP
-SET PC, typ.pUnpack
- ;
+SET PC, pop
 
 ;:### typ.pPack (inputLocation, inputLength, outputLocation)
 ;:Reads an unpacked (`0b0000 0000 0XXX XXXX`) string from *inputLocation* of *inputLength* and outputs a packed (`0b0YYY YYYY 0XXX XXXX`) little-endian style string at *outputLocation*.
