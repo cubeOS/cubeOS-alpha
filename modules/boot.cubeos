@@ -1,0 +1,95 @@
+;;;;;;;;
+; BOOT ;
+;;;;;;;;
+;:# BOOT Loader
+;:Initializes the kernel on startup
+;:
+
+;:### __BOOT
+;:Invokes the boot loader
+;:
+;:1. Invoke *sv.init* to mount the screen at *videoRAM*.
+;:2. Invoke *cat.mountSystem* to initialize the file system with arguments `0x8000, 0x810, 128`.
+;:3. Invoke *p.init* to initialize the Dash Package Handler
+;:4. Invoke *s.instance* to intialize the DASH Shell
+;:
+:__BOOT
+JSR HWM
+
+SET A, 0
+SET B, 6
+HWI [HW.GenericClock]
+
+SET A, videoRAM
+SET B, fontRAM
+JSR sv.init ;set up boot screen and screen
+
+SET A, 0x2000 ;heap location
+SET B, 0x1000 ;length
+SET C, 0x0100 ;block size (16 blocks)
+JSR heap.init
+
+;SHOULD SET VARIABLES TO LOCATION OF HEAP HEADER
+
+JSR pih.init
+
+SET A, 0x8000
+SET B, 0x810
+SET C, 128
+
+JSR cat.mountSystem ;initialize FS
+
+JSR p.init ;initialize DPH
+
+SET A, 1
+:__BOOT.bootscreenDisplayLoop
+HWI [HW.GenericClock]
+IFL C, 15
+  SET PC, __BOOT.bootscreenDisplayLoop
+
+JSR s.instance ;initialize DASH Shell
+
+SET PC, halt
+
+:pTitle DAT 0x7563, 0x6562, 0x534f
+
+:halt SUB PC, 1
+ ;
+ 
+;:### SYSTEM.RESTART
+;:Clears all registers, drops interrupt queue
+;:**under development**
+;:
+:SYSTEM.RESTART
+SET A, 0
+SET B, 0
+SET C, 0
+SET X, 0
+SET Y, 0
+SET Z, 0
+SET I, 0
+SET J, 0
+SET SP, 0
+IAS 0
+SET PC, 0
+
+
+;:### ext
+;:Exits a subroutine with A set to 0 (`TRUE`)
+;:To use, do `SET PC, ext` instead of `SET PC, POP` at the end of a subroutine
+;:
+:ext ; exit true
+SET A, 0
+SET PC, POP
+ ;
+
+;:### exf
+;:Exits a subroutine with A set to 1 (`FALSE`)
+;:To use, do `SET PC, exf` instead of `SET PC, POP` at the end of a subroutine
+;:
+:exf ; exit false
+SET A, 1
+SET PC, POP
+ ;
+ ;;
+ 

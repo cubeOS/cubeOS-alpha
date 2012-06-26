@@ -1,0 +1,239 @@
+;;;;;;;;;;;;;;;;
+; DASH ; Shell ;
+;;;;;;;;;;;;;;;;
+;:The DASH Shell is essential to cubeOS's function. It acts as an interpreter for ASCII commands, <strike>which are passed to the package manager in order to directly execute subroutines,</strike> and also handles keyboard input.
+;:
+;:## Usage
+;:At the prompt, which is of the form "*CWD*$", the user can use an attached Generic Keyboard to input ASCII and control characters. 
+;:
+;:## Control Characters
+;:
+;:### Control + Delete
+;:Restarts the DASH Shell by calling *s.instance*.
+;:
+;:## Subroutines
+
+:v.sPrompt DAT 0x2024
+:v.promptLoc DAT 0
+
+:v.stdin DAT s.stdin.space
+:v.stdout DAT s.stdout.space
+
+:v.cmdmem DAT 1 ;used in stupid way of "hashing" input
+;SHOULD USE FOR HASH INSTEAD, BUT ONLY IF NECESSARY
+
+;:### s.instance
+;:Prepares a new terminal session at the root directory.
+;:
+;:1. Set *env.cwds* to "/ " in packed form (`0x202F`)
+;:2. Clears the screen
+;:3. Calls *s.takeIn*
+;:4. Calls *s.parse*
+;:5. Calls *s.stdout* with the argument being the cursor location when the user pressed enter
+;:6. Loops nonendingly to 3
+;:
+:s.instance ;SHOULD PREPARE STDIN and STDOUT
+SET [env.cwds], 0x202F
+JSR sv.clear ;clear the screen
+SET A, [v.scrnLoc]
+
+:s.instance.promptLoop
+JSR s.takeIn
+SET PUSH, A ;keep track of cursor location
+
+JSR s.parse
+
+SET A, POP ;restore cursor location for passing to s.stdout
+JSR s.stdout
+
+SET PC, s.instance.promptLoop
+
+SET PC, POP
+ ;
+ 
+;:### s.takeIn (cursorPointer)
+;:Writes a prompt to the screen using *v.sPrompt* and enters a loop to take ASCII input from the keyboard and write it to the screen at *cursorPointer*. It exits when the user presses `enter`.
+;:
+;:**returns** the cursor location on exit
+;:
+:s.takeIn
+SET PUSH, I
+SET I, 0
+
+JSR sv.getNewLine ;get the next blank line after *cursorPointer*
+JSR s.drawPrompt ;draw the prompt using s.drawPrompt
+
+SET A, 1 ;HWI parameter
+
+:s.takeIn.loop
+IFL I, [v.promptLoc]
+  SET I, [v.promptLoc]
+SET [I], 0xf09e ;cursor character
+
+:s.takeIn.wait
+HWI [HW.GenericKeyboard]
+
+IFG C, 0x1f
+  IFL C, 0x80
+    SET PC, s.takeIn.write
+
+IFE C, 0x10
+  SET PC, s.takeIn.backspace
+
+IFE C, 0x11
+  SET PC, s.takeIn.enter
+  
+;INSERT (0x12)
+  
+IFE C, 0x13
+  SET PC, s.takeIn.delete
+  
+SET PC, s.takeIn.wait
+
+
+:s.takeIn.write
+XOR C, 0xF000
+STI [I], C
+
+IFN I, [v.scrnEnd] ;write normally
+  SET PC, s.takeIn.loop
+
+:s.takeIn.write.scroll
+SUB [v.promptLoc], [v.scrnWidth] ;make prompt scroll, too
+JSR sv.scrollUp ;scroll everything up
+SET PC, s.takeIn.loop
+
+
+:s.takeIn.backspace
+STD [I], 0
+SET [I], 0
+SET PC, s.takeIn.loop
+ ;
+
+:s.takeIn.delete
+SET A, 2 ;changes interrupt action, so must be reset afterward
+SET B, 0x91 ;sets B to the *Control* key
+HWI [HW.GenericKeyboard] ;C becomes 1 if *Control* is pressed
+
+IFE C, 1 ;exit if 
+  SET PC, s.instance
+
+SET A, 1 ;reset interrupt action
+SET PC, s.takeIn.loop
+ ;
+
+:s.takeIn.enter
+SET [I], 0
+SET A, [v.promptLoc]
+SET B, I ;UNNECESSARY ASSIGNMENT OF CURSOR POSITION
+JSR s.stdin
+
+SET A, I;return location in A
+SET I, POP
+SET PC, POP
+ ;
+
+;:### s.parse
+;:This subroutine isolates the first argument in *v.stdin* by scanning through, then stopping on null or 0x20. Then, it gets the *crp.dshash* of the string. Then, it calls *p.lookup* to invoke the command.
+;:
+;:This should also point the process to the starts of the remaining arguments.
+;:
+:s.parse
+SET A, [v.stdin]
+SET B, A
+
+:s.parse.getFirstArg
+IFC [B], 0x20 ;if [B] is 0x0000 or 0x0020
+  SET PC, s.parse.exit
+ADD B, 1
+SET PC, s.parse.getFirstArg
+
+:s.parse.exit
+SUB B, A ;make B the length of the first argument
+JSR crp.dsHash ;returns the hashvalue in A
+
+JSR p.lookup
+
+;MAYBE SET B AND C TO 0?
+
+SET PC, A ;calls the subroutine returned by *p.lookup*
+ ;
+
+;:### s.drawPrompt (pointer)
+;:Draws a prompt using *env.cwds* and *v.sPrompt* at *pointer* and sets *v.promptLoc* to the location following the prompt.
+;:
+;:**returns** the location following the prompt
+;:
+:s.drawPrompt
+
+SET C, A
+SET A, env.cwds
+SET B, 1
+JSR typ.pUnpack
+
+SET C, A
+SET A, v.sPrompt
+SET B, 1
+JSR typ.pUnpack
+
+SET [v.promptLoc], A
+
+SET PC, POP
+ ;
+
+;:### s.stdin (startPointer)
+;:Performs a C-style copy from *startPointer* to *v.stdin*, replacing un-(single)quoted spaces with zeros.
+;:
+:s.stdin
+SET PUSH, I
+SET I, A
+SET B, [v.stdin]
+
+:s.stdin.loop
+STI [B], [I]
+AND [B], 0x007F
+
+IFE [B], 0x27 ;single quote
+  XOR [s.stdin.quoteflag], 1 ;flip state
+  
+IFN [s.stdin.quoteflag], 1 ;unless they're quoted
+  IFE [B], 0x20 ;set spaces
+    JSR s.stdin.newarg
+
+ADD B, 1
+
+IFN [I], 0
+  SET PC, s.stdin.loop
+
+SET [B], 0
+SET I, POP
+SET PC, POP
+
+:s.stdin.newarg
+SET [B], 0
+;ADD A POINTER TO THE ARGUMENT TO s.stdin.args
+SET PC, POP
+
+
+:s.stdin.quoteflag DAT 0 ;is 1 if iterator is inside quotes
+;:s.stdin.escflag DAT 0 ;is 1 if "\" was the most recent character
+
+;:s.stdin.args ;for handling arguments
+;DAT 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
+ ;
+
+;:### s.stdout (outputPointer)
+;:Does a C-style copy from *v.stdout* to *outputPointer*.
+:s.stdout
+JSR sv.getNewLine
+
+SET B, A ;output
+SET A, [v.stdout] ;input
+SET PC, sv.write ;process to screen (null-terminated)
+ ;
+;;RESERVED SPACE
+:s.stdin.space
+DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+:s.stdout.space
+DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+ ;;
