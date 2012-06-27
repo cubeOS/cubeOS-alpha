@@ -149,8 +149,8 @@ SUB B, A ;make B the length of the first argument
 JSR crp.dsHash ;returns the hashvalue in A
 
 JSR p.lookup
-SET B, v.stdin
-SET C, v.stdout
+SET B, [v.stdin]
+SET C, [v.stdout]
 
 SET PC, A ;calls the subroutine returned by *p.lookup*
  ;
