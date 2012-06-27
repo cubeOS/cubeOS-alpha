@@ -1,0 +1,16 @@
+;:### package.gawd
+;:Prints gawdgasm in glorious rainbowy letters
+;:
+;:**author** dylwhich
+;:
+
+:package.gawd
+DAT 0xffab, 0xcdff
+DAT "gawd", 0
+
+;sets the color
+SET B, stuff
+:stuff
+DAT 0xd001, "G", 0xc001, "A", 0xf001, "W", 0xf601, "D"
+
+SET PC, typ.cCopy
