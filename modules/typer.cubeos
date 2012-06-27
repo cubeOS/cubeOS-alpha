@@ -9,11 +9,12 @@
 ;:
 :typ.htoascii
 SET PUSH, I
-SET I, 3 ;counter for how many times to shift the hextet
+SET I, 4 ;counter for how many times to shift the hextet
 
 :typ.htoascii.lookup
 SET C, 0xf000
 AND C, A
+SHR C, 12
 SET [B], [typ.htoascii.table + C]
 
 SHL A, 4
