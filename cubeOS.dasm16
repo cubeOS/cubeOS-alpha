@@ -644,6 +644,37 @@ SET PC, POP
 ; TYPER ; Data and String Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;:### typ.htoascii (hextet, outputPointer)
+;:Converts *hextet* (a 16-bit unsigned integer) to ASCII, and writes that ASCII to *outputPointer*. Always produces four ASCII characters.
+;:
+;:**returns** the location following the last character of the ASCII writing.
+;:
+:typ.htoascii
+SET PUSH, I
+SET I, 3 ;counter for how many times to shift the hextet
+
+:typ.htoascii.lookup
+SET C, 0xf000
+AND C, A
+SET [B], [typ.htoascii.table + C]
+
+SHL A, 4
+SUB I, 1
+ADD B, 1
+
+ADD Y, 1
+
+IFN I, 0
+  SET PC, typ.htoascii.lookup
+
+SET I, POP
+SET A, B
+SET PC, POP
+
+:typ.htoascii.table
+DAT 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39 ; "0" - "9"
+DAT 0x61, 0x62, 0x63, 0x64, 0x65, 0x66 ; "a" - "f"
+
 ;:### typ.cCopy (inputPointer, outputPointer)
 ;:Copies the null-terminated string at *inputPointer* to *outputPointer*.
 ;:**returns** the location following the last character of the copy at the *outputPointer* location
@@ -1541,6 +1572,9 @@ JSR dl.makeHashTable
 SET A, package.ls
 JSR p.loadPackage
 
+SET A, package.test
+JSR p.loadPackage
+
 SET A, package.rainbow
 JSR p.loadPackage
 
@@ -1644,6 +1678,18 @@ SET PC, typ.cCopy
 
 :package.ls.message DAT 0xf001, "There is no filesystem.", 0
  ;
+:package.test
+DAT 0xffab, 0xcdff
+DAT "test", 0
+
+SET B, C
+SET A, 0x0123
+
+SET [B], 0xf001
+ADD B, 1
+
+SET PC, typ.htoascii
+
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
 ;:
