@@ -6,3 +6,4 @@ SET B, C
 SET PC, typ.cUnpack
 SET [C], 0xf001
 ADD C, 1
+SET PC, POP
