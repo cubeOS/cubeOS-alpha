@@ -8,5 +8,7 @@ SET A, 0x01ab
 SET [B], 0xf001
 ADD B, 1
 
-SET PC, typ.htoascii
+JSR typ.htoascii
 
+SET [B], 0
+SET PC, POP
