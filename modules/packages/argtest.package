@@ -1,0 +1,9 @@
+:package.argtest
+DAT 0xffab, 0xcdff
+DAT "argtest", 0
+
+SET A, [B+1]
+SET B, C
+SET [B], 0xf001
+ADD B, 1
+SET PC, typ.cCopy
