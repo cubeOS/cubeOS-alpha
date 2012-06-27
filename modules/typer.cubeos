@@ -4,7 +4,7 @@
 
 ;:### typ.cCopy (inputPointer, outputPointer)
 ;:Copies the null-terminated string at *inputPointer* to *outputPointer*.
-;:**returns** the location following the last character of the copy at the *outputPointer* location (?)
+;:**returns** the location following the last character of the copy at the *outputPointer* location
 ;:
 
 :typ.cCopy
