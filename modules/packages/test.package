@@ -3,7 +3,7 @@ DAT 0xffab, 0xcdff
 DAT "test", 0
 
 SET B, C
-SET A, 0x0123
+SET A, 0x01ab
 
 SET [B], 0xf001
 ADD B, 1
