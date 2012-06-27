@@ -13,14 +13,11 @@
 ;:
 ;:## Subroutines
 
-:v.sPrompt DAT 0x2024
+:v.sPrompt DAT 0xF001, "$ "
 :v.promptLoc DAT 0
 
 :v.stdin DAT s.stdin.space
 :v.stdout DAT s.stdout.space
-
-:v.cmdmem DAT 1 ;used in stupid way of "hashing" input
-;SHOULD USE FOR HASH INSTEAD, BUT ONLY IF NECESSARY
 
 ;:### s.instance
 ;:Prepares a new terminal session at the root directory.
@@ -32,8 +29,8 @@
 ;:5. Calls *s.stdout* with the argument being the cursor location when the user pressed enter
 ;:6. Loops nonendingly to 3
 ;:
-:s.instance ;SHOULD PREPARE STDIN and STDOUT
-SET [env.cwds], 0x202F
+:s.instance
+SET [env.cwds], 0x202F ;CWD SHOULD BE A LOCAL VARIABLE
 JSR sv.clear ;clear the screen
 SET A, [v.scrnLoc]
 
@@ -166,15 +163,9 @@ SET PC, A ;calls the subroutine returned by *p.lookup*
 ;:
 :s.drawPrompt
 
-SET C, A
-SET A, env.cwds
-SET B, 1
-JSR typ.pUnpack
-
-SET C, A
+SET B, A
 SET A, v.sPrompt
-SET B, 1
-JSR typ.pUnpack
+JSR sv.write
 
 SET [v.promptLoc], A
 
