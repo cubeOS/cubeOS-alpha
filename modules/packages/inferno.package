@@ -5,7 +5,7 @@ DAT "inferno",0
 
 
 SET A, pack.inferno.text
-SET B, [v.stdout]
+SET B, C
 SET PC, typ.cCopy
 
 :pack.inferno.text DAT 0xF001, "Lasciate ogne speranza, voi ch'intrate.", 0

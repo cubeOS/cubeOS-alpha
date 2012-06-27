@@ -13,32 +13,5 @@ SET A, package.ls.message
 SET B, C
 SET PC, typ.cCopy
 
-:package.ls.message DAT 0xF001, "There is no filesystem.", 0
-
-;0b00 is stdout
-
-SET PUSH, I
-SET PUSH, J
-
-;SHOULD NOT ALWAYS LIST ROOT
-
-SET I, [env.fs]
-SET I, [I+4] ;I is the start of the first inode now
-SET J, [I+2] ;J is the length of the first inode now
-ADD J, I ;J is the stop location now
-ADD I, 3 ;I is the start of the first link now
-
-:package.ls.loop
-SET A, I
-SET B, [v.stdout]
-JSR typ.cUnpack ;UNPACKS WITH COLOR SUPPLIED BY SUBROUTINE; SHOULD UNPACK LITERALLY AND ALLOW SHELL TO HANDLE COLOR
-
-ADD I, 16
-IFL I, J
-  SET PC, package.ls.loop
-
-
-SET J, POP
-SET I, POP
-SET PC, POP
+:package.ls.message DAT 0xf001, "There is no filesystem.", 0
  ;

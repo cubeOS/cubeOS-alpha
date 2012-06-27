@@ -646,7 +646,7 @@ SET PC, POP
 
 ;:### typ.cCopy (inputPointer, outputPointer)
 ;:Copies the null-terminated string at *inputPointer* to *outputPointer*.
-;:**returns** the location following the last character of the copy at the *outputPointer* location (?)
+;:**returns** the location following the last character of the copy at the *outputPointer* location
 ;:
 
 :typ.cCopy
@@ -1304,8 +1304,8 @@ SUB B, A ;make B the length of the first argument
 JSR crp.dsHash ;returns the hashvalue in A
 
 JSR p.lookup
-SET B, v.stdin
-SET C, v.stdout
+SET B, [v.stdin]
+SET C, [v.stdout]
 
 SET PC, A ;calls the subroutine returned by *p.lookup*
  ;
@@ -1608,39 +1608,19 @@ DAT 0x7001, "Invalid command.", 0 ;THIS SHOULD BE PACKED TEXT
 ;:### package.ls
 ;:Writes the names all of the links (files and directories) in the current working directory to stdout.
 ;:
+;:**author** SashaCrofter
+;:
 
 :package.ls
 
 DAT 0xffab, 0xcdff
 DAT "ls",0
 
+SET A, package.ls.message
+SET B, C
+SET PC, typ.cCopy
 
-;0b00 is stdout
-
-SET PUSH, I
-SET PUSH, J
-
-;SHOULD NOT ALWAYS LIST ROOT
-
-SET I, [env.fs]
-SET I, [I+4] ;I is the start of the first inode now
-SET J, [I+2] ;J is the length of the first inode now
-ADD J, I ;J is the stop location now
-ADD I, 3 ;I is the start of the first link now
-
-:package.ls.loop
-SET A, I
-SET B, [v.stdout]
-JSR typ.cUnpack ;UNPACKS WITH COLOR SUPPLIED BY SUBROUTINE; SHOULD UNPACK LITERALLY AND ALLOW SHELL TO HANDLE COLOR
-
-ADD I, 16
-IFL I, J
-  SET PC, package.ls.loop
-
-
-SET J, POP
-SET I, POP
-SET PC, POP
+:package.ls.message DAT 0xf001, "There is no filesystem.", 0
  ;
 ;:### package.pwd
 ;:Prints the current working directory.
@@ -1668,7 +1648,7 @@ DAT "inferno",0
 
 
 SET A, pack.inferno.text
-SET B, [v.stdout]
+SET B, C
 SET PC, typ.cCopy
 
 :pack.inferno.text DAT 0xF001, "Lasciate ogne speranza, voi ch'intrate.", 0
