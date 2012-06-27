@@ -1,12 +1,12 @@
-;:### package.gawd
+;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
 ;:
 ;:**author** dylwhich
 ;:
 
-:package.gawd
+:package.rainbow
 DAT 0xffab, 0xcdff
-DAT "gawd", 0
+DAT "rainbow", 0
 
 ;sets the color
 SET A, package.gawd.text
@@ -14,4 +14,4 @@ SET B, C ;make B point to stdout
 SET PC, typ.cCopy
 
 :package.gawd.text
-DAT 0xd001, "G", 0xc001, "A", 0xf001, "W", 0xf601, "D"
+DAT 0xc001, "R", 0xe001, "A", 0xa001, "I", 0x2001, "N", 0xb001, "B", 0x9001, "O", 0xd001, "W", 0
