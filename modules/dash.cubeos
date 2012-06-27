@@ -22,7 +22,7 @@
 ;:### s.instance
 ;:Prepares a new terminal session at the root directory.
 ;:
-;:1. Set *env.cwds* to "/ " in packed form (`0x202F`)
+;:1. SHOULD Set *v.cwds* to "/ " in packed form (`0x202F`)
 ;:2. Clears the screen
 ;:3. Calls *s.takeIn*
 ;:4. Calls *s.parse*
@@ -30,7 +30,6 @@
 ;:6. Loops nonendingly to 3
 ;:
 :s.instance
-SET [env.cwds], 0x202F ;CWD SHOULD BE A LOCAL VARIABLE
 JSR sv.clear ;clear the screen
 SET A, [v.scrnLoc]
 
@@ -131,7 +130,7 @@ SET PC, POP
  ;
 
 ;:### s.parse
-;:This subroutine isolates the first argument in *v.stdin* by scanning through, then stopping on null or 0x20. Then, it gets the *crp.dshash* of the string. Then, it calls *p.lookup*, sets `B` to the location of stdin and `C` to the location of stdout, and invokes the command.
+;:This subroutine isolates the first argument in *v.stdin* by scanning through, then stopping on null or 0x20. Then, it gets the *crp.dshash* of the string. Then, it calls *p.lookup*, sets `B` to the location of stdin and `C` to the location of stdout, and invokes the subroutine returned by *p.lookup*.
 ;:
 ;:This should also point the process to the starts of the remaining arguments.
 ;:
@@ -227,4 +226,6 @@ SET PC, sv.write ;process to screen (null-terminated)
 DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 :s.stdout.space
 DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+:v.cwds
+DAT 0x202f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
  ;;
