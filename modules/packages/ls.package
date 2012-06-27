@@ -1,12 +1,19 @@
 ;:### package.ls
 ;:Writes the names all of the links (files and directories) in the current working directory to stdout.
 ;:
+;:**author** SashaCrofter
+;:
 
 :package.ls
 
 DAT 0xffab, 0xcdff
 DAT "ls",0
 
+SET A, package.ls.message
+SET B, C
+SET PC, typ.cCopy
+
+:package.ls.message DAT 0xF001, "There is no filesystem.", 0
 
 ;0b00 is stdout
 
