@@ -4,3 +4,5 @@ DAT "pwd", 0
 SET A, v.cwds
 SET B, C
 SET PC, typ.cUnpack
+SET [C], 0xf001
+ADD C, 1
