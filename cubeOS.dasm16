@@ -116,8 +116,530 @@ SET PC, POP
  
 
 ; ; ; ;
-;TYPE.CUNPACK NEEDS TO BE REWRITTEN
+;;;;;;;;;;;;;;;;;;;;;;;;;
+; Monitor Preallocation ;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;:# Monitor Preallocation
+;:Functions as a reserved spot for the font and video RAM of the LEM1802.
+;:
 
+;:### fontRAM
+;:Contains the default font shown [here](http://github.com/cubeOS/cubeOS-alpha/raw/master/font/defaultFont.png).
+;:
+
+:fontRAM
+DAT 0xb79e, 0x388e, 0x722c, 0x75f4, 0x19bb, 0x7f8f, 0x85f9, 0xb158, 0x242e, 0x2400, 0x082a, 0x0800, 0x0008, 0x0000, 0x0808, 0x0808, 0x00ff, 0x0000, 0x00f8, 0x0808, 0x08f8, 0x0000, 0x080f, 0x0000, 0x000f, 0x0808, 0x00ff, 0x0808, 0x08f8, 0x0808, 0x08ff, 0x0000, 0x080f, 0x0808, 0x08ff, 0x0808, 0x6633, 0x99cc, 0x9933, 0x66cc, 0xfef8, 0xe080, 0x7f1f, 0x0701, 0x0107, 0x1f7f, 0x80e0, 0xf8fe, 0x5500, 0xaa00, 0x55aa, 0x55aa, 0xffaa, 0xff55, 0x0f0f, 0x0f0f, 0xf0f0, 0xf0f0, 0x0000, 0xffff, 0xffff, 0x0000, 0xffff, 0xffff, 0x0000, 0x0000, 0x005f, 0x0000, 0x0300, 0x0300, 0x3e14, 0x3e00, 0x266b, 0x3200, 0x611c, 0x4300, 0x3629, 0x7650, 0x0002, 0x0100, 0x1c22, 0x4100, 0x4122, 0x1c00, 0x1408, 0x1400, 0x081c, 0x0800, 0xC020, 0x0000, 0x0808, 0x0800, 0x0040, 0x0000, 0x601c, 0x0300, 0x3e49, 0x3e00, 0x427f, 0xC000, 0x6259, 0x4600, 0x2249, 0x3600, 0x0f08, 0x7f00, 0x2745, 0x3900, 0x3e49, 0x3200, 0x6119, 0x0700, 0x3649, 0x3600, 0x2649, 0x3e00, 0x0024, 0x0000, 0xC024, 0x0000, 0x0814, 0x2200, 0x1414, 0x1400, 0x2214, 0x0800, 0x0259, 0x0600, 0x3e59, 0x5e00, 0x7e09, 0x7e00, 0x7f49, 0x3600, 0x3e41, 0x2200, 0x7f41, 0x3e00, 0x7f49, 0x4100, 0x7f09, 0x0100, 0x3e41, 0x7a00, 0x7f08, 0x7f00, 0x417f, 0x4100, 0x2040, 0x3f00, 0x7f08, 0x7700, 0x7f40, 0xC000, 0x7f06, 0x7f00, 0x7f01, 0x7e00, 0x3e41, 0x3e00, 0x7f09, 0x0600, 0x3e61, 0x7e00, 0x7f09, 0x7600, 0x2649, 0x3200, 0x017f, 0x0100, 0x3f40, 0x7f00, 0x1f60, 0x1f00, 0x7f30, 0x7f00, 0x7708, 0x7700, 0x0778, 0x0700, 0x7149, 0x4700, 0x007f, 0x4100, 0x031c, 0x6000, 0x417f, 0x0000, 0x0201, 0x0200, 0x8080, 0x8000, 0x0001, 0x0200, 0x2454, 0x7800, 0x7f44, 0x3800, 0x3844, 0x2800, 0x3844, 0x7f00, 0x3854, 0x5800, 0x087e, 0x0900, 0x4854, 0x3c00, 0x7f04, 0x7800, 0x047d, 0x0000, 0x2040, 0x3d00, 0x7f10, 0x6c00, 0x017f, 0x0000, 0x7c18, 0x7c00, 0x7c04, 0x7800, 0x3844, 0x3800, 0x7c14, 0x0800, 0x0814, 0x7c00, 0x7c04, 0x0800, 0x4854, 0x2400, 0x043e, 0x4400, 0x3c40, 0x7c00, 0x1c60, 0x1c00, 0x7c30, 0x7c00, 0x6c10, 0x6c00, 0x4c50, 0x3c00, 0x6454, 0x4c00, 0x0836, 0x4100, 0x0077, 0x0000, 0x4136, 0x0800, 0x0201, 0x0201, 0x0205, 0x0200
+
+
+;:### videoRAM
+;:Contains the cubeOS logo/splash screen, shown [here](https://github.com/cubeOS/cubeOS-alpha/raw/master/logo/cubeOSLogo.png).
+;:
+:videoRAM
+DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
+DAT 0,0,0xF01F,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B, 0xF01B, 0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0xF057,0xF065,0,0,  0,0,0,0, 0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0xC01C,0xC01C,0,  0,0xC01C,0xC01C,0,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0xC01D,0xC01F,0xC01F,0xC01F,  0xC01F,0xC01F,0xC01F,0xC01E,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0xC01F,0x0C43,0x0C55,  0x0C42,0x0C45,0xC01F,0,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0,0xC01F,0xC01F,  0xC01F,0xC01F,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01F, 0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0,0,0xC01B,  0xC01B,0,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0xF053,0xF063,0xF069,0xF065,  0xF06E,0xF063,0xF065,0,  0,0,0,0,  0,0,0,0, 0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0xF01F,0,0
+DAT 0,0,0xF01F,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01F,0,0
+DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
+ ;
+ ;;
+
+; ; ; ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; CAT ; CAT FileSystem         ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;:# CAT
+;:**CAT** is the default file system for cubeOS. It is based on the [Harry's Allocation Table](https://github.com/0x10cStandardsCommittee/0x10c-Standards/blob/master/FS/Draft_Harrys_Allocation_Table.txt) file system format. cubeOS uses hashes to identify links, in addition to fourteen character strings.
+;:
+;:**requires**
+;:
+;:- crypt
+;:
+;:**STILL UNDER HEAVY DEVELOPMENT. DO NOT USE**
+
+:cat.def.curDir DAT ".", 0 ;stock current directory name
+:cat.def.parDir DAT "..", 0 ;stock parent directory name
+
+;:## High-level Commands
+;:The high-level commands provide a smooth interface with the filesystem that can be used easily by modules and the rest of the operating system.
+;:
+
+
+
+;:## Low-level Commands
+;:The low-level commands are used by the high level commands to provide fast and efficient access to the framework of the filesystem itself.
+;:
+
+;:### cat.mountSystem (location, length, sectorSize)
+;:Mounts */* directory at *location*, reserving *length* words after it. It then initializes a cat filesystem with the given *sectorSize*.
+;:
+;:Currently unsafe if the number of sectors is greater than 16
+;:**returns** location of first word in header
+;:
+
+;SHOULD KEEP TRACK OF WHERE FILESYSTEM IS SO IT CAN ADD NEW STRIPS AND DO SEARCHES
+
+:cat.mountSystem
+SET [env.fs], A
+
+SET PUSH, I
+SET PUSH, J
+SET PUSH, X
+SET PUSH, A ;store location for retrieval at the end
+SET I, A
+DIV B, C ;make B the maximum number of sectors ;SHOULD 
+
+;should find the maximum number of sectors, but doesn't
+
+:cat.mountSystem.initHeader
+STI [I], 0xC001 ;magic number, cat v1.0
+STI [I], B ;number of sectors
+STI [I], 0 ;reserved for sector map start
+STI [I], 0 ;reserved for sector joins start
+STI [I], 0 ;reserved for sector start
+STI [I], C ;sector size
+STI [I], 0 ;sectors in use
+
+:cat.mountSystem.initSectorMap
+SET [A+2], I ;sector map start
+SET PUSH, B ;store B
+SET C, B ;we will change B later
+DIV C, 16 ;find number of words needed to represent sector use states
+;OPTIMIZE DIV WITH SHR
+ADD C, I ;C becomes sector map end location
+
+:cat.mountSystem.initSectorMap.loop
+SET X, 0xFFFF ;make X initializer for sector map
+SHR X, B ;set only the excess bits to used
+STI [I], X
+
+IFG X, 0 ;exit if that was enough bits to represent all sectors
+  SET PC, cat.mountSystem.initSectorMap.end
+
+SUB B, 16
+SET PC, cat.mountSystem.initSectorMap.loop ;COULD BE REORDERED MORE EFFICIENTLY
+
+:cat.mountSystem.initSectorMap.end
+SET B, POP ;restore number of sectors
+
+:cat.mountSystem.initSectorJoin
+SET [A+3], I ;sector join start
+ADD B, I ;make B the ending location of sector join
+
+:cat.mountSystem.initSectorJoin.loop
+STI [I], 0
+IFN I, B ;continue reserving until I reaches the end location
+  SET PC, cat.mountSystem.initSectorJoin.loop
+
+:cat.mountSystem.initSectors
+SET [A+4], I
+
+:cat.mountSystem.initializeRoot
+SET A, 0
+SET B, 1
+JSR cat.newInode
+
+SET A, 0
+SET B, 0
+SET C, cat.def.curDir
+JSR cat.newLink
+
+SET A, 0
+SET B, 1
+SET C, temp.cat.directoryName
+JSR cat.newLink
+
+SET A, 1
+SET B, 2
+JSR cat.newInode
+
+SET PC, cat.mountSystem.exit
+
+:temp.cat.directoryName DAT "test"
+:temp.cat.fileContent DAT "This is a test."
+
+:cat.mountSystem.exit
+SET A, POP ;return location
+
+SET X, POP
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
+
+;:### cat.getOpenSector ()
+;:Finds the first open sector in the filesystem
+;:**modifies** A
+;:**returns** sector number
+;:
+:cat.getOpenSector
+SET PUSH, B
+SET PUSH, C
+SET PUSH, I
+
+SET A, [env.fs]
+SET B, [A+2] ;starting location
+SET C, [A+3] ;ending location
+
+:cat.getOpenSector.wordloop
+SET A, [C]
+
+;CHECK THROUGH AND FIND THE FIRST OPEN SECTOR
+
+SET I, POP
+SET C, POP
+SET B, POP
+
+;:### cat.getSectorPointer (sector)
+;:**modifies** A
+;:**returns** a pointer to the location of the given sector in memory
+;:
+:cat.getSectorPointer
+SET PUSH, B
+SET B, [env.fs]
+MUL A, [B+5] ;multiply by sector size
+ADD A, [B+4] ;add sector offset
+SET B, POP
+SET PC, POP
+ ;
+
+;:### cat.getInodePointer (inodeNumber)
+;:Obeys sector links to find pointer to inode.
+;:**returns** pointer to the location of the given inode in memory
+;:**UNDER DEVELOPMENT**
+;:
+:cat.getInodePointer
+SET PUSH, I
+
+SET B, [env.fs+3] ;make B a pointer to the sector joins start
+
+
+;:### cat.newInode (sector, type)
+;:Creates a new inode of *type* and length 0 at *sector*. It also marks the corresponding sector in sector map as used.
+;:Types are 0, for unused, 1, for directory, and 2, for file.
+;:**modifies** A, B
+;:**returns** sector of inode
+
+:cat.newInode
+SET PUSH, A ;store A for returning
+JSR cat.getSectorPointer ;make A a pointer to the start of that sector
+
+SET [A], B
+SET [A+1], 0 ;the number of links pointing to the inode
+SET [A+2], 0 ;the number content size
+SET [A+3], 0 ;reserved
+
+SET A, POP
+SET PC, POP
+ ;
+
+;:### cat.newLink (sector, targetSector, namePointer)
+;:Creates a new link under the given sector, extending the length of the inode automatically <strike>and overflowing to the next open sector (updating sector usage and linking) if necessary</strike>.
+;:The first word is the *targetSector*, and the remaining fifteen words are copied literally <strike>(maximum length fourteen)</strike> from the null-terminated word at *namePointer*.
+;:**returns** 0 if successful, and 1 if the given sector does not contain a directory
+;:
+:cat.newLink
+JSR cat.getSectorPointer ;get the memory location 
+
+IFN [A], 1 ;if the sector does not contain a directory
+  SET PC, exf ;exit false
+
+SET PUSH, A ;store A for later
+
+ADD A, [A+2] ;add the length of the existing links
+ADD A, 4 ;add the length of the inode
+;SHOULD CHECK TO SEE IF IT IS OUT OF BOUNDS OF THE SECTOR; IF SO, IT MUST CONTINUE ON TO EITHER THE LINKED SECTOR OR LINK ANOTHER
+
+SET [A], B ;set the link target
+ADD A, 1
+SET B, C
+
+JSR typ.cCopy ;SHOULD IMPOSE MAXIMUM LENGTH
+
+SET A, POP
+ADD [A+2], 16 ;add the length of the link (always 16) to the length of the inode
+SET PC, ext ;exit successful
+ ;
+
+; ; ; ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; PINKIEPIE ; Interrupt Handler ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;: **PinkiePie Interrupt Handler** is cubeOS's integrated software interrupt handler.
+;:
+
+
+;:## Software Interrupts
+;:A software interrupt is called in assembly by `INT a`, where `a` is a "message." Upon executing an interrupt, `PC` and `A` are pushed to the stack and replaced by the value in the register `IA` and the message, respectively. This forces the DCPU to begin executing code at whatever address `IA` was set to beforehand. That code can then exit by doing, after restoring other registers, `RFI 0`, which disables interrupt queueing, pops `A` from the stack, then pops `PC` from the stack. That will allow the DCPU to resume the code it was executing before the interrupt was called.
+;:In large operating environments, it makes sense to set `IA` to a constant value at the start of operation, before any interrupts are called. This allows for *interrupt handlers*, which are usually provided by operating systems. The start address of the interrupt handler is placed in `IA`, so it is invoked whenever an interrupt is called. This allows it to handle interrupts consistently, as based on the message.
+;:It also allows software not included in the kernal (and therefore not privvy to labels,) to make function calls defined by the interrupt handler. Furthermore, advanced enough interrupt handlers can allow an operating system to support multitasking.
+;:
+
+;:## Initialization
+;:To initialize PinkiePie, use `pih.init`. Changes to IA can be reset by performing this call again.
+;:
+;:### pih.init
+;:Does `IAS pih` to direct any interrupts to the interrupt handler.
+;:
+:pih.init
+IAS pih
+SET PC, POP
+ ;
+ 
+;:## Interrupt Handler
+;:The interrupt handler is located at the label `pih`. The subroutine `pih.init` makes this the active interrupt handler.
+;:PinkiePie's interrupt handling process is as follows.
+;:
+;:1. Trigger interrupt queueing with `IAQ 1`
+;:2. Drops the interrupt and returns with `RFI` if the message is greater than 128.
+;:3. Looks up the message in `pih.cmdtable`.
+;:4. If the value is `0xFFFF`, then return with `RFI`.
+;:5. Push `B` and `C` to the stack, so they will be preserved.
+;:6. `JSR` to the value returned by the table.
+;:7. Pop `C` and `B` from the stack, and do `RFI`.
+;:
+;:If the interrupt is actually an API call, (i.e. A call made to the OS with arguments.) then the receiving subroutine must pop arguments from the stack in order to retrieve them. This is necessary, but **be careful**.
+;:
+
+;THIS WHOLE THING COULD USE HASHTABLES
+
+:pih
+IAQ 1 ;trigger interrupt queueing
+
+IFG A, 128 ;If the message is too great
+  RFI 1
+
+SET A, [A+pih.cmdtable]
+
+IFE A, 0xffff
+  RFI 1
+
+SET PUSH, B
+SET PUSH, C
+
+JSR A
+
+SET C, POP
+SET B, POP
+RFI 1
+
+;:### Messages
+;:Messages 0-63 are reserved for calls reagarding the OS.
+;:Messages 64-127 are reserved for programs.
+
+
+:pih.cmdtable
+DAT 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff
+
+:pihExit
+SET C, POP
+SET B, POP
+RFI 0
+ ;
+
+; ; ; ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SIMVID ; Video Manager ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+:v.scrnLoc DAT 0
+:v.scrnEnd DAT 0
+:v.scrnHeight DAT 12
+:v.scrnWidth DAT 32
+
+;:### sv.init (videoRAMPointer, fontRAMPointer)
+;:Maps the screen's font to *fontRAMPointer* and the screen's video ram to *videoRAMPointer* in that order.
+;:
+:sv.init
+
+SET PUSH, A
+SET A, 1
+HWI [HW.LEM1802] ;MEM_MAP_FONT
+
+SET B, POP
+SET A, 0
+HWI [HW.LEM1802] ;MEM_MAP_SCREEN
+
+SET [v.scrnLoc], B
+ADD B, 0x180
+SET [v.scrnEnd], B
+SET PC, POP
+ ;
+ 
+;:### sv.write (inputPointer, outputPointer)
+;:Writes ASCII to the screen using special characters to act as directives. (This does not perform preprocessing such as translating normal ASCII into those special characters.) Special characters are as follows.
+;:**returns** the location of the null following the written text
+;:
+;:#### Color `0x01`
+;:Substitutes the first nine bits of every word following this with the first nine bits of this word.
+;:
+;:
+;:
+:sv.write
+SET PUSH, I
+SET PUSH, J
+
+SET X, sv.write.v.color
+
+SET I, A
+SET J, B
+SET [sv.write.v.color], 0xF000 ;default to white on black
+
+:sv.write.loop
+SET A, [I]
+AND A, 0x007F
+
+IFE A, 0x01
+  SET PC, sv.write.s.color
+
+BOR A, [sv.write.v.color]
+
+STI [J], A ;set the destination to the processed source and increment destination pointer and source pointer
+
+IFN [I], 0
+  SET PC, sv.write.loop
+  
+SET [J], [I] ;write the terminating null
+
+SET A, J
+SET J, POP
+SET I, POP
+SET PC, POP
+
+:sv.write.s.color
+SET [sv.write.v.color], [I]
+AND [sv.write.v.color], 0xFF80 ;first 9 bits
+ADD I, 1 ;increment the source, but not the destination
+SET PC, sv.write.loop
+
+:sv.write.v.color DAT 0
+ ;
+ 
+:sv.clear
+SET PUSH, I
+SET PUSH, J
+
+SET I, [v.scrnLoc]
+
+:sv.clear.loop
+STI [I], 0
+
+IFL I, [v.scrnEnd]
+  SET PC, sv.clear.loop
+
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
+
+:sv.getLoc ; (xOffset, yOffset)
+IFL A, [v.scrnWidth]
+  IFL B, [v.scrnHeight]
+    SET PC, sv.getLoc.loc ;if onscreen, continue
+SET PC, exf
+
+:sv.getLoc.loc
+MUL B, [v.scrnWidth] ;make yOffset a line index
+ADD A, B              ;combine them
+ADD A, [v.scrnLoc]    ;make the index an index onscreen
+SET PC, POP           ;return in A
+ ;
+
+:sv.autoScroll ; () does not modify registers
+SET PUSH, X
+
+SET X, [v.scrnEnd]
+SUB X, [v.scrnWidth]
+
+IFE [X], 0
+  SET PC, sv.autoScroll.ex
+
+SET PUSH, I
+SET PUSH, J
+SET I, [v.scrnLoc]
+SET J, I
+ADD J, [v.scrnWidth]
+
+:sv.autoScroll.loop
+STI [I], [J]
+IFN J, X
+  SET PC, sv.autoScroll.loop
+
+SET X, J
+:sv.autoScroll.looplast
+STI [I], [X]
+SET [X], 0
+ADD X, 1
+IFG X, [v.scrnEnd]
+  SET PC, sv.autoScroll.subex
+SET PC, sv.autoScroll.looplast
+
+:sv.autoScroll.subex
+SET J, POP
+SET I, POP
+
+:sv.autoScroll.ex
+SET X, POP
+SET PC, POP
+ ;
+
+:sv.scrollUp
+SET PUSH, I
+SET PUSH, J
+
+SET I, [v.scrnLoc]
+SET J, I
+ADD J, [v.scrnWidth]
+
+:sv.scrollUp.loop
+STI [I], [J]
+IFL J, [v.scrnEnd]
+  SET PC, sv.scrollUp.loop
+
+:sv.scrollUp.clearLast
+SET I, [v.scrnEnd]
+SUB I, [v.scrnWidth]
+
+:sv.scrollUp.clearLast.loop
+STI [I], 0
+IFL I, [v.scrnEnd]
+  SET PC, sv.scrollUp.clearLast.loop
+
+SET J, POP
+SET I, POP
+SUB I, [v.scrnWidth] ;adjust I for caller, hopefully
+SET PC, POP
+ ;
+ 
+:sv.getNewLine ; (currentLoc)
+SET PUSH, I
+SET I, [v.scrnLoc]
+JSR sv.autoScroll
+SET PC, sv.getNewLine.loop.sub
+
+:sv.getNewLine.loop
+ADD I, [v.scrnWidth]
+
+:sv.getNewLine.loop.sub
+IFG A, I ;exit successful if line scrnindex >= currentindex
+  SET PC, sv.getNewLine.loop
+
+IFE I, [v.scrnEnd]
+  SUB I, [v.scrnWidth]
+
+SET A, I
+SET I, POP
+SET PC, POP
+ ;
+ ;;
+
+; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; TYPER ; Data and String Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -236,13 +758,11 @@ SET Y, 0x7F00
 :typ.pUnpack.loop
 SET X, [A]
 AND X, Z
-XOR X, 0xF000
 STI [I], X
 
 SET X, [A]
 AND X, Y
 SHR X, 8
-XOR X, 0xF000
 STI [I], X
 
 ADD A, 1
@@ -260,124 +780,33 @@ SET PC, POP
  ;;
 
 ; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; PINKIEPIE ; Interrupt Handler ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;: **PinkiePie Interrupt Handler** is cubeOS's integrated software interrupt handler.
+;;;;;;;;;;;;;;;;;;
+; KeyboardDaemon ;
+;;;;;;;;;;;;;;;;;;
+;:KeyboardDaemon should be invoked by the interrupt handler whenever a keypress is detected. It has a number of variables that must be set at compile time, but those important for ASCII input should be set per keyboard session.
 ;:
 
 
-;:## Software Interrupts
-;:A software interrupt is called in assembly by `INT a`, where `a` is a "message." Upon executing an interrupt, `PC` and `A` are pushed to the stack and replaced by the value in the register `IA` and the message, respectively. This forces the DCPU to begin executing code at whatever address `IA` was set to beforehand. That code can then exit by doing, after restoring other registers, `RFI 0`, which disables interrupt queueing, pops `A` from the stack, then pops `PC` from the stack. That will allow the DCPU to resume the code it was executing before the interrupt was called.
-;:In large operating environments, it makes sense to set `IA` to a constant value at the start of operation, before any interrupts are called. This allows for *interrupt handlers*, which are usually provided by operating systems. The start address of the interrupt handler is placed in `IA`, so it is invoked whenever an interrupt is called. This allows it to handle interrupts consistently, as based on the message.
-;:It also allows software not included in the kernal (and therefore not privvy to labels,) to make function calls defined by the interrupt handler. Furthermore, advanced enough interrupt handlers can allow an operating system to support multitasking.
-;:
+:v.kd.modeflag DAT 0
+:v.kd.writePointer DAT 0
+:v.kd.effect DAT 0
+:v.kd.enterPointer DAT 0
 
-;:## Initialization
-;:To initialize PinkiePie, use `pih.init`. Changes to IA can be reset by performing this call again.
+;:### kd.setup (A=, B=mode, C=effect, I=writePointer, J=enterPointer)
 ;:
-;:### pih.init
-;:Does `IAS pih` to direct any interrupts to the interrupt handler.
-;:
-:pih.init
-IAS pih
+:kd.setup
+SET [v.kd.modeflag], B
+SET [v.kd.effect], C
+SET [v.kd.writePointer], I
+SET [v.kd.enterPointer], J
 SET PC, POP
- ;
- 
-;:## Interrupt Handler
-;:The interrupt handler is located at the label `pih`. The subroutine `pih.init` makes this the active interrupt handler.
-;:PinkiePie's interrupt handling process is as follows.
+
+;:### kd.handle
+;:This subroutine should be called by an interrupt triggered by a keypress.
 ;:
-;:1. Trigger interrupt queueing with `IAQ 1`
-;:2. Drops the interrupt and returns with `RFI` if the message is greater than 128.
-;:3. Looks up the message in `pih.cmdtable`.
-;:4. If the value is `0xFFFF`, then return with `RFI`.
-;:5. Push `B` and `C` to the stack, so they will be preserved.
-;:6. `JSR` to the value returned by the table.
-;:7. Pop `C` and `B` from the stack, and do `RFI`.
-;:
-;:If the interrupt is actually an API call, (i.e. A call made to the OS with arguments.) then the receiving subroutine must pop arguments from the stack in order to retrieve them. This is necessary, but **be careful**.
-;:
+:kd.handle
+HWI [HW.GenericKeyboard]
 
-;THIS WHOLE THING COULD USE HASHTABLES
-
-:pih
-IAQ 1 ;trigger interrupt queueing
-
-IFG A, 128 ;If the message is too great
-  RFI 1
-
-SET A, [A+pih.cmdtable]
-
-IFE A, 0xffff
-  RFI 1
-
-SET PUSH, B
-SET PUSH, C
-
-JSR A
-
-SET C, POP
-SET B, POP
-RFI 1
-
-;:### Messages
-;:Messages 0-63 are reserved for calls reagarding the OS.
-;:Messages 64-127 are reserved for programs.
-
-
-:pih.cmdtable
-DAT 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff
-
-:pihExit
-SET C, POP
-SET B, POP
-RFI 0
- ;
-
-; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; CRYPT ; Cryptography Lib ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;:# Crypt
-;:Cryptography Library
-;:
-
-;:##crp.dsHash (inputPointer, inputLength)
-;:Reads data of *inputLength* from *inputPointer* and performs a hash function on it.
-;:**returns** the 16-bit hash
-;:
-;:For every value, shift the word *i* left and BOR with EX. XOR all of the resulting values together to produce the hash.
-;:```python
-;:for i in inputLength:
-;:	output ^ (inputPointer[i] << i)
-;:```
-;:
-
-:crp.dsHash
-SET PUSH, I
-SET PUSH, J
-SET I, A
-SET J, 0
-
-SET A, 0
-ADD B, I ;B becomes the exit location
-
-:crp.dsHash.loop
-SET C, [I]
-SHL C, J
-BOR C, EX
-XOR A, C
-
-STI C, 0 ;efficient I and J increment
-IFL I, B
-  SET PC, crp.dsHash.loop
-
-SET J, POP
-SET I, POP
-SET PC, POP
- ;
 
 ; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -465,6 +894,261 @@ SET X, POP
 SET C, POP
 SET B, POP
 SET A, POP
+SET PC, POP
+ ;
+
+; ; ; ;
+;RETURNS INCORRECT VALUE IF DOING HASHGET ON AN UNPRESENT VALUE
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; DATALIB ; Data Managing Library ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;:DataLib is a library for managing arbitrary amounts of data with relative speed and efficiency.
+;:
+
+;:## Hash Table
+;:Subroutines for creating and searching hash tables, which are sorted tables that store values under names
+;:
+
+;:### dl.makeHashTable (headerPointer, indicies, startingLength)
+;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. *length* is not the total length of the table, but rather the number of occupied indicies.
+;:**returns** *headerPointer*
+;:
+:dl.makeHashTable
+SET [A], 0x5468 ;"hT" magic number
+SET [A+1], B ;indicies
+SET [A+2], C ;length
+SET [A+3], 0 ;reserved
+SET PC, POP
+ ;
+
+;:### dl.hashGet (searchTerm, hashTablePointer)
+;:Searches the hash table at *hashTablePointer* for *searchTerm* in the lookup portion of it. It returns the value in the value portion associated with the searchTerm.
+;:
+;:**returns** value associated by the hash table with *searchTerm*, or 1 if it could not be found
+;:**development version** 
+;:
+:dl.hashGet
+SET PUSH, [B+1] ;store the number of indicies
+
+SET C, [B+2] ;length
+ADD B, 4 ;location
+JSR dl.searchValTable
+
+IFE A, 1
+  SET PC, dl.hashGet.exf
+
+ADD A, POP ;make A an index in the value table
+SET A, [A] ;return the value, rather than the index
+SET PC, POP
+
+:dl.hashGet.exf
+;A is 1
+SET B, POP
+SET PC, POP
+ ;
+
+;:### dl.hashInsert (lookupValue, insertValue, hashTablePointer)
+;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table. This is designed to work very well with the 16-bit hashing algorithm crp.dsHash.
+;:
+;:**under development**
+;:
+:dl.hashInsert
+SET PUSH, B ;store *insertValue*
+SET PUSH, [C+1] ;store *indicies* from header
+SET PUSH, C ;store pointer to header
+
+SET B, C
+ADD B, 4 ;start of sortedTable (for lookups)
+SET C, [C+2] ;length of sortedTable
+
+JSR dl.sortedInsert
+
+SET C, POP
+ADD [C+2], 1 ;add one to the length
+
+ADD A, POP ;retrieve *indicies* from stack
+
+SET B, A
+SET A, POP ;retrieve *insertValue* from stack
+
+SET PC, dl.unsortedInsert
+ ;
+
+;:## Sorted Table
+;:Subroutines for creating and searching sorted tables
+;:
+
+;:### dl.sortedInsert (insertValue, tableLocation, tableLength)
+;:Inserts *insertValue* into the sorted table at *tableLocation* of *tableLength*, maintaining the sortedness of the table.
+;:
+;:**returns** location of insert<strike>, or 1 if the value is already present in the table</strike>
+;:
+:dl.sortedInsert
+SET PUSH, A
+JSR dl.findInsertIndex
+
+;NEED TO HANDLE DUPLICATE ENTRY
+
+SET B, A
+SET A, POP
+SET PC, dl.unsortedInsert ;exit when this subroutine exits
+ ;
+
+;:### dl.searchValTable (searchTerm, tableLocation, tableLength)
+;:Performs a binary search on the table at *tableLocation* (with length *tableLength*) for *searchTerm* and returns the memory location
+;:
+:dl.searchValTable
+IFE C, 0 ;if *tableLength* is zero, return the tableLocation
+  SET PC, dl.searchValTable.noLength
+
+IFE C, 1
+  SET PC, dl.searchValTable.lengthOne
+
+SET PUSH, I
+
+:dl.searchValTable.recheck
+SET I, C
+SHR I, 1 ;divide by 2
+ADD I, B
+
+IFE [I], A
+SET PC, dl.searchValTable.found
+
+IFE C, 1
+  SET PC, dl.searchValTable.exf
+
+IFG A, [I]
+  SET PC, dl.searchValTable.toolow
+
+IFL A, [I]
+  SET PC, dl.searchValTable.toohigh
+
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.toohigh
+SET C, I
+SUB C, B
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.toolow
+ADD C, B
+SUB C, I
+SET B, I
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.found
+SET A, I
+SET I, POP
+SET PC, POP
+
+:dl.searchValTable.noLength
+SET A, B
+SET PC, POP
+
+:dl.searchValTable.lengthOne
+IFG A, [B] ;if *insertValue* is greater than the existing value
+  ADD B, 1 ;look at the second value
+
+SET A, B ;return B
+SET PC, POP
+
+:dl.searchValTable.exf
+SET A, 1
+SET I, POP
+SET PC, POP
+ ;
+
+;:### dl.findInsertIndex (searchTerm, tableLocation, tableLength)
+;:Returns the index at which *searchTerm* should be inserted to keep the table at *tableLocation* with length *tableLength* sorted.
+;:
+:dl.findInsertIndex
+JSR dl.searchValTable
+
+IFE A, 1 ;if the value isn't there
+  ADD A, B ;add B to make it the index to insert at
+
+;DO SOMETHING IF A != 1 AND LENGTH ISN'T LOW
+  
+SET PC, POP
+ ;
+ 
+;:### dl.unsortedInsert (insertValue, insertLocation)
+;:Inserts *insertValue* at *insertLocation* and pushes the value it would replace upward in memory recursively until only a null is overwritten.
+;:**returns** *insertLocation*
+;:
+:dl.unsortedInsert
+SET PUSH, I
+SET PUSH, X ;SHOULD JUST USE A
+SET PUSH, Y ;SHOULD JUST USE B
+
+SET PUSH, B
+SET I, B
+SET X, A
+
+:dl.unsortedInsert.loop
+IFE X, 0
+  SET PC, dl.unsortedInsert.exit
+SET Y, [I]
+STI [I], X
+SET X, Y
+
+SET PC, dl.unsortedInsert.loop
+
+:dl.unsortedInsert.exit
+SET A, POP
+SET Y, POP
+SET X, POP
+SET I, POP
+SET PC, POP
+ ;
+ ;;
+ 
+
+:screendata
+:ht dat 0,0,0,0
+
+; ; ; ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; CRYPT ; Cryptography Lib ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:# Crypt
+;:Cryptography Library
+;:
+
+;:##crp.dsHash (inputPointer, inputLength)
+;:Reads data of *inputLength* from *inputPointer* and performs a hash function on it.
+;:**returns** the 16-bit hash
+;:
+;:For every value, shift the word *i* left and BOR with EX. XOR all of the resulting values together to produce the hash.
+;:```python
+;:for i in inputLength:
+;:	output ^ (inputPointer[i] << i)
+;:```
+;:
+
+:crp.dsHash
+SET PUSH, I
+SET PUSH, J
+SET I, A
+SET J, 0
+
+SET A, 0
+ADD B, I ;B becomes the exit location
+
+:crp.dsHash.loop
+SET C, [I]
+SHL C, J
+BOR C, EX
+XOR A, C
+
+STI C, 0 ;efficient I and J increment
+IFL I, B
+  SET PC, crp.dsHash.loop
+
+SET J, POP
+SET I, POP
 SET PC, POP
  ;
 
@@ -710,281 +1394,6 @@ DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
  ;;
 
 ; ; ; ;
-;RETURNS INCORRECT VALUE IF DOING HASHGET ON AN UNPRESENT VALUE
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; DATALIB ; Data Managing Library ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;:DataLib is a library for managing arbitrary amounts of data with relative speed and efficiency.
-;:
-
-;:## Hash Table
-;:Subroutines for creating and searching hash tables, which are sorted tables that store values under names
-;:
-
-;:### dl.makeHashTable (headerPointer, indicies, startingLength)
-;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. *length* is not the total length of the table, but rather the number of occupied indicies.
-;:**returns** *headerPointer*
-;:
-:dl.makeHashTable
-SET [A], 0x5468 ;"hT" magic number
-SET [A+1], B ;indicies
-SET [A+2], C ;length
-SET [A+3], 0 ;reserved
-SET PC, POP
- ;
-
-;:### dl.hashGet (searchTerm, hashTablePointer)
-;:Searches the hash table at *hashTablePointer* for *searchTerm* in the lookup portion of it. It returns the value in the value portion associated with the searchTerm.
-;:
-;:**returns** value associated by the hash table with *searchTerm*, or 1 if it could not be found
-;:**development version** 
-;:
-:dl.hashGet
-SET PUSH, [B+1] ;store the number of indicies
-
-SET C, [B+2] ;length
-ADD B, 4 ;location
-JSR dl.searchValTable
-
-IFE A, 1
-  SET PC, dl.hashGet.exf
-
-ADD A, POP ;make A an index in the value table
-SET A, [A] ;return the value, rather than the index
-SET PC, POP
-
-:dl.hashGet.exf
-;A is 1
-SET B, POP
-SET PC, POP
- ;
-
-;:### dl.hashInsert (lookupValue, insertValue, hashTablePointer)
-;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table. This is designed to work very well with the 16-bit hashing algorithm crp.dsHash.
-;:
-;:**under development**
-;:
-:dl.hashInsert
-SET PUSH, B ;store *insertValue*
-SET PUSH, [C+1] ;store *indicies* from header
-SET PUSH, C ;store pointer to header
-
-SET B, C
-ADD B, 4 ;start of sortedTable (for lookups)
-SET C, [C+2] ;length of sortedTable
-
-JSR dl.sortedInsert
-
-SET C, POP
-ADD [C+2], 1 ;add one to the length
-
-ADD A, POP ;retrieve *indicies* from stack
-
-SET B, A
-SET A, POP ;retrieve *insertValue* from stack
-
-SET PC, dl.unsortedInsert
- ;
-
-;:## Sorted Table
-;:Subroutines for creating and searching sorted tables
-;:
-
-;:### dl.sortedInsert (insertValue, tableLocation, tableLength)
-;:Inserts *insertValue* into the sorted table at *tableLocation* of *tableLength*, maintaining the sortedness of the table.
-;:
-;:**returns** location of insert<strike>, or 1 if the value is already present in the table</strike>
-;:
-:dl.sortedInsert
-SET PUSH, A
-JSR dl.findInsertIndex
-
-;NEED TO HANDLE DUPLICATE ENTRY
-
-SET B, A
-SET A, POP
-SET PC, dl.unsortedInsert ;exit when this subroutine exits
- ;
-
-;:### dl.searchValTable (searchTerm, tableLocation, tableLength)
-;:Performs a binary search on the table at *tableLocation* (with length *tableLength*) for *searchTerm* and returns the memory location
-;:
-:dl.searchValTable
-IFE C, 0 ;if *tableLength* is zero, return the tableLocation
-  SET PC, dl.searchValTable.noLength
-
-IFE C, 1
-  SET PC, dl.searchValTable.lengthOne
-
-SET PUSH, I
-
-:dl.searchValTable.recheck
-SET I, C
-SHR I, 1 ;divide by 2
-ADD I, B
-
-IFE [I], A
-SET PC, dl.searchValTable.found
-
-IFE C, 1
-  SET PC, dl.searchValTable.exf
-
-IFG A, [I]
-  SET PC, dl.searchValTable.toolow
-
-IFL A, [I]
-  SET PC, dl.searchValTable.toohigh
-
-SET PC, dl.searchValTable.recheck
-
-:dl.searchValTable.toohigh
-SET C, I
-SUB C, B
-SET PC, dl.searchValTable.recheck
-
-:dl.searchValTable.toolow
-ADD C, B
-SUB C, I
-SET B, I
-SET PC, dl.searchValTable.recheck
-
-:dl.searchValTable.found
-SET A, I
-SET I, POP
-SET PC, POP
-
-:dl.searchValTable.noLength
-SET A, B
-SET PC, POP
-
-:dl.searchValTable.lengthOne
-IFG A, [B] ;if *insertValue* is greater than the existing value
-  ADD B, 1 ;look at the second value
-
-SET A, B ;return B
-SET PC, POP
-
-:dl.searchValTable.exf
-SET A, 1
-SET I, POP
-SET PC, POP
- ;
-
-;:### dl.findInsertIndex (searchTerm, tableLocation, tableLength)
-;:Returns the index at which *searchTerm* should be inserted to keep the table at *tableLocation* with length *tableLength* sorted.
-;:
-:dl.findInsertIndex
-JSR dl.searchValTable
-
-IFE A, 1 ;if the value isn't there
-  ADD A, B ;add B to make it the index to insert at
-
-;DO SOMETHING IF A != 1 AND LENGTH ISN'T LOW
-  
-SET PC, POP
- ;
- 
-;:### dl.unsortedInsert (insertValue, insertLocation)
-;:Inserts *insertValue* at *insertLocation* and pushes the value it would replace upward in memory recursively until only a null is overwritten.
-;:**returns** *insertLocation*
-;:
-:dl.unsortedInsert
-SET PUSH, I
-SET PUSH, X ;SHOULD JUST USE A
-SET PUSH, Y ;SHOULD JUST USE B
-
-SET PUSH, B
-SET I, B
-SET X, A
-
-:dl.unsortedInsert.loop
-IFE X, 0
-  SET PC, dl.unsortedInsert.exit
-SET Y, [I]
-STI [I], X
-SET X, Y
-
-SET PC, dl.unsortedInsert.loop
-
-:dl.unsortedInsert.exit
-SET A, POP
-SET Y, POP
-SET X, POP
-SET I, POP
-SET PC, POP
- ;
- ;;
- 
-
-:screendata
-:ht dat 0,0,0,0
-
-; ; ; ;
-;;;;;;;;;;;;;;;;;;
-; KeyboardDaemon ;
-;;;;;;;;;;;;;;;;;;
-;:KeyboardDaemon should be invoked by the interrupt handler whenever a keypress is detected. It has a number of variables that must be set at compile time, but those important for ASCII input should be set per keyboard session.
-;:
-
-
-:v.kd.modeflag DAT 0
-:v.kd.writePointer DAT 0
-:v.kd.effect DAT 0
-:v.kd.enterPointer DAT 0
-
-;:### kd.setup (A=, B=mode, C=effect, I=writePointer, J=enterPointer)
-;:
-:kd.setup
-SET [v.kd.modeflag], B
-SET [v.kd.effect], C
-SET [v.kd.writePointer], I
-SET [v.kd.enterPointer], J
-SET PC, POP
-
-;:### kd.handle
-;:This subroutine should be called by an interrupt triggered by a keypress.
-;:
-:kd.handle
-HWI [HW.GenericKeyboard]
-
-
-; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;
-; Monitor Preallocation ;
-;;;;;;;;;;;;;;;;;;;;;;;;;
-;:# Monitor Preallocation
-;:Functions as a reserved spot for the font and video RAM of the LEM1802.
-;:
-
-;:### fontRAM
-;:Contains the default font shown [here](http://github.com/cubeOS/cubeOS-alpha/raw/master/font/defaultFont.png).
-;:
-
-:fontRAM
-DAT 0xb79e, 0x388e, 0x722c, 0x75f4, 0x19bb, 0x7f8f, 0x85f9, 0xb158, 0x242e, 0x2400, 0x082a, 0x0800, 0x0008, 0x0000, 0x0808, 0x0808, 0x00ff, 0x0000, 0x00f8, 0x0808, 0x08f8, 0x0000, 0x080f, 0x0000, 0x000f, 0x0808, 0x00ff, 0x0808, 0x08f8, 0x0808, 0x08ff, 0x0000, 0x080f, 0x0808, 0x08ff, 0x0808, 0x6633, 0x99cc, 0x9933, 0x66cc, 0xfef8, 0xe080, 0x7f1f, 0x0701, 0x0107, 0x1f7f, 0x80e0, 0xf8fe, 0x5500, 0xaa00, 0x55aa, 0x55aa, 0xffaa, 0xff55, 0x0f0f, 0x0f0f, 0xf0f0, 0xf0f0, 0x0000, 0xffff, 0xffff, 0x0000, 0xffff, 0xffff, 0x0000, 0x0000, 0x005f, 0x0000, 0x0300, 0x0300, 0x3e14, 0x3e00, 0x266b, 0x3200, 0x611c, 0x4300, 0x3629, 0x7650, 0x0002, 0x0100, 0x1c22, 0x4100, 0x4122, 0x1c00, 0x1408, 0x1400, 0x081c, 0x0800, 0xC020, 0x0000, 0x0808, 0x0800, 0x0040, 0x0000, 0x601c, 0x0300, 0x3e49, 0x3e00, 0x427f, 0xC000, 0x6259, 0x4600, 0x2249, 0x3600, 0x0f08, 0x7f00, 0x2745, 0x3900, 0x3e49, 0x3200, 0x6119, 0x0700, 0x3649, 0x3600, 0x2649, 0x3e00, 0x0024, 0x0000, 0xC024, 0x0000, 0x0814, 0x2200, 0x1414, 0x1400, 0x2214, 0x0800, 0x0259, 0x0600, 0x3e59, 0x5e00, 0x7e09, 0x7e00, 0x7f49, 0x3600, 0x3e41, 0x2200, 0x7f41, 0x3e00, 0x7f49, 0x4100, 0x7f09, 0x0100, 0x3e41, 0x7a00, 0x7f08, 0x7f00, 0x417f, 0x4100, 0x2040, 0x3f00, 0x7f08, 0x7700, 0x7f40, 0xC000, 0x7f06, 0x7f00, 0x7f01, 0x7e00, 0x3e41, 0x3e00, 0x7f09, 0x0600, 0x3e61, 0x7e00, 0x7f09, 0x7600, 0x2649, 0x3200, 0x017f, 0x0100, 0x3f40, 0x7f00, 0x1f60, 0x1f00, 0x7f30, 0x7f00, 0x7708, 0x7700, 0x0778, 0x0700, 0x7149, 0x4700, 0x007f, 0x4100, 0x031c, 0x6000, 0x417f, 0x0000, 0x0201, 0x0200, 0x8080, 0x8000, 0x0001, 0x0200, 0x2454, 0x7800, 0x7f44, 0x3800, 0x3844, 0x2800, 0x3844, 0x7f00, 0x3854, 0x5800, 0x087e, 0x0900, 0x4854, 0x3c00, 0x7f04, 0x7800, 0x047d, 0x0000, 0x2040, 0x3d00, 0x7f10, 0x6c00, 0x017f, 0x0000, 0x7c18, 0x7c00, 0x7c04, 0x7800, 0x3844, 0x3800, 0x7c14, 0x0800, 0x0814, 0x7c00, 0x7c04, 0x0800, 0x4854, 0x2400, 0x043e, 0x4400, 0x3c40, 0x7c00, 0x1c60, 0x1c00, 0x7c30, 0x7c00, 0x6c10, 0x6c00, 0x4c50, 0x3c00, 0x6454, 0x4c00, 0x0836, 0x4100, 0x0077, 0x0000, 0x4136, 0x0800, 0x0201, 0x0201, 0x0205, 0x0200
-
-
-;:### videoRAM
-;:Contains the cubeOS logo/splash screen, shown [here](https://github.com/cubeOS/cubeOS-alpha/raw/master/logo/cubeOSLogo.png).
-;:
-:videoRAM
-DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
-DAT 0,0,0xF01F,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B, 0xF01B, 0xF01F,0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0xF057,0xF065,0,0,  0,0,0,0, 0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0xC01C,0xC01C,0,  0,0xC01C,0xC01C,0,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0xC01D,0xC01F,0xC01F,0xC01F,  0xC01F,0xC01F,0xC01F,0xC01E,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0xC01F,0x0C43,0x0C55,  0x0C42,0x0C45,0xC01F,0,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0,0xC01F,0xC01F,  0xC01F,0xC01F,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01F, 0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0,0,0xC01B,  0xC01B,0,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0xF053,0xF063,0xF069,0xF065,  0xF06E,0xF063,0xF065,0,  0,0,0,0,  0,0,0,0, 0,0xF01F,0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0xF01F,0,0
-DAT 0,0,0xF01F,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01F,0,0
-DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
- ;
- ;;
-
-; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; HEAPMAN ; Heap Manager   ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1102,419 +1511,6 @@ IFN I, 0		;continue scanning
 ;NEED TO FIND THE LOCATION OF THE FIRST BLOCK
 ;NEED TO RESERVE THOSE BLOCKS
  ;;
-
-; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;
-; SIMVID ; Video Manager ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-:v.scrnLoc DAT 0
-:v.scrnEnd DAT 0
-:v.scrnHeight DAT 12
-:v.scrnWidth DAT 32
-
-;:### sv.init (videoRAMPointer, fontRAMPointer)
-;:Maps the screen's font to *fontRAMPointer* and the screen's video ram to *videoRAMPointer* in that order.
-;:
-:sv.init
-
-SET PUSH, A
-SET A, 1
-HWI [HW.LEM1802] ;MEM_MAP_FONT
-
-SET B, POP
-SET A, 0
-HWI [HW.LEM1802] ;MEM_MAP_SCREEN
-
-SET [v.scrnLoc], B
-ADD B, 0x180
-SET [v.scrnEnd], B
-SET PC, POP
- ;
- 
-;:### sv.write (inputPointer, outputPointer)
-;:Writes ASCII to the screen using special characters to act as directives. (This does not perform preprocessing such as translating normal ASCII into those special characters.) Special characters are as follows.
-;:**returns** the location of the null following the written text
-;:
-;:#### Color `0x01`
-;:Substitutes the first nine bits of every word following this with the first nine bits of this word.
-;:
-;:
-;:
-:sv.write
-SET PUSH, I
-SET PUSH, J
-
-SET X, sv.write.v.color
-
-SET I, A
-SET J, B
-SET [sv.write.v.color], 0xF000 ;default to white on black
-
-:sv.write.loop
-SET A, [I]
-AND A, 0x007F
-
-IFE A, 0x01
-  SET PC, sv.write.s.color
-
-BOR A, [sv.write.v.color]
-
-STI [J], A ;set the destination to the processed source and increment destination pointer and source pointer
-
-IFN [I], 0
-  SET PC, sv.write.loop
-  
-SET [J], [I] ;write the terminating null
-
-SET A, J
-SET J, POP
-SET I, POP
-SET PC, POP
-
-:sv.write.s.color
-SET [sv.write.v.color], [I]
-AND [sv.write.v.color], 0xFF80 ;first 9 bits
-ADD I, 1 ;increment the source, but not the destination
-SET PC, sv.write.loop
-
-:sv.write.v.color DAT 0
- ;
- 
-:sv.clear
-SET PUSH, I
-SET PUSH, J
-
-SET I, [v.scrnLoc]
-
-:sv.clear.loop
-STI [I], 0
-
-IFL I, [v.scrnEnd]
-  SET PC, sv.clear.loop
-
-SET J, POP
-SET I, POP
-SET PC, POP
- ;
-
-:sv.getLoc ; (xOffset, yOffset)
-IFL A, [v.scrnWidth]
-  IFL B, [v.scrnHeight]
-    SET PC, sv.getLoc.loc ;if onscreen, continue
-SET PC, exf
-
-:sv.getLoc.loc
-MUL B, [v.scrnWidth] ;make yOffset a line index
-ADD A, B              ;combine them
-ADD A, [v.scrnLoc]    ;make the index an index onscreen
-SET PC, POP           ;return in A
- ;
-
-:sv.autoScroll ; () does not modify registers
-SET PUSH, X
-
-SET X, [v.scrnEnd]
-SUB X, [v.scrnWidth]
-
-IFE [X], 0
-  SET PC, sv.autoScroll.ex
-
-SET PUSH, I
-SET PUSH, J
-SET I, [v.scrnLoc]
-SET J, I
-ADD J, [v.scrnWidth]
-
-:sv.autoScroll.loop
-STI [I], [J]
-IFN J, X
-  SET PC, sv.autoScroll.loop
-
-SET X, J
-:sv.autoScroll.looplast
-STI [I], [X]
-SET [X], 0
-ADD X, 1
-IFG X, [v.scrnEnd]
-  SET PC, sv.autoScroll.subex
-SET PC, sv.autoScroll.looplast
-
-:sv.autoScroll.subex
-SET J, POP
-SET I, POP
-
-:sv.autoScroll.ex
-SET X, POP
-SET PC, POP
- ;
-
-:sv.scrollUp
-SET PUSH, I
-SET PUSH, J
-
-SET I, [v.scrnLoc]
-SET J, I
-ADD J, [v.scrnWidth]
-
-:sv.scrollUp.loop
-STI [I], [J]
-IFL J, [v.scrnEnd]
-  SET PC, sv.scrollUp.loop
-
-:sv.scrollUp.clearLast
-SET I, [v.scrnEnd]
-SUB I, [v.scrnWidth]
-
-:sv.scrollUp.clearLast.loop
-STI [I], 0
-IFL I, [v.scrnEnd]
-  SET PC, sv.scrollUp.clearLast.loop
-
-SET J, POP
-SET I, POP
-SUB I, [v.scrnWidth] ;adjust I for caller, hopefully
-SET PC, POP
- ;
- 
-:sv.getNewLine ; (currentLoc)
-SET PUSH, I
-SET I, [v.scrnLoc]
-JSR sv.autoScroll
-SET PC, sv.getNewLine.loop.sub
-
-:sv.getNewLine.loop
-ADD I, [v.scrnWidth]
-
-:sv.getNewLine.loop.sub
-IFG A, I ;exit successful if line scrnindex >= currentindex
-  SET PC, sv.getNewLine.loop
-
-IFE I, [v.scrnEnd]
-  SUB I, [v.scrnWidth]
-
-SET A, I
-SET I, POP
-SET PC, POP
- ;
- ;;
-
-; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; CAT ; CAT FileSystem         ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;:# CAT
-;:**CAT** is the default file system for cubeOS. It is based on the [Harry's Allocation Table](https://github.com/0x10cStandardsCommittee/0x10c-Standards/blob/master/FS/Draft_Harrys_Allocation_Table.txt) file system format. cubeOS uses hashes to identify links, in addition to fourteen character strings.
-;:
-;:**requires**
-;:
-;:- crypt
-;:
-;:**STILL UNDER HEAVY DEVELOPMENT. DO NOT USE**
-
-:cat.def.curDir DAT ".", 0 ;stock current directory name
-:cat.def.parDir DAT "..", 0 ;stock parent directory name
-
-;:## High-level Commands
-;:The high-level commands provide a smooth interface with the filesystem that can be used easily by modules and the rest of the operating system.
-;:
-
-
-
-;:## Low-level Commands
-;:The low-level commands are used by the high level commands to provide fast and efficient access to the framework of the filesystem itself.
-;:
-
-;:### cat.mountSystem (location, length, sectorSize)
-;:Mounts */* directory at *location*, reserving *length* words after it. It then initializes a cat filesystem with the given *sectorSize*.
-;:
-;:Currently unsafe if the number of sectors is greater than 16
-;:**returns** location of first word in header
-;:
-
-;SHOULD KEEP TRACK OF WHERE FILESYSTEM IS SO IT CAN ADD NEW STRIPS AND DO SEARCHES
-
-:cat.mountSystem
-SET [env.fs], A
-
-SET PUSH, I
-SET PUSH, J
-SET PUSH, X
-SET PUSH, A ;store location for retrieval at the end
-SET I, A
-DIV B, C ;make B the maximum number of sectors ;SHOULD 
-
-;should find the maximum number of sectors, but doesn't
-
-:cat.mountSystem.initHeader
-STI [I], 0xC001 ;magic number, cat v1.0
-STI [I], B ;number of sectors
-STI [I], 0 ;reserved for sector map start
-STI [I], 0 ;reserved for sector joins start
-STI [I], 0 ;reserved for sector start
-STI [I], C ;sector size
-STI [I], 0 ;sectors in use
-
-:cat.mountSystem.initSectorMap
-SET [A+2], I ;sector map start
-SET PUSH, B ;store B
-SET C, B ;we will change B later
-DIV C, 16 ;find number of words needed to represent sector use states
-;OPTIMIZE DIV WITH SHR
-ADD C, I ;C becomes sector map end location
-
-:cat.mountSystem.initSectorMap.loop
-SET X, 0xFFFF ;make X initializer for sector map
-SHR X, B ;set only the excess bits to used
-STI [I], X
-
-IFG X, 0 ;exit if that was enough bits to represent all sectors
-  SET PC, cat.mountSystem.initSectorMap.end
-
-SUB B, 16
-SET PC, cat.mountSystem.initSectorMap.loop ;COULD BE REORDERED MORE EFFICIENTLY
-
-:cat.mountSystem.initSectorMap.end
-SET B, POP ;restore number of sectors
-
-:cat.mountSystem.initSectorJoin
-SET [A+3], I ;sector join start
-ADD B, I ;make B the ending location of sector join
-
-:cat.mountSystem.initSectorJoin.loop
-STI [I], 0
-IFN I, B ;continue reserving until I reaches the end location
-  SET PC, cat.mountSystem.initSectorJoin.loop
-
-:cat.mountSystem.initSectors
-SET [A+4], I
-
-:cat.mountSystem.initializeRoot
-SET A, 0
-SET B, 1
-JSR cat.newInode
-
-SET A, 0
-SET B, 0
-SET C, cat.def.curDir
-JSR cat.newLink
-
-SET A, 0
-SET B, 1
-SET C, temp.cat.directoryName
-JSR cat.newLink
-
-SET A, 1
-SET B, 2
-JSR cat.newInode
-
-SET PC, cat.mountSystem.exit
-
-:temp.cat.directoryName DAT "test"
-:temp.cat.fileContent DAT "This is a test."
-
-:cat.mountSystem.exit
-SET A, POP ;return location
-
-SET X, POP
-SET J, POP
-SET I, POP
-SET PC, POP
- ;
-
-;:### cat.getOpenSector ()
-;:Finds the first open sector in the filesystem
-;:**modifies** A
-;:**returns** sector number
-;:
-:cat.getOpenSector
-SET PUSH, B
-SET PUSH, C
-SET PUSH, I
-
-SET A, [env.fs]
-SET B, [A+2] ;starting location
-SET C, [A+3] ;ending location
-
-:cat.getOpenSector.wordloop
-SET A, [C]
-
-;CHECK THROUGH AND FIND THE FIRST OPEN SECTOR
-
-SET I, POP
-SET C, POP
-SET B, POP
-
-;:### cat.getSectorPointer (sector)
-;:**modifies** A
-;:**returns** a pointer to the location of the given sector in memory
-;:
-:cat.getSectorPointer
-SET PUSH, B
-SET B, [env.fs]
-MUL A, [B+5] ;multiply by sector size
-ADD A, [B+4] ;add sector offset
-SET B, POP
-SET PC, POP
- ;
-
-;:### cat.getInodePointer (inodeNumber)
-;:Obeys sector links to find pointer to inode.
-;:**returns** pointer to the location of the given inode in memory
-;:**UNDER DEVELOPMENT**
-;:
-:cat.getInodePointer
-SET PUSH, I
-
-SET B, [env.fs+3] ;make B a pointer to the sector joins start
-
-
-;:### cat.newInode (sector, type)
-;:Creates a new inode of *type* and length 0 at *sector*. It also marks the corresponding sector in sector map as used.
-;:Types are 0, for unused, 1, for directory, and 2, for file.
-;:**modifies** A, B
-;:**returns** sector of inode
-
-:cat.newInode
-SET PUSH, A ;store A for returning
-JSR cat.getSectorPointer ;make A a pointer to the start of that sector
-
-SET [A], B
-SET [A+1], 0 ;the number of links pointing to the inode
-SET [A+2], 0 ;the number content size
-SET [A+3], 0 ;reserved
-
-SET A, POP
-SET PC, POP
- ;
-
-;:### cat.newLink (sector, targetSector, namePointer)
-;:Creates a new link under the given sector, extending the length of the inode automatically <strike>and overflowing to the next open sector (updating sector usage and linking) if necessary</strike>.
-;:The first word is the *targetSector*, and the remaining fifteen words are copied literally <strike>(maximum length fourteen)</strike> from the null-terminated word at *namePointer*.
-;:**returns** 0 if successful, and 1 if the given sector does not contain a directory
-;:
-:cat.newLink
-JSR cat.getSectorPointer ;get the memory location 
-
-IFN [A], 1 ;if the sector does not contain a directory
-  SET PC, exf ;exit false
-
-SET PUSH, A ;store A for later
-
-ADD A, [A+2] ;add the length of the existing links
-ADD A, 4 ;add the length of the inode
-;SHOULD CHECK TO SEE IF IT IS OUT OF BOUNDS OF THE SECTOR; IF SO, IT MUST CONTINUE ON TO EITHER THE LINKED SECTOR OR LINK ANOTHER
-
-SET [A], B ;set the link target
-ADD A, 1
-SET B, C
-
-JSR typ.cCopy ;SHOULD IMPOSE MAXIMUM LENGTH
-
-SET A, POP
-ADD [A+2], 16 ;add the length of the link (always 16) to the length of the inode
-SET PC, ext ;exit successful
- ;
 
 ; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
