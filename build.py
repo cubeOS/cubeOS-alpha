@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import sys, os, glob
+import sys, os, glob, subprocess
 
 kernel = ""
 location = os.path.dirname(os.path.abspath(sys.argv[0])) + os.sep
@@ -8,7 +8,6 @@ location = os.path.dirname(os.path.abspath(sys.argv[0])) + os.sep
 modLoc = location + "modules/"
 moduleExtention = ".cubeos"
 modules = []
-
 
 packLoc = location + "modules/packages/"
 packageExtention = ".package"
@@ -18,6 +17,7 @@ builtPackageModule = ""
 packageLoads = ""
 packages = ""
 
+dasloc = open("das-location", 'r').read()
 
 # Create a list of all modules
 modules.append(modLoc + "environment" + moduleExtention)
@@ -49,3 +49,5 @@ kernelf.seek(0)
 kernelf.write(kernel)
 kernelf.truncate()
 kernelf.close()
+
+args = (dasloc, "-o", "cubeOS.bin", "cubeOS.dasm16")
