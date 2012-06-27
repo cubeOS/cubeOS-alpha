@@ -15,5 +15,3 @@ ADD C, 1
 SET A, v.cwds
 SET B, C
 SET PC, typ.cUnpack
-
-SET PC, POP
