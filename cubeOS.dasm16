@@ -1525,13 +1525,13 @@ JSR dl.makeHashTable
 SET A, package.ls
 JSR p.loadPackage
 
+SET A, package.rainbow
+JSR p.loadPackage
+
 SET A, package.pwd
 JSR p.loadPackage
 
 SET A, package.inferno
-JSR p.loadPackage
-
-SET A, package.gawd
 JSR p.loadPackage
 
 
@@ -1625,6 +1625,23 @@ SET PC, typ.cCopy
 
 :package.ls.message DAT 0xf001, "There is no filesystem.", 0
  ;
+;:### package.rainbow
+;:Prints gawdgasm in glorious rainbowy letters
+;:
+;:**author** dylwhich
+;:
+
+:package.rainbow
+DAT 0xffab, 0xcdff
+DAT "rainbow", 0
+
+;sets the color
+SET A, package.gawd.text
+SET B, C ;make B point to stdout
+SET PC, typ.cCopy
+
+:package.gawd.text
+DAT 0xc001, "R", 0xe001, "A", 0xa001, "I", 0x2001, "N", 0xb001, "B", 0x9001, "O", 0xd001, "W", 0
 ;:### package.pwd
 ;:Prints the current working directory.
 ;:
@@ -1654,23 +1671,6 @@ SET PC, typ.cCopy
 
 :pack.inferno.text DAT 0xF001, "Lasciate ogne speranza, voi ch'intrate.", 0
  ;
-;:### package.gawd
-;:Prints gawdgasm in glorious rainbowy letters
-;:
-;:**author** dylwhich
-;:
-
-:package.gawd
-DAT 0xffab, 0xcdff
-DAT "gawd", 0
-
-;sets the color
-SET A, package.gawd.text
-SET B, C ;make B point to stdout
-SET PC, typ.cCopy
-
-:package.gawd.text
-DAT 0xd001, "G", 0xc001, "A", 0xf001, "W", 0xf601, "D"
 
 
  ;;
