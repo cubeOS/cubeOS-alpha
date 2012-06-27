@@ -6,7 +6,6 @@
 
 ;:### p.init
 ;:Initializes all of the pre-defined packages and their respective commands so that they can be accessed in a table.
-;:**Currently unstable.**
 ;:
 :p.init
 SET A, p.hashTable
