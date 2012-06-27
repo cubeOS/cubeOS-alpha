@@ -1,5 +1,3 @@
-;TYPE.CUNPACK NEEDS TO BE REWRITTEN
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; TYPER ; Data and String Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -118,13 +116,11 @@ SET Y, 0x7F00
 :typ.pUnpack.loop
 SET X, [A]
 AND X, Z
-XOR X, 0xF000
 STI [I], X
 
 SET X, [A]
 AND X, Y
 SHR X, 8
-XOR X, 0xF000
 STI [I], X
 
 ADD A, 1
