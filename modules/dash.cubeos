@@ -13,7 +13,7 @@
 ;:
 ;:## Subroutines
 
-:v.sPrompt DAT 0xF001, "$ "
+:v.sPrompt DAT 0xF001, "$ ", 0
 :v.promptLoc DAT 0
 
 :v.stdin DAT s.stdin.space

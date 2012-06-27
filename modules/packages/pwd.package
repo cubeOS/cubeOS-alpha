@@ -1,9 +1,19 @@
+;:### package.pwd
+;:Prints the current working directory.
+;:
+;:**author** dylwhich
+;:
+
 :package.pwd
 DAT 0xffab, 0xcdff
 DAT "pwd", 0
+
+;sets the color
+SET [C], 0xf001
+ADD C, 1
+
 SET A, v.cwds
 SET B, C
 SET PC, typ.cUnpack
-SET [C], 0xf001
-ADD C, 1
+
 SET PC, POP
