@@ -9,8 +9,9 @@ DAT 0xffab, 0xcdff
 DAT "gawd", 0
 
 ;sets the color
-SET B, stuff
-:stuff
-DAT 0xd001, "G", 0xc001, "A", 0xf001, "W", 0xf601, "D"
-
+SET A, package.gawd.text
+SET B, C ;make B point to stdout
 SET PC, typ.cCopy
+
+:package.gawd.text
+DAT 0xd001, "G", 0xc001, "A", 0xf001, "W", 0xf601, "D"
