@@ -179,8 +179,10 @@ SET PUSH, I
 SET PUSH, J
 SET PUSH, X
 SET I, A
-SET X, 1 ;defining $1 first, skipping 0
+SET X, 1 ;the argument indexing index ($1, $2)
 SET B, [v.stdin]
+
+SET [s.args], B ;handle $0 separately
 
 :s.stdin.loop
 STI [B], [I]

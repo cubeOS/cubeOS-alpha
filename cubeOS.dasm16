@@ -407,8 +407,6 @@ SET PC, POP
 ;:If the interrupt is actually an API call, (i.e. A call made to the OS with arguments.) then the receiving subroutine must pop arguments from the stack in order to retrieve them. This is necessary, but **be careful**.
 ;:
 
-;THIS WHOLE THING COULD USE HASHTABLES
-
 :pih
 IAQ 1 ;trigger interrupt queueing
 
@@ -1364,8 +1362,10 @@ SET PUSH, I
 SET PUSH, J
 SET PUSH, X
 SET I, A
-SET X, 1 ;defining $1 first, skipping 0
+SET X, 1 ;the argument indexing index ($1, $2)
 SET B, [v.stdin]
+
+SET [s.args], B ;handle $0 separately
 
 :s.stdin.loop
 STI [B], [I]
@@ -1688,16 +1688,11 @@ SET PC, typ.cCopy
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
+SET A, [B]
 SET B, C
-SET A, 0x01ab
-
 SET [B], 0xf001
 ADD B, 1
-
-JSR typ.htoascii
-
-SET [B], 0
-SET PC, POP
+SET PC, typ.cCopy
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
 ;:
