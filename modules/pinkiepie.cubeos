@@ -37,8 +37,6 @@ SET PC, POP
 ;:If the interrupt is actually an API call, (i.e. A call made to the OS with arguments.) then the receiving subroutine must pop arguments from the stack in order to retrieve them. This is necessary, but **be careful**.
 ;:
 
-;THIS WHOLE THING COULD USE HASHTABLES
-
 :pih
 IAQ 1 ;trigger interrupt queueing
 
