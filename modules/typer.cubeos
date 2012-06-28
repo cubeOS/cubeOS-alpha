@@ -21,8 +21,6 @@ SHL A, 4
 SUB I, 1
 ADD B, 1
 
-ADD Y, 1
-
 IFN I, 0
   SET PC, typ.htoascii.lookup
 
