@@ -178,7 +178,7 @@ SET PC, POP
 SET PUSH, I
 SET PUSH, J
 SET I, A
-SET J, 0
+SET J, 1
 SET B, [v.stdin]
 
 :s.stdin.loop
@@ -208,6 +208,8 @@ SET PC, POP
 SET [B], 0
 SET C, B
 ADD C, 1
+SET Y, s.args ;DEBUG
+SET Z, J ;DEBUG
 IFL J, 15
   SET [s.args + J], C
 ADD J, 1

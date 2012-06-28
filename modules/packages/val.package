@@ -8,8 +8,7 @@
 DAT 0xffab, 0xcdff
 DAT "val", 0
 
-SET A, [B+5]
-SET Z, A ;DEBUG
+SET A, [B+1]
 ADD A, [A]
 SET B, C
 SET [B], 0xf001
