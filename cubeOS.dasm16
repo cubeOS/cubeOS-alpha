@@ -1587,10 +1587,10 @@ JSR p.loadPackage
 SET A, package.pwd
 JSR p.loadPackage
 
-SET A, package.argtest
+SET A, package.inferno
 JSR p.loadPackage
 
-SET A, package.inferno
+SET A, package.echo
 JSR p.loadPackage
 
 
@@ -1751,15 +1751,6 @@ ADD C, 1
 SET A, v.cwds
 SET B, C
 SET PC, typ.cUnpack
-:package.argtest
-DAT 0xffab, 0xcdff
-DAT "argtest", 0
-
-SET A, [B+1]
-SET B, C
-SET [B], 0xf001
-ADD B, 1
-SET PC, typ.cCopy
 :package.inferno
 
 DAT 0xffab, 0xcdff
@@ -1772,6 +1763,15 @@ SET PC, typ.cCopy
 
 :pack.inferno.text DAT 0xF001, "Lasciate ogne speranza, voi ch'intrate.", 0
  ;
+:package.echo
+DAT 0xffab, 0xcdff
+DAT "echo", 0
+
+SET A, [B+1]
+SET B, C
+SET [B], 0xf001
+ADD B, 1
+SET PC, typ.cCopy
 
 
  ;;
