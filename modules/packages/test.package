@@ -2,8 +2,21 @@
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
-SET A, [B]
+SET A, SYSTEM.RESTART
+JSR pih.newMsg
+
+SET PUSH, A
+
 SET B, C
-SET [B], 0xf001
-ADD B, 1
-SET PC, typ.cCopy
+JSR typ.htoascii
+
+SET [A], 0x20
+ADD A, 1
+SET PUSH, A
+
+SET A, SYSTEM.RESTART
+JSR pih.newMsg
+
+SET B, POP
+JSR typ.htoascii
+SET PC, POP
