@@ -1334,7 +1334,7 @@ SUB B, A ;make B the length of the first argument
 JSR crp.dsHash ;returns the hashvalue in A
 
 JSR p.lookup
-SET B, [s.args]
+SET B, s.args
 SET C, [v.stdout]
 
 SET PC, A ;calls the subroutine returned by *p.lookup*
@@ -1362,8 +1362,9 @@ SET PC, POP
 :s.stdin
 SET PUSH, I
 SET PUSH, J
+SET PUSH, X
 SET I, A
-SET J, 1
+SET X, 1 ;defining $1 first, skipping 0
 SET B, [v.stdin]
 
 :s.stdin.loop
@@ -1383,8 +1384,9 @@ IFN [I], 0
   SET PC, s.stdin.loop
 
 SET [B], 0
-IFL J, 15
+IFL X, 15
   SET [s.args + J], 0 ;zero the pointer following the last argument
+SET X, POP
 SET J, POP
 SET I, POP
 SET PC, POP
@@ -1393,9 +1395,9 @@ SET PC, POP
 SET [B], 0
 SET C, B
 ADD C, 1
-IFL J, 15
-  SET [s.args + J], C
-ADD J, 1
+IFL X, 15
+  SET [s.args + X], C
+ADD X, 1
 SET PC, POP
 
 
@@ -1591,9 +1593,6 @@ JSR p.loadPackage
 SET A, package.inferno
 JSR p.loadPackage
 
-SET A, package.typ.htoascii
-JSR p.loadPackage
-
 
 SET PC, POP
  ;
@@ -1726,8 +1725,7 @@ DAT 0xc001, "R", 0xe001, "A", 0xa001, "I", 0x2001, "N", 0xb001, "B", 0x9001, "O"
 DAT 0xffab, 0xcdff
 DAT "val", 0
 
-SET A, [B+5]
-SET Y, B ;DEBUG
+SET A, [B+1]
 SET A, [A]
 SET B, C
 SET [B], 0xf001
@@ -1774,26 +1772,6 @@ SET PC, typ.cCopy
 
 :pack.inferno.text DAT 0xF001, "Lasciate ogne speranza, voi ch'intrate.", 0
  ;
-;:### package.val
-;:Returns the hex value for a given ASCII character
-;:
-;:**author** dylwhich
-;:
-
-:package.val
-DAT 0xffab, 0xcdff
-DAT "val", 0
-
-SET A, [B+5]
-SET Z, A ;DEBUG
-ADD A, [A]
-SET B, C
-SET [B], 0xf001
-ADD B, 1
-JSR typ.htoascii
-
-SET [B], 0
-SET PC, POP
 
 
  ;;
