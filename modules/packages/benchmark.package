@@ -1,0 +1,54 @@
+:package.benchmark
+DAT 0xffab, 0xcdff
+DAT "benchmark", 0
+
+SET PUSH, I
+SET PUSH, J
+SET I, 10
+
+SET A, package.benchmark.checkforexit
+JSR pih.newMsg
+
+SET B, A
+SET A, 1
+HWI [HW.GenericClock]
+
+:package.benchmark.cycle
+SET B, 167 ;1000 / 6
+:package.benchmark.cycle.loop
+SUB B, 1
+IFN B, 0
+  SET PC, package.benchmark.cycle.loop
+
+ADD A, 1 ;add 1000 cycles 
+SET PC, package.benchmark.cycle ;only exit if 
+
+:package.benchmark.checkforexit
+SUB I, 1
+IFN I, 0
+  RFI 0
+
+SET I, A
+
+SET A, 1
+SET B, 0
+HWI [HW.GenericClock]
+
+SET A, I
+
+SET I, C
+STI [I], 0xf001
+
+SET B, I
+JSR typ.htoascii
+
+SET I, B
+STI [I], 0x20
+STI [I], 0x6b ;"k"
+STI [I], 0x48 ;"H"
+STI [I], 0x7a ;"z"
+
+SET J, POP
+SET I, POP
+SET PC, POP
+
