@@ -17,8 +17,6 @@ builtPackageModule = ""
 packageLoads = ""
 packages = ""
 
-dasloc = open("das-location", 'r').read()
-
 # Create a list of all modules
 modules.append(modLoc + "environment" + moduleExtention)
 modules.append(modLoc + "boot" + moduleExtention)
@@ -49,5 +47,3 @@ kernelf.seek(0)
 kernelf.write(kernel)
 kernelf.truncate()
 kernelf.close()
-
-args = (dasloc, "-o", "cubeOS.bin", "cubeOS.dasm16")
