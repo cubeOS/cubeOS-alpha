@@ -14,6 +14,9 @@ ADD B, 1
 
 SET A, 0xA005 ;first word in name
 JSR typ.cCopy
+
+SET [A], 0x000A ;LF (\n)
+ADD A, 1
 SET B, A
 
 SET A, 0xA015 ;second link

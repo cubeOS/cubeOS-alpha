@@ -248,15 +248,15 @@ JSR cat.newInode
 
 SET A, 0
 JSR cat.getSectorPointer ;pointer to root
-ADD A, 3 ;inode content lenght
+ADD A, 3 ;inode content length
 
-SET [A], 16
+SET [A], 32
 ADD A, 1 ;go to first word after inode
 
 SET B, A
 SET A, temp.cat.testLink
 SET C, 32
-JSR typ.cCopy
+JSR typ.pCopy
 
 SET PC, cat.mountSystem.exit
 
@@ -1817,6 +1817,9 @@ ADD B, 1
 
 SET A, 0xA005 ;first word in name
 JSR typ.cCopy
+
+SET [A], 0x000A ;LF (\n)
+ADD A, 1
 SET B, A
 
 SET A, 0xA015 ;second link
