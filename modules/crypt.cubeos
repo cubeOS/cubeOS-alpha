@@ -28,7 +28,7 @@ IFN A, B
 SET A, C
 
 ;:### <strike>crp.dsHash (inputPointer, inputLength)</strike>
-;:**depricated**
+;:***depricated***
 ;:Reads data of *inputLength* from *inputPointer* and performs a hash function on it.
 ;:**returns** the 16-bit hash
 ;:
