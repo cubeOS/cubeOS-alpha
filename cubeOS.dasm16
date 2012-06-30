@@ -155,13 +155,12 @@ DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,
 ; CAT ; CAT FileSystem         ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;:# CAT
-;:**CAT** is the default file system for cubeOS. It is based on the [Harry's Allocation Table](https://github.com/0x10cStandardsCommittee/0x10c-Standards/blob/master/FS/Draft_Harrys_Allocation_Table.txt) file system format. cubeOS uses hashes to identify links, in addition to fourteen character strings.
+;:**CAT** is the default file system for cubeOS. It is based on the [Harry's Allocation Table](https://github.com/0x10cStandardsCommittee/0x10c-Standards/blob/master/FS/Draft_Harrys_Allocation_Table.txt) file system format.
 ;:
-;:**requires**
-;:
-;:- crypt
+;:In order to act on a file or directory, it must be "opened." This copies the inode's contents to a temporary position (as provided by the program opening it.) Some of the subroutines below act on opened directories, so as to add links. When one is finished with a directory or file, one must "write" it back into its strip.
 ;:
 ;:**STILL UNDER HEAVY DEVELOPMENT. DO NOT USE**
+;:
 
 :cat.def.curDir DAT ".", 0 ;stock current directory name
 :cat.def.parDir DAT "..", 0 ;stock parent directory name
@@ -245,24 +244,25 @@ SET A, 0
 SET B, 1
 JSR cat.newInode
 
-SET A, 0
-SET B, 0
-SET C, cat.def.curDir
-JSR cat.newLink
+;TEST LINK
 
 SET A, 0
-SET B, 1
-SET C, temp.cat.directoryName
-JSR cat.newLink
+JSR cat.getSectorPointer ;pointer to root
+ADD A, 3 ;inode content lenght
 
-SET A, 1
-SET B, 2
-JSR cat.newInode
+SET [A], 16
+ADD A, 1 ;go to first word after inode
+
+SET B, A
+SET A, temp.cat.testLink
+SET C, 32
+JSR typ.cCopy
 
 SET PC, cat.mountSystem.exit
 
-:temp.cat.directoryName DAT "test"
-:temp.cat.fileContent DAT "This is a test."
+:temp.cat.testLink
+DAT 1, "TestDir", 0, 0, 0, 0, 0, 0, 0, 0
+DAT 2, "TestFile", 0, 0, 0, 0, 0, 0, 0
 
 :cat.mountSystem.exit
 SET A, POP ;return location
@@ -270,6 +270,68 @@ SET A, POP ;return location
 SET X, POP
 SET J, POP
 SET I, POP
+SET PC, POP
+ ;
+
+;:### cat.open (stripStartSector, continuousMemoryLocation)
+;:Obeying sector joins, copies the entire file or directory (including inode) specified by *stripStartSector* to *continuousMemoryLocation*.
+;:
+:cat.open
+SET PUSH, I
+SET PUSH, A
+
+JSR cat.getSectorPointer ;only modifies A
+SET I, [A+3] ;set I to the content length
+ADD I, 4 ;add the inode length
+
+SET A, POP
+
+:cat.open.loop
+SET PUSH, A ;store A for looping
+
+JSR cat.getJoinedSector
+
+IFE A, 0
+  SET PC, cat.open.exit
+
+SET C, [env.fs]
+SET C, [C+5]
+
+SUB I, C ;subtract from the total length
+;rather than subtracting every time, one could do MOD and use the remainder for copying the very end of the strip
+
+JSR cat.getSectorPointer ;only modifies A; get literal memory location
+
+JSR typ.pCopy ;copy the sector
+SET B, A ;put the copy continue location in B
+
+SET A, POP
+JSR cat.getJoinedSector
+SET PC, cat.open.loop
+
+:cat.open.exit
+SET A, POP
+JSR cat.getSectorPointer
+
+SET C, I
+SET Z, C
+JSR typ.pCopy
+
+SET I, POP
+SET PC, POP
+ ;
+
+;:### cat.getJoinedSector (sectorNumber)
+;:**modifies** A
+;:**returns** the sector joined to *sectorNumber*, or **0** if unjoined or unused
+;:
+:cat.getJoinedSector
+SET PUSH, B
+SET B, [env.fs] ;sector joins start
+SET B, [B+3]
+ADD B, A
+SET A, [B]
+SET B, POP
 SET PC, POP
  ;
 
@@ -295,6 +357,7 @@ SET A, [C]
 SET I, POP
 SET C, POP
 SET B, POP
+ ;
 
 ;:### cat.getSectorPointer (sector)
 ;:**modifies** A
@@ -308,17 +371,6 @@ ADD A, [B+4] ;add sector offset
 SET B, POP
 SET PC, POP
  ;
-
-;:### cat.getInodePointer (inodeNumber)
-;:Obeys sector links to find pointer to inode.
-;:**returns** pointer to the location of the given inode in memory
-;:**UNDER DEVELOPMENT**
-;:
-:cat.getInodePointer
-SET PUSH, I
-
-SET B, [env.fs+3] ;make B a pointer to the sector joins start
-
 
 ;:### cat.newInode (sector, type)
 ;:Creates a new inode of *type* and length 0 at *sector*. It also marks the corresponding sector in sector map as used.
@@ -339,14 +391,12 @@ SET A, POP
 SET PC, POP
  ;
 
-;:### cat.newLink (sector, targetSector, namePointer)
+;:### cat.newLink (directoryPointer, targetStripStartSector, namePointer)
 ;:Creates a new link under the given sector, extending the length of the inode automatically <strike>and overflowing to the next open sector (updating sector usage and linking) if necessary</strike>.
-;:The first word is the *targetSector*, and the remaining fifteen words are copied literally <strike>(maximum length fourteen)</strike> from the null-terminated word at *namePointer*.
+;:The first word is the *targetStripStartSector*, and the remaining fifteen words are copied literally <strike>(maximum length fourteen)</strike> from the null-terminated word at *namePointer*.
 ;:**returns** 0 if successful, and 1 if the given sector does not contain a directory
 ;:
 :cat.newLink
-JSR cat.getSectorPointer ;get the memory location 
-
 IFN [A], 1 ;if the sector does not contain a directory
   SET PC, exf ;exit false
 
@@ -715,6 +765,33 @@ SET A, J
 SET J, POP
 SET I, POP
 SET PC, POP
+ ;
+
+;:### typ.pCopy (inputPointer, outputPointer, length)
+;:Copies data of *length* from *inputPointer* to *outputPointer*.
+;:**returns** a pointer to the word following the last output word
+;:
+:typ.pCopy
+SET PUSH, I
+SET PUSH, J
+
+SET I, A
+SET J, B
+ADD C, A
+
+:typ.pCopy.loop
+IFE I, C
+  SET PC, typ.pCopy.exit
+
+STI [J], [I]
+SET PC, typ.pCopy.loop
+
+:typ.pCopy.exit
+SET A, J
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
 
 ;:### typ.cUnpack (inputPointer, outputPointer)
 ;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) null-terminated at *inputPointer*(A) and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*(B).
@@ -1151,7 +1228,29 @@ SET PC, POP
 ;:Cryptography Library
 ;:
 
-;:##crp.dsHash (inputPointer, inputLength)
+;:### crp.sum (inputPointer, inputLength)
+;:Performs a BSD-checksum operation.
+;:**returns** the 16-bit hash
+;:
+:crp.sum
+ADD B, A
+SET C, 0
+
+:crp.sum.loop
+SHR C, 1
+BOR C, EX ;checksum = (checksum >> 1) + ((checksum & 1) << 15)
+
+ADD C, [A] ;checksum += ch
+
+ADD A, 1
+
+IFN A, B
+  SET PC, crp.sum.loop
+
+SET A, C
+
+;:### <strike>crp.dsHash (inputPointer, inputLength)</strike>
+;:***depricated***
 ;:Reads data of *inputLength* from *inputPointer* and performs a hash function on it.
 ;:**returns** the 16-bit hash
 ;:
@@ -1608,6 +1707,9 @@ JSR p.loadPackage
 SET A, package.echo
 JSR p.loadPackage
 
+SET A, package.sum
+JSR p.loadPackage
+
 
 SET PC, POP
  ;
@@ -1703,20 +1805,23 @@ SET PC, typ.cCopy
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
+SET PUSH, C
+
 SET A, 0
-SET B, 60
-HWI [HW.GenericClock]
+SET B, 0xA000 ;continuous memory location
+JSR cat.open ;open root directory
 
-SET A, package.exit
-JSR pih.newMsg
+SET B, POP
+SET [B], 0xf001
+ADD B, 1
 
+SET A, 0xA005 ;first word in name
+JSR typ.cCopy
 SET B, A
-SET A, 1
-HWI [HW.GenericClock]
 
-SUB PC, 1
+SET A, 0xA015 ;second link
+JSR typ.cCopy
 
-:package.exit
 SET PC, POP
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
@@ -1846,6 +1951,11 @@ SET B, C
 SET [B], 0xf001
 ADD B, 1
 SET PC, typ.cCopy
+:package.sum
+DAT 0xffab, 0xcdff
+DAT "sum", 0
+
+
 
 
  ;;

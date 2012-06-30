@@ -2,18 +2,21 @@
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
+SET PUSH, C
+
 SET A, 0
-SET B, 60
-HWI [HW.GenericClock]
+SET B, 0xA000 ;continuous memory location
+JSR cat.open ;open root directory
 
-SET A, package.exit
-JSR pih.newMsg
+SET B, POP
+SET [B], 0xf001
+ADD B, 1
 
+SET A, 0xA005 ;first word in name
+JSR typ.cCopy
 SET B, A
-SET A, 1
-HWI [HW.GenericClock]
 
-SUB PC, 1
+SET A, 0xA015 ;second link
+JSR typ.cCopy
 
-:package.exit
 SET PC, POP
