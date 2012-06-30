@@ -1602,6 +1602,9 @@ JSR p.loadPackage
 SET A, package.inferno
 JSR p.loadPackage
 
+SET A, package.benchmark
+JSR p.loadPackage
+
 SET A, package.echo
 JSR p.loadPackage
 
@@ -1700,15 +1703,20 @@ SET PC, typ.cCopy
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
-SET A, SYSTEM.RESTART
+SET A, 0
+SET B, 60
+HWI [HW.GenericClock]
+
+SET A, package.exit
 JSR pih.newMsg
 
-SET PUSH, A
+SET B, A
+SET A, 1
+HWI [HW.GenericClock]
 
-SET B, C
-JSR typ.htoascii
+SUB PC, 1
 
-INT POP
+:package.exit
 SET PC, POP
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
@@ -1775,6 +1783,60 @@ SET PC, typ.cCopy
 
 :pack.inferno.text DAT 0xF001, "Lasciate ogne speranza, voi ch'intrate.", 0
  ;
+:package.benchmark
+DAT 0xffab, 0xcdff
+DAT "benchmark", 0
+
+SET PUSH, I
+SET PUSH, J
+SET I, 10
+
+SET A, package.benchmark.checkforexit
+JSR pih.newMsg
+
+SET B, A
+SET A, 1
+HWI [HW.GenericClock]
+
+:package.benchmark.cycle
+SET B, 167 ;1000 / 6
+:package.benchmark.cycle.loop
+SUB B, 1
+IFN B, 0
+  SET PC, package.benchmark.cycle.loop
+
+ADD A, 1 ;add 1000 cycles 
+SET PC, package.benchmark.cycle ;only exit if 
+
+:package.benchmark.checkforexit
+SUB I, 1
+IFN I, 0
+  RFI 0
+
+SET I, A
+
+SET A, 1
+SET B, 0
+HWI [HW.GenericClock]
+
+SET A, I
+
+SET I, C
+STI [I], 0xf001
+
+SET B, I
+JSR typ.htoascii
+
+SET I, B
+STI [I], 0x20
+STI [I], 0x6b ;"k"
+STI [I], 0x48 ;"H"
+STI [I], 0x7a ;"z"
+
+SET J, POP
+SET I, POP
+SET PC, POP
+
 :package.echo
 DAT 0xffab, 0xcdff
 DAT "echo", 0
