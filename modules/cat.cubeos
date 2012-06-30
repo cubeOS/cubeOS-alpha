@@ -91,24 +91,25 @@ SET A, 0
 SET B, 1
 JSR cat.newInode
 
-SET A, 0
-SET B, 0
-SET C, cat.def.curDir
-JSR cat.newLink
+;TEST LINK
 
 SET A, 0
-SET B, 1
-SET C, temp.cat.directoryName
-JSR cat.newLink
+JSR cat.getSectorPointer ;pointer to root
+ADD A, 3 ;inode content lenght
 
-SET A, 1
-SET B, 2
-JSR cat.newInode
+SET [A], 16
+ADD A, 1 ;go to first word after inode
+
+SET B, A
+SET A, temp.cat.testLink
+SET C, 32
+JSR typ.cCopy
 
 SET PC, cat.mountSystem.exit
 
-:temp.cat.directoryName DAT "test"
-:temp.cat.fileContent DAT "This is a test."
+:temp.cat.testLink
+DAT 1, "TestDir", 0, 0, 0, 0, 0, 0, 0, 0
+DAT 2, "TestFile", 0, 0, 0, 0, 0, 0, 0
 
 :cat.mountSystem.exit
 SET A, POP ;return location
@@ -127,7 +128,7 @@ SET PUSH, I
 SET PUSH, A
 
 JSR cat.getSectorPointer ;only modifies A
-SET I, [A+2] ;set I to the content length
+SET I, [A+3] ;set I to the content length
 ADD I, 4 ;add the inode length
 
 SET A, POP
@@ -136,6 +137,7 @@ SET A, POP
 SET PUSH, A ;store A for looping
 
 JSR cat.getJoinedSector
+
 IFE A, 0
   SET PC, cat.open.exit
 
@@ -159,6 +161,7 @@ SET A, POP
 JSR cat.getSectorPointer
 
 SET C, I
+SET Z, C
 JSR typ.pCopy
 
 SET I, POP
@@ -171,8 +174,8 @@ SET PC, POP
 ;:
 :cat.getJoinedSector
 SET PUSH, B
-SET B, [env.fs]sector joins start
-ADD B, [B+3]
+SET B, [env.fs] ;sector joins start
+SET B, [B+3]
 ADD B, A
 SET A, [B]
 SET B, POP

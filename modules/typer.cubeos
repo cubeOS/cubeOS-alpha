@@ -81,6 +81,7 @@ SET PC, typ.pCopy.loop
 SET A, J
 SET J, POP
 SET I, POP
+SET PC, POP
  ;
 
 ;:### typ.cUnpack (inputPointer, outputPointer)
