@@ -149,7 +149,7 @@ SUB B, A ;make B the length of the first argument
 JSR crp.dsHash ;returns the hashvalue in A
 
 JSR p.lookup
-SET B, [s.args]
+SET B, s.args
 SET C, [v.stdout]
 
 SET PC, A ;calls the subroutine returned by *p.lookup*
@@ -177,9 +177,12 @@ SET PC, POP
 :s.stdin
 SET PUSH, I
 SET PUSH, J
+SET PUSH, X
 SET I, A
-SET J, 0
+SET X, 1 ;the argument indexing index ($1, $2)
 SET B, [v.stdin]
+
+SET [s.args], B ;handle $0 separately
 
 :s.stdin.loop
 STI [B], [I]
@@ -198,8 +201,9 @@ IFN [I], 0
   SET PC, s.stdin.loop
 
 SET [B], 0
-IFL J, 15
+IFL X, 15
   SET [s.args + J], 0 ;zero the pointer following the last argument
+SET X, POP
 SET J, POP
 SET I, POP
 SET PC, POP
@@ -208,9 +212,9 @@ SET PC, POP
 SET [B], 0
 SET C, B
 ADD C, 1
-IFL J, 15
-  SET [s.args + J], C
-ADD J, 1
+IFL X, 15
+  SET [s.args + X], C
+ADD X, 1
 SET PC, POP
 
 

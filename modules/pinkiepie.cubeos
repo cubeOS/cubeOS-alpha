@@ -37,8 +37,6 @@ SET PC, POP
 ;:If the interrupt is actually an API call, (i.e. A call made to the OS with arguments.) then the receiving subroutine must pop arguments from the stack in order to retrieve them. This is necessary, but **be careful**.
 ;:
 
-;THIS WHOLE THING COULD USE HASHTABLES
-
 :pih
 IAQ 1 ;trigger interrupt queueing
 
@@ -72,3 +70,22 @@ SET C, POP
 SET B, POP
 RFI 0
  ;
+
+;:### pih.newMsg (location)
+;:Finds the first unused message greater than or equal to 64, but less than or equal to 127. It then makes *location* the location to jump to when that interrupt is triggered.
+;:
+;:**returns** the first open message
+;:
+:pih.newMsg
+SET B, 64
+
+:pih.newMsg.findOpen
+IFE [pih.cmdtable + B], 0xffff
+  SET PC, pih.newMsg.found
+ADD B, 1
+SET PC, pih.newMsg.findOpen
+
+:pih.newMsg.found
+SET [pih.cmdtable + B], A
+SET A, B
+SET PC, POP

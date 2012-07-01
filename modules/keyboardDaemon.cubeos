@@ -1,27 +1,14 @@
 ;;;;;;;;;;;;;;;;;;
 ; KeyboardDaemon ;
 ;;;;;;;;;;;;;;;;;;
-;:KeyboardDaemon should be invoked by the interrupt handler whenever a keypress is detected. It has a number of variables that must be set at compile time, but those important for ASCII input should be set per keyboard session.
+;:An instance of KeyboardDemon should be registered to any process that requires detection of keypresses. It requests an interrupt value from the operating system, and, when it detects that interrupt, writes the pressed key, if it is ASCII, to the location registered on its instantiation. (That location is, of course, incremented.)
 ;:
 
 
-:v.kd.modeflag DAT 0
 :v.kd.writePointer DAT 0
-:v.kd.effect DAT 0
-:v.kd.enterPointer DAT 0
 
-;:### kd.setup (A=, B=mode, C=effect, I=writePointer, J=enterPointer)
+;:### kd.init (writePointer)
 ;:
-:kd.setup
-SET [v.kd.modeflag], B
-SET [v.kd.effect], C
-SET [v.kd.writePointer], I
-SET [v.kd.enterPointer], J
-SET PC, POP
+:kd.init
 
-;:### kd.handle
-;:This subroutine should be called by an interrupt triggered by a keypress.
-;:
-:kd.handle
-HWI [HW.GenericKeyboard]
 
