@@ -514,12 +514,14 @@ SET I, B
 SET B, 0xA000
 JSR cat.open
 
-SET J, 0xA000
+SET J, 0xA005 ;
+SET C, J
 
 :cat.getSectorFromSingleRelative.compare
 IFE [I], 0
-  SET PC, cat.getSectorFromSingleRelative.found
+  SET A, 0
 IFE [I], 0x2f ;"/"
-  SET PC, cat.getSectorFromSingleRelative.found
+  SET A, 0
 
-;TODO compare two strings properly
+
+:cat.getSectorFromSingleRelative.found
