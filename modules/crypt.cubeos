@@ -6,7 +6,29 @@
 ;:Cryptography Library
 ;:
 
-;:##crp.dsHash (inputPointer, inputLength)
+;:### crp.sum (inputPointer, inputLength)
+;:Performs a BSD-checksum operation.
+;:**returns** the 16-bit hash
+;:
+:crp.sum
+ADD B, A
+SET C, 0
+
+:crp.sum.loop
+SHR C, 1
+BOR C, EX ;checksum = (checksum >> 1) + ((checksum & 1) << 15)
+
+ADD C, [A] ;checksum += ch
+
+ADD A, 1
+
+IFN A, B
+  SET PC, crp.sum.loop
+
+SET A, C
+
+;:### <strike>crp.dsHash (inputPointer, inputLength)</strike>
+;:***depricated***
 ;:Reads data of *inputLength* from *inputPointer* and performs a hash function on it.
 ;:**returns** the 16-bit hash
 ;:

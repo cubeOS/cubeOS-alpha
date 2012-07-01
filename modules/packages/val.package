@@ -1,14 +1,19 @@
-;:### package.typ.htoascii
+;:### package.val
 ;:Returns the hex value for a given ASCII character
 ;:
 ;:**author** dylwhich
 ;:
 
-:package.typ.htoascii
+:package.val
 DAT 0xffab, 0xcdff
-DAT "typ.htoascii"
+DAT "val", 0
 
 SET A, [B+1]
+SET A, [A]
 SET B, C
 SET [B], 0xf001
 ADD B, 1
+JSR typ.htoascii
+
+SET [B], 0
+SET PC, POP

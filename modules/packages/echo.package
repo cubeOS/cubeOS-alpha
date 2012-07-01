@@ -1,6 +1,6 @@
-:package.argtest
+:package.echo
 DAT 0xffab, 0xcdff
-DAT "argtest", 0
+DAT "echo", 0
 
 SET A, [B+1]
 SET B, C
