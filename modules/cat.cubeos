@@ -13,7 +13,7 @@
 ;:The high-level commands provide a smooth interface with the filesystem that can be used easily by modules and the rest of the operating system.
 ;:
 
-;:### cat.
+
 
 ;:## Low-level Commands
 ;:The low-level commands are used by the high level commands to provide fast and efficient access to the framework of the filesystem itself.
@@ -22,7 +22,6 @@
 ;:### cat.mountSystem (location, length, sectorSize)
 ;:Mounts */* directory at *location*, reserving *length* words after it. It then initializes a cat filesystem with the given *sectorSize*.
 ;:
-;:Currently unsafe if the number of sectors is greater than 16
 ;:**returns** location of first word in header
 ;:
 
@@ -500,3 +499,27 @@ SET A, POP
 ADD [A+2], 16 ;add the length of the link (always 16) to the length of the inode
 SET PC, ext ;exit successful
  ;
+
+;:## Low-Level Parsing Commands
+;:
+
+;:### cat.getSectorFromSingleRelative (currentSector, relativePath)
+;:Gets the sector pointed to by the link in *currentSector* by *relativePath*. This is **not recursive**. *relativePath* is considered terminated by either a null or a slash (`/`).
+;:
+:cat.getSectorFromSingleRelative
+SET PUSH, I
+SET PUSH, J
+SET I, B
+
+SET B, 0xA000
+JSR cat.open
+
+SET J, 0xA000
+
+:cat.getSectorFromSingleRelative.compare
+IFE [I], 0
+  SET PC, cat.getSectorFromSingleRelative.found
+IFE [I], 0x2f ;"/"
+  SET PC, cat.getSectorFromSingleRelative.found
+
+;TODO compare two strings properly
