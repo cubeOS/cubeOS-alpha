@@ -93,7 +93,7 @@ JSR cat.newInode
 
 ;TEST LINK
 
-SET A, 0
+;cat.newInode returns the affected sector
 JSR cat.getSectorPointer ;pointer to root
 ADD A, 3 ;inode content length
 
@@ -168,8 +168,100 @@ SET I, POP
 SET PC, POP
  ;
 
+;:### cat.write (inputPointer, sectorNumber)
+;:Obeying sector joins, copies the entire contents of an open file at *inputPointer* to the sector at *sectorNumber*, linking new sectors as needed and unlinking old ones if they become unnecessary.
+;:**under development**
+;:
+:cat.write
+SET PUSH, I
+SET PUSH, J
+SET PUSH, X
+
+SET J, [env.fs]
+SET J, [J+5] ;set C to the size of a sector
+
+SET I, [A+3] ;set A to the size of the input
+ADD I, 4 ;include the size of the inode
+
+SET PUSH, I ;store the size of the input for later
+
+DIV I, J ;set I to the number of sectors needed for the whole file
+ADD I, 1 ;DIV rounds down ;FIND A RELIABLE WAY TO DO THIS
+
+SET X, A ;make X the storage place for the current input index
+
+:cat.write.loop
+IFE I, 1
+  SET PC, cat.write.exit
+
+SET PUSH, B ;store the current sector number
+
+SET A, B
+JSR cat.getSectorPointer ;get the location of the sector in memory
+SET B, A
+
+
+SET A, X ;set A to the location for input in the copy
+SET C, J 
+JSR typ.pCopy ;returns the output location
+
+ADD X, J ;make X the location of the remaining part of the file
+SUB I, 1 ;reduce the number of remaining sectors to copy by 1
+
+SET A, POP ;restore the number of the sector that was just written to
+JSR cat.linkNewSector ;link a new sector if one is not already linked
+
+SET B, A ;set B to the next sector to write to
+
+SET PC, cat.write.loop
+
+:cat.write.exit
+SET C, POP ;restore the size of the input
+MOD C, J ;make C the leftover size
+
+SET A, B
+JSR cat.getSectorPointer
+SET B, A
+
+SET A, X
+JSR typ.pCopy
+
+SET X, POP
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
+
+;:### cat.linkNewSector (sectorNumber)
+;:If **sectorNumber** does not link to another sector, link the first open sector to it.
+;:
+;:**modifies** A <br />
+;:**returns** the sector number joined
+;:
+:cat.linkNewSector
+SET PUSH, B
+SET B, [env.fs]
+SET B, [B+3]
+
+ADD B, A
+IFN [B], 0 ;if the sector is already linked, just return with that value.
+  SET PC, cat.linkNewSector.exit
+
+;if it's not already linked, do the following
+
+JSR cat.getOpenSector ;modifies A; get the first open sector from the bitmap
+JSR cat.markSectorUsed ;returns the sector; mark that sector used
+
+SET [B], A ;link the new sector
+
+:cat.linkNewSector.exit
+SET A, [B]
+SET B, POP
+SET PC, POP
+ ;
+
 ;:### cat.getJoinedSector (sectorNumber)
-;:**modifies** A
+;:**modifies** A <br />
 ;:**returns** the sector joined to *sectorNumber*, or **0** if unjoined or unused
 ;:
 :cat.getJoinedSector
@@ -183,7 +275,8 @@ SET PC, POP
  ;
 
 ;:### cat.getOpenSector ()
-;:Finds the first open sector in the filesystem
+;:Finds the first open sector in the filesystem. **Does not detect when the system is full.**
+;:
 ;:**modifies** A
 ;:**returns** sector number
 ;:
@@ -194,16 +287,35 @@ SET PUSH, I
 
 SET A, [env.fs]
 SET B, [A+2] ;starting location
-SET C, [A+3] ;ending location
+;SET C, [A+3] ;ending location
 
 :cat.getOpenSector.wordloop
-SET A, [C]
+SET A, [B]
+SET C, 0x8000 ;0b1000 0000 0000 0000
 
-;CHECK THROUGH AND FIND THE FIRST OPEN SECTOR
+:cat.getOpenSector.bitloop
+IFC C, A ;if C & A == 0
+  SET PC, cat.getOpenSector.exit
+
+ADD I, 1
+
+IFE C, 0x0001 ;0b0000 0000 0000 0001
+  SET PC, cat.getOpenSector.nextWord ;get the next word in the map
+
+SHR C, 1
+SET PC, cat.getOpenSector.bitloop
+
+:cat.getOpenSector.nextWord
+ADD B, 1
+SET PC, cat.getOpenSector.wordloop
+
+:cat.getOpenSector.exit
+SET A, I
 
 SET I, POP
 SET C, POP
 SET B, POP
+SET PC, POP
  ;
 
 ;:### cat.getSectorPointer (sector)
@@ -222,21 +334,149 @@ SET PC, POP
 ;:### cat.newInode (sector, type)
 ;:Creates a new inode of *type* and length 0 at *sector*. It also marks the corresponding sector in sector map as used.
 ;:Types are 0, for unused, 1, for directory, and 2, for file.
-;:**modifies** A, B
-;:**returns** sector of inode
+;:
+;:**modifies** A, B <br />
+;:**returns** the sector of the inode
 
 :cat.newInode
+SET PUSH, C
 SET PUSH, A ;store A for returning
 JSR cat.getSectorPointer ;make A a pointer to the start of that sector
 
 SET [A], B
 SET [A+1], 0 ;the number of links pointing to the inode
-SET [A+2], 0 ;the number content size
-SET [A+3], 0 ;reserved
+SET [A+2], 0 ;reserved high order word content size
+SET [A+3], 0 ;low order word content size
+
+SET A, PEEK
+SHR A, 4 ;divide by 16
+
+SET B, [env.fs]
+SET B, [B+2] ;set B to the location of the sector map
+
+ADD B, A ;set B to the location of the relavent word of the sector map
+
+SET A, PEEK
+AND A, 0x000f ;set A to the index of the relevant bit
+
+SET C, 0x8000 ;0b1000 0000 0000 0000
+SHR C, A ;make the relevant bit of C 1
+
+BOR [B], C ;set the relevant bit of B to 1
 
 SET A, POP
+SET C, POP
 SET PC, POP
  ;
+
+;:### cat.rmInode (sector)
+;:Marks *sector* unused in the sector map, <strike>unlinks the rest of the strip</strike>, and marks its inode unused.
+;:
+;:**modifies** A <br />
+;:**returns** *sector*
+;:
+:cat.rmInode
+SET PUSH, C
+SET PUSH, B
+SET PUSH, A ;store A for returning
+
+JSR cat.getSectorPointer ;get the sector in memory
+SET [A], 0 ;mark the inode unused
+
+SET A, PEEK
+JSR cat.freeStrip
+
+SET A, POP
+SET B, POP
+SET C, POP
+SET PC, POP
+ ;
+
+;:### cat.freeStrip (startSector)
+;:Unlinks all of the sectors in a strip and marks them each as free
+;:
+:cat.freeStrip
+SET C, [env.fs]
+SET C, [C+3] ;set I to the sector joins start
+
+:cat.freeStrip.loop
+SET B, C
+ADD B, A ;set B to the location of the sector's join
+
+JSR cat.markSectorUnused ;marks the sector unused in the bitmap
+;without changing registers
+
+IFE [B], 0
+  SET PC, POP
+
+SET A, [B]
+SET [B], 0
+SET PC, cat.freeStrip.loop
+ ;
+
+;:### cat.markSectorUsed (sector)
+;:Marks a sector used in the bitmap.
+;:
+;:**modifies** A <br />
+;:**returns** *sector*
+;:
+:cat.markSectorUsed
+SET PUSH, C
+SET PUSH, B
+SET PUSH, A ;store for reusage
+
+SHR A, 4 ;divide by 16
+
+SET B, [env.fs]
+SET B, [B+2] ;set B to the location of the sector map
+
+ADD B, A ;set B to the location of the relavent word of the sector map
+
+SET A, PEEK
+AND A, 0x000f ;set A to the index of the relevant bit
+
+SET C, 0x8000 ;0b1000 0000 0000 0000
+SHR C, A ;make the relevant bit of C 1
+
+BOR [B], C ;set the relevant bit of B to 0
+SET A, POP
+SET B, POP
+SET C, POP
+SET PC, POP
+ ;
+
+;:### cat.markSectorUnused (sector)
+;:Marks a sector unused in the bitmap.
+;:
+;:**modifies** A <br />
+;:**returns** *sector*
+;:
+:cat.markSectorUnused
+SET PUSH, C
+SET PUSH, B
+SET PUSH, A ;store for reusage
+
+SHR A, 4 ;divide by 16
+
+SET B, [env.fs]
+SET B, [B+2] ;set B to the location of the sector map
+
+ADD B, A ;set B to the location of the relavent word of the sector map
+
+SET A, PEEK
+AND A, 0x000f ;set A to the index of the relevant bit
+
+SET C, 0x8000 ;0b1000 0000 0000 0000
+SHR C, A ;make the relevant bit of C 1
+XOR C, 0xffff ;negate C, so the relevant bit is 0
+
+AND [B], C ;set the relevant bit of B to 0
+SET A, POP
+SET B, POP
+SET C, POP
+SET PC, POP
+ ;
+
 
 ;:### cat.newLink (directoryPointer, targetStripStartSector, namePointer)
 ;:Creates a new link under the given sector, extending the length of the inode automatically <strike>and overflowing to the next open sector (updating sector usage and linking) if necessary</strike>.

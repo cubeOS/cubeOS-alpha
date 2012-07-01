@@ -2,24 +2,18 @@
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
-SET PUSH, C
-
 SET A, 0
-SET B, 0xA000 ;continuous memory location
-JSR cat.open ;open root directory
+SET B, 0xA000
+JSR cat.open
 
-SET B, POP
-SET [B], 0xf001
-ADD B, 1
-
-SET A, 0xA005 ;first word in name
+SET A, package.test.newfilename
+SET B, 0xA015 ;the first word
 JSR typ.cCopy
 
-SET [A], 0x000A ;LF (\n)
-ADD A, 1
-SET B, A
-
-SET A, 0xA015 ;second link
-JSR typ.cCopy
+SET A, 0xA000
+SET B, 0
+JSR cat.write
 
 SET PC, POP
+
+:package.test.newfilename DAT "newfilename", 0
