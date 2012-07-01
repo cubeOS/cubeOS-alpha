@@ -162,9 +162,6 @@ DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,
 ;:**STILL UNDER HEAVY DEVELOPMENT. DO NOT USE**
 ;:
 
-:cat.def.curDir DAT ".", 0 ;stock current directory name
-:cat.def.parDir DAT "..", 0 ;stock parent directory name
-
 ;:## High-level Commands
 ;:The high-level commands provide a smooth interface with the filesystem that can be used easily by modules and the rest of the operating system.
 ;:
@@ -178,7 +175,6 @@ DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,
 ;:### cat.mountSystem (location, length, sectorSize)
 ;:Mounts */* directory at *location*, reserving *length* words after it. It then initializes a cat filesystem with the given *sectorSize*.
 ;:
-;:Currently unsafe if the number of sectors is greater than 16
 ;:**returns** location of first word in header
 ;:
 
@@ -314,7 +310,6 @@ SET A, POP
 JSR cat.getSectorPointer
 
 SET C, I
-SET Z, C
 JSR typ.pCopy
 
 SET I, POP
@@ -535,6 +530,7 @@ SET PUSH, A ;store A for returning
 
 JSR cat.getSectorPointer ;get the sector in memory
 SET [A], 0 ;mark the inode unused
+SET [A+3], 0 ;set the content length to zero
 
 SET A, PEEK
 JSR cat.freeStrip
@@ -656,6 +652,32 @@ SET A, POP
 ADD [A+2], 16 ;add the length of the link (always 16) to the length of the inode
 SET PC, ext ;exit successful
  ;
+
+;:## Low-Level Parsing Commands
+;:
+
+;:### cat.getSectorFromSingleRelative (currentSector, relativePath)
+;:Gets the sector pointed to by the link in *currentSector* by *relativePath*. This is **not recursive**. *relativePath* is considered terminated by either a null or a slash (`/`).
+;:
+:cat.getSectorFromSingleRelative
+SET PUSH, I
+SET PUSH, J
+SET I, B
+
+SET B, 0xA000
+JSR cat.open
+
+SET J, 0xA005 ;
+SET C, J
+
+:cat.getSectorFromSingleRelative.compare
+IFE [I], 0
+  SET A, 0
+IFE [I], 0x2f ;"/"
+  SET A, 0
+
+
+:cat.getSectorFromSingleRelative.found
 
 ; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
