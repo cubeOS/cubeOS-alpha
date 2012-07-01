@@ -1,17 +1,17 @@
 body {
   margin: 0;
   padding: 0;
-  background: #151515 url("../images/bkg.png") 0 0;
-  color: #eaeaea;
+  background: #ffffff url("../images/wbkg.png") 0 0;
+  color: #030303;
   font: 16px;
-  line-height: 1.5;
+  line-height: 1.3;
   font-family: Monaco, "Bitstream Vera Sans Mono", "Lucida Console", Terminal, monospace;
 }
 
 /* General & 'Reset' Stuff */
 
 .container {
-  width: 90%;
+  width: 65%;
   max-width: 600px;
   margin: 0 auto;
 }
@@ -26,30 +26,35 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 li {
-  line-height: 1.4 ;
+  line-height: 1.3 ;
 }
 
 /* Header, <header>
    header   - container
    h1       - project name
-   h2       - project description
+   h2       - tagline
+   h3       - project description
 */
 
 header {
-  background: rgba(0, 0, 0, 0.1);
-  width: 100%;
-  border-bottom: 1px dashed #b5e853;
+  background: rgba(16, 16, 16, 0.05);
+  width: 80%;
+  border-style: dotted;
+  border-color: #000000;
+  border-width: 3px;
   padding: 20px 0;
-  margin: 0 0 40px 0;
+  margin: 2px 0 40px 0;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 header h1 {
-  font-size: 30px;
+  font-size: 35px;
   line-height: 1.5;
-  margin: 0 0 0 -40px;
+  margin: 0 0 0 -20px;
   font-weight: bold;
   font-family: Monaco, "Bitstream Vera Sans Mono", "Lucida Console", Terminal, monospace;
-  color: #b5e853;
+  color: #000000;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1),
                0 0 5px rgba(181, 232, 83, 0.1),
                0 0 10px rgba(181, 232, 83, 0.1);
@@ -57,27 +62,42 @@ header h1 {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
 header h1:before {
-  content: "./ ";
-  font-size: 24px;
-}
+  content: "$ ";
+  font-size: 32px;
+}*/
 
 header h2 {
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 300;
-  color: #666;
+  color: #030303;
+}
+
+header h3 {
+  font-size: 18px;
+  font-weight: 250;
+  color: #040404;
 }
 
 #downloads .btn {
-  display: inline-block;
+  width: 33%
+  max-width: 200px
+  margin: 0 auto;
+
+  float: left;
+  border-style: dotted;
+  border-color: #000000;
+  border-width: 1px;
   text-align: center;
-  margin: 0;
+  padding: 10px, 10px;
 }
 
 /* Main Content
 */
 
 #main_content {
+  color: #000000
   width: 100%;
   -webkit-font-smoothing: antialiased;
 }
@@ -88,7 +108,7 @@ section img {
 h1, h2, h3, h4, h5, h6 {
   font-weight: normal;
   font-family: Monaco, "Bitstream Vera Sans Mono", "Lucida Console", Terminal, monospace;
-  color: #b5e853;
+  color: #000000;
   letter-spacing: -0.03em;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1),
                0 0 5px rgba(181, 232, 83, 0.1),
@@ -120,7 +140,7 @@ h1, h2, h3, h4, h5, h6 {
 #main_content h6 {
   font-size: 12px;
   text-transform: uppercase;
-  color: #999;
+  color: #030303;
   margin: 0 0 5px 0;
 }
 
@@ -137,16 +157,16 @@ ul li:before {
   content: ">>";
   font-family: Monaco, "Bitstream Vera Sans Mono", "Lucida Console", Terminal, monospace;
   font-size: 13px;
-  color: #b5e853;
+  color: #030303;
   margin-left: -37px;
   margin-right: 21px;
   line-height: 16px;
 }
 
 blockquote {
-  color: #aaa;
+  color: #030303;
   padding-left: 10px;
-  border-left: 1px dotted #666;
+  border-left: 1px dotted #080808;
 }
 
 pre {
@@ -154,7 +174,7 @@ pre {
   border: 1px solid rgba(255, 255, 255, 0.15);
   padding: 10px;
   font-size: 14px;
-  color: #b5e853;
+  color: #030303;
   border-radius: 2px;
   -moz-border-radius: 2px;
   -webkit-border-radius: 2px;
@@ -170,7 +190,7 @@ table {
 
 th {
   text-align: left;
-  border-bottom: 1px dashed #b5e853;
+  border-bottom: 1px dashed #040404;
   padding: 5px 10px;
 }
 
@@ -190,13 +210,13 @@ hr {
 
 .btn {
   display: inline-block;
-  background: -webkit-linear-gradient(top, rgba(40, 40, 40, 0.3), rgba(35, 35, 35, 0.3) 50%, rgba(10, 10, 10, 0.3) 50%, rgba(0, 0, 0, 0.3));
+  background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.3), rgba(35, 35, 35, 0.3) 50%, rgba(10, 10, 10, 0.3) 50%, rgba(0, 0, 0, 0.3));
   padding: 8px 18px;
   border-radius: 50px;
   border: 2px solid rgba(0, 0, 0, 0.7);
   border-bottom: 2px solid rgba(0, 0, 0, 0.7);
   border-top: 2px solid rgba(0, 0, 0, 1);
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(0, 0, 0, 0.8);
   font-family: Helvetica, Arial, sans-serif;
   font-weight: bold;
   font-size: 13px;
@@ -206,6 +226,7 @@ hr {
 }
 
 .btn:hover {
+  color: rgba(255, 255, 255, 0.9);
   background: -webkit-linear-gradient(top, rgba(40, 40, 40, 0.6), rgba(35, 35, 35, 0.6) 50%, rgba(10, 10, 10, 0.8) 50%, rgba(0, 0, 0, 0.8));
 }
 
@@ -219,7 +240,7 @@ hr {
 
 .btn-github .icon {
   opacity: 0.6;
-  background: url("../images/blacktocat.png") 0 0 no-repeat;
+  background: url("../images/whitetocat.png") 0 0 no-repeat;
 }
 
 /* Links
