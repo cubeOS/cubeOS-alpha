@@ -9,14 +9,11 @@
 ;:**STILL UNDER HEAVY DEVELOPMENT. DO NOT USE**
 ;:
 
-:cat.def.curDir DAT ".", 0 ;stock current directory name
-:cat.def.parDir DAT "..", 0 ;stock parent directory name
-
 ;:## High-level Commands
 ;:The high-level commands provide a smooth interface with the filesystem that can be used easily by modules and the rest of the operating system.
 ;:
 
-
+;:### cat.
 
 ;:## Low-level Commands
 ;:The low-level commands are used by the high level commands to provide fast and efficient access to the framework of the filesystem itself.
@@ -161,7 +158,6 @@ SET A, POP
 JSR cat.getSectorPointer
 
 SET C, I
-SET Z, C
 JSR typ.pCopy
 
 SET I, POP
@@ -382,6 +378,7 @@ SET PUSH, A ;store A for returning
 
 JSR cat.getSectorPointer ;get the sector in memory
 SET [A], 0 ;mark the inode unused
+SET [A+3], 0 ;set the content length to zero
 
 SET A, PEEK
 JSR cat.freeStrip
