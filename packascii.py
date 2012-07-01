@@ -1,4 +1,4 @@
-#!/usr/bin/bython
+#!/usr/bin/python
 import sys
 str = raw_input(">")
 shift = 1;
