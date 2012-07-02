@@ -9,7 +9,7 @@ modLoc = location + "modules/"
 moduleExtention = ".cubeos"
 modules = []
 
-packLoc = location + "modules/packages/"
+packLoc = location + "../cubeOS-packages/stdlib/"
 packageExtention = ".package"
 
 packageModule = modLoc + "package" + moduleExtention
