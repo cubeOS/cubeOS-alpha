@@ -68,7 +68,9 @@ SET I, POP
 SET PC, POP
 
 :sv.write.exitEarly
-SET [B], 0x0000
+SET [B], 0x0000 ;make the first word in the output null
+SET A, B ;return the index that sv.write would have written to
+         ;if there had been content
 SET PC, POP
 
 :sv.write.s.color
