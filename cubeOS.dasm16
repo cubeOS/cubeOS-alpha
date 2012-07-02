@@ -37,10 +37,6 @@ SET PC, __BOOT
 :__BOOT
 JSR HWM
 
-SET A, 0
-SET B, 6
-HWI [HW.GenericClock]
-
 SET A, videoRAM
 SET B, fontRAM
 JSR sv.init ;set up boot screen and screen
@@ -62,11 +58,56 @@ JSR cat.mountSystem ;initialize FS
 
 JSR p.init ;initialize DPH
 
+SET A, 0
+SET B, 6
+HWI [HW.GenericClock]
+
+SET A, 0
+SET B, 0x0FFF
+HWI [HW.Speaker]
+
 SET A, 1
-:__BOOT.bootscreenDisplayLoop
+:__BOOT.wait0
+HWI [HW.GenericClock]
+IFL C, 5
+  SET PC, __BOOT.wait0
+
+SET A, 1
+SET B, 0x3FFF
+HWI [HW.Speaker]
+
+SET A, 1
+:__BOOT.wait1
+HWI [HW.GenericClock]
+IFL C, 10
+  SET PC, __BOOT.wait1
+
+SET A, 1
+SET B, 0x7FFF
+HWI [HW.Speaker]
+
+SET A, 1
+:__BOOT.wait2
+HWI [HW.GenericClock]
+IFL C, 10
+  SET PC, __BOOT.wait2
+
+SET A, 1
+SET B, 0xFFFF
+HWI [HW.Speaker]
+
+SET A, 1
+:__BOOT.wait3
 HWI [HW.GenericClock]
 IFL C, 15
-  SET PC, __BOOT.bootscreenDisplayLoop
+  SET PC, __BOOT.wait3
+
+SET A, 0
+SET B, 0
+HWI [HW.Speaker]
+SET A, 1
+SET B, 0
+HWI [HW.Speaker]
 
 JSR s.instance ;initialize DASH Shell
 
@@ -116,101 +157,39 @@ SET PC, POP
  
 
 ; ; ; ;
-;;;;;;;;
-; BOOT ;
-;;;;;;;;
-;:# BOOT Loader
-;:Initializes the kernel on startup
+;;;;;;;;;;;;;;;;;;;;;;;;;
+; Monitor Preallocation ;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;:# Monitor Preallocation
+;:Functions as a reserved spot for the font and video RAM of the LEM1802.
 ;:
 
-;:### __BOOT
-;:Invokes the boot loader
+;:### fontRAM
+;:Contains the default font shown [here](http://github.com/cubeOS/cubeOS-alpha/raw/master/font/defaultFont.png).
 ;:
-;:1. Invoke *sv.init* to mount the screen at *videoRAM*.
-;:2. Invoke *cat.mountSystem* to initialize the file system with arguments `0x8000, 0x810, 128`.
-;:3. Invoke *p.init* to initialize the Dash Package Handler
-;:4. Invoke *s.instance* to intialize the DASH Shell
+
+:fontRAM
+DAT 0xb79e, 0x388e, 0x722c, 0x75f4, 0x19bb, 0x7f8f, 0x85f9, 0xb158, 0x242e, 0x2400, 0x082a, 0x0800, 0x0008, 0x0000, 0x0808, 0x0808, 0x00ff, 0x0000, 0x00f8, 0x0808, 0x08f8, 0x0000, 0x080f, 0x0000, 0x000f, 0x0808, 0x00ff, 0x0808, 0x08f8, 0x0808, 0x08ff, 0x0000, 0x080f, 0x0808, 0x08ff, 0x0808, 0x6633, 0x99cc, 0x9933, 0x66cc, 0xfef8, 0xe080, 0x7f1f, 0x0701, 0x0107, 0x1f7f, 0x80e0, 0xf8fe, 0x5500, 0xaa00, 0x55aa, 0x55aa, 0xffaa, 0xff55, 0x0f0f, 0x0f0f, 0xf0f0, 0xf0f0, 0x0000, 0xffff, 0xffff, 0x0000, 0xffff, 0xffff, 0x0000, 0x0000, 0x005f, 0x0000, 0x0300, 0x0300, 0x3e14, 0x3e00, 0x266b, 0x3200, 0x611c, 0x4300, 0x3629, 0x7650, 0x0002, 0x0100, 0x1c22, 0x4100, 0x4122, 0x1c00, 0x1408, 0x1400, 0x081c, 0x0800, 0xC020, 0x0000, 0x0808, 0x0800, 0x0040, 0x0000, 0x601c, 0x0300, 0x3e49, 0x3e00, 0x427f, 0xC000, 0x6259, 0x4600, 0x2249, 0x3600, 0x0f08, 0x7f00, 0x2745, 0x3900, 0x3e49, 0x3200, 0x6119, 0x0700, 0x3649, 0x3600, 0x2649, 0x3e00, 0x0024, 0x0000, 0xC024, 0x0000, 0x0814, 0x2200, 0x1414, 0x1400, 0x2214, 0x0800, 0x0259, 0x0600, 0x3e59, 0x5e00, 0x7e09, 0x7e00, 0x7f49, 0x3600, 0x3e41, 0x2200, 0x7f41, 0x3e00, 0x7f49, 0x4100, 0x7f09, 0x0100, 0x3e41, 0x7a00, 0x7f08, 0x7f00, 0x417f, 0x4100, 0x2040, 0x3f00, 0x7f08, 0x7700, 0x7f40, 0xC000, 0x7f06, 0x7f00, 0x7f01, 0x7e00, 0x3e41, 0x3e00, 0x7f09, 0x0600, 0x3e61, 0x7e00, 0x7f09, 0x7600, 0x2649, 0x3200, 0x017f, 0x0100, 0x3f40, 0x7f00, 0x1f60, 0x1f00, 0x7f30, 0x7f00, 0x7708, 0x7700, 0x0778, 0x0700, 0x7149, 0x4700, 0x007f, 0x4100, 0x031c, 0x6000, 0x417f, 0x0000, 0x0201, 0x0200, 0x8080, 0x8000, 0x0001, 0x0200, 0x2454, 0x7800, 0x7f44, 0x3800, 0x3844, 0x2800, 0x3844, 0x7f00, 0x3854, 0x5800, 0x087e, 0x0900, 0x4854, 0x3c00, 0x7f04, 0x7800, 0x047d, 0x0000, 0x2040, 0x3d00, 0x7f10, 0x6c00, 0x017f, 0x0000, 0x7c18, 0x7c00, 0x7c04, 0x7800, 0x3844, 0x3800, 0x7c14, 0x0800, 0x0814, 0x7c00, 0x7c04, 0x0800, 0x4854, 0x2400, 0x043e, 0x4400, 0x3c40, 0x7c00, 0x1c60, 0x1c00, 0x7c30, 0x7c00, 0x6c10, 0x6c00, 0x4c50, 0x3c00, 0x6454, 0x4c00, 0x0836, 0x4100, 0x0077, 0x0000, 0x4136, 0x0800, 0x0201, 0x0201, 0x0205, 0x0200
+
+
+;:### videoRAM
+;:Contains the cubeOS logo/splash screen, shown [here](https://github.com/cubeOS/cubeOS-alpha/raw/master/logo/cubeOSLogo.png).
 ;:
-:__BOOT
-JSR HWM
-
-SET A, 0
-SET B, 6
-HWI [HW.GenericClock]
-
-SET A, videoRAM
-SET B, fontRAM
-JSR sv.init ;set up boot screen and screen
-
-SET A, 0x2000 ;heap location
-SET B, 0x1000 ;length
-SET C, 0x0100 ;block size (16 blocks)
-JSR heap.init
-
-;SHOULD SET VARIABLES TO LOCATION OF HEAP HEADER
-
-JSR pih.init
-
-SET A, 0x8000
-SET B, 0x810
-SET C, 128
-
-JSR cat.mountSystem ;initialize FS
-
-JSR p.init ;initialize DPH
-
-SET A, 1
-:__BOOT.bootscreenDisplayLoop
-HWI [HW.GenericClock]
-IFL C, 15
-  SET PC, __BOOT.bootscreenDisplayLoop
-
-JSR s.instance ;initialize DASH Shell
-
-SET PC, halt
-
-:pTitle DAT 0x7563, 0x6562, 0x534f
-
-:halt SUB PC, 1
- ;
- 
-;:### SYSTEM.RESTART
-;:Clears all registers, drops interrupt queue
-;:**under development**
-;:
-:SYSTEM.RESTART
-SET A, 0
-SET B, 0
-SET C, 0
-SET X, 0
-SET Y, 0
-SET Z, 0
-SET I, 0
-SET J, 0
-SET SP, 0
-IAS 0
-SET PC, 0
-
-
-;:### ext
-;:Exits a subroutine with A set to 0 (`TRUE`)
-;:To use, do `SET PC, ext` instead of `SET PC, POP` at the end of a subroutine
-;:
-:ext ; exit true
-SET A, 0
-SET PC, POP
- ;
-
-;:### exf
-;:Exits a subroutine with A set to 1 (`FALSE`)
-;:To use, do `SET PC, exf` instead of `SET PC, POP` at the end of a subroutine
-;:
-:exf ; exit false
-SET A, 1
-SET PC, POP
+:videoRAM
+DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
+DAT 0,0,0xF01F,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B, 0xF01B, 0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0xF057,0xF065,0,0,  0,0,0,0, 0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0xC01C,0xC01C,0,  0,0xC01C,0xC01C,0,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0xC01D,0xC01F,0xC01F,0xC01F,  0xC01F,0xC01F,0xC01F,0xC01E,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0xC01F,0x0C43,0x0C55,  0x0C42,0x0C45,0xC01F,0,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0,0xC01F,0xC01F,  0xC01F,0xC01F,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01F, 0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0,0,0xC01B,  0xC01B,0,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0xF053,0xF063,0xF069,0xF065,  0xF06E,0xF063,0xF065,0,  0,0,0,0,  0,0,0,0, 0,0xF01F,0,0
+DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0xF01F,0,0
+DAT 0,0,0xF01F,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01F,0,0
+DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
  ;
  ;;
- 
 
 ; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -742,929 +721,6 @@ IFE [I], 0x2f ;"/"
 :cat.getSectorFromSingleRelative.found
 
 ; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; CRYPT ; Cryptography Lib ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;:# Crypt
-;:Cryptography Library
-;:
-
-;:### crp.sum (inputPointer, inputLength)
-;:Performs a BSD-checksum operation.
-;:**returns** the 16-bit hash
-;:
-:crp.sum
-ADD B, A
-SET C, 0
-
-:crp.sum.loop
-SHR C, 1
-BOR C, EX ;checksum = (checksum >> 1) + ((checksum & 1) << 15)
-
-ADD C, [A] ;checksum += ch
-
-ADD A, 1
-
-IFN A, B
-  SET PC, crp.sum.loop
-
-SET A, C
-
-;:### <strike>crp.dsHash (inputPointer, inputLength)</strike>
-;:***depricated***
-;:Reads data of *inputLength* from *inputPointer* and performs a hash function on it.
-;:**returns** the 16-bit hash
-;:
-;:For every value, shift the word *i* left and BOR with EX. XOR all of the resulting values together to produce the hash.
-;:```python
-;:for i in inputLength:
-;:	output ^ (inputPointer[i] << i)
-;:```
-;:
-
-:crp.dsHash
-SET PUSH, I
-SET PUSH, J
-SET I, A
-SET J, 0
-
-SET A, 0
-ADD B, I ;B becomes the exit location
-
-:crp.dsHash.loop
-SET C, [I]
-SHL C, J
-BOR C, EX
-XOR A, C
-
-STI C, 0 ;efficient I and J increment
-IFL I, B
-  SET PC, crp.dsHash.loop
-
-SET J, POP
-SET I, POP
-SET PC, POP
- ;
-
-; ; ; ;
-;;;;;;;;;;;;;;;;
-; DASH ; Shell ;
-;;;;;;;;;;;;;;;;
-;:The DASH Shell is essential to cubeOS's function. It acts as an interpreter for ASCII commands, <strike>which are passed to the package manager in order to directly execute subroutines,</strike> and also handles keyboard input.
-;:
-;:## Usage
-;:At the prompt, the user can use an attached Generic Keyboard to input ASCII and control characters. 
-;:
-;:## Control Characters
-;:
-;:### Control + Delete
-;:Restarts the DASH Shell by calling *s.instance*.
-;:
-;:## Subroutines
-
-:v.sPrompt DAT 0xF001, "$ ", 0
-:v.promptLoc DAT 0
-
-:v.stdin DAT s.stdin.space
-:v.stdout DAT s.stdout.space
-
-;:### s.instance
-;:Prepares a new terminal session at the root directory.
-;:
-;:1. SHOULD Set *v.cwds* to "/ " in packed form (`0x202F`)
-;:2. Clears the screen
-;:3. Calls *s.takeIn*
-;:4. Calls *s.parse*
-;:5. Calls *s.stdout* with the argument being the cursor location when the user pressed enter
-;:6. Loops nonendingly to 3
-;:
-:s.instance
-JSR sv.clear ;clear the screen
-SET A, [v.scrnLoc]
-
-:s.instance.promptLoop
-JSR s.takeIn
-SET PUSH, A ;keep track of cursor location
-
-JSR s.parse
-
-SET A, POP ;restore cursor location for passing to s.stdout
-JSR s.stdout
-
-SET PC, s.instance.promptLoop
-
-SET PC, POP
- ;
- 
-;:### s.takeIn (cursorPointer)
-;:Writes a prompt to the screen using *v.sPrompt* and enters a loop to take ASCII input from the keyboard and write it to the screen at *cursorPointer*. It exits when the user presses `enter`.
-;:
-;:**returns** the cursor location on exit
-;:
-:s.takeIn
-SET PUSH, I
-SET I, 0
-
-JSR sv.getNewLine ;get the next blank line after *cursorPointer*
-JSR s.drawPrompt ;draw the prompt using s.drawPrompt
-
-SET A, 1 ;HWI parameter
-
-:s.takeIn.loop
-IFL I, [v.promptLoc]
-  SET I, [v.promptLoc]
-SET [I], 0xf09e ;cursor character
-
-:s.takeIn.wait
-HWI [HW.GenericKeyboard]
-
-IFG C, 0x1f
-  IFL C, 0x80
-    SET PC, s.takeIn.write
-
-IFE C, 0x10
-  SET PC, s.takeIn.backspace
-
-IFE C, 0x11
-  SET PC, s.takeIn.enter
-  
-;INSERT (0x12)
-  
-IFE C, 0x13
-  SET PC, s.takeIn.delete
-  
-SET PC, s.takeIn.wait
-
-
-:s.takeIn.write
-XOR C, 0xF000
-STI [I], C
-
-IFN I, [v.scrnEnd] ;write normally
-  SET PC, s.takeIn.loop
-
-:s.takeIn.write.scroll
-SUB [v.promptLoc], [v.scrnWidth] ;make prompt scroll, too
-JSR sv.scrollUp ;scroll everything up
-SET PC, s.takeIn.loop
-
-
-:s.takeIn.backspace
-STD [I], 0
-SET [I], 0
-SET PC, s.takeIn.loop
- ;
-
-:s.takeIn.delete
-SET A, 2 ;changes interrupt action, so must be reset afterward
-SET B, 0x91 ;sets B to the *Control* key
-HWI [HW.GenericKeyboard] ;C becomes 1 if *Control* is pressed
-
-IFE C, 1 ;exit if 
-  SET PC, s.instance
-
-SET A, 1 ;reset interrupt action
-SET PC, s.takeIn.loop
- ;
-
-:s.takeIn.enter
-SET [I], 0
-SET A, [v.promptLoc]
-SET B, I ;UNNECESSARY ASSIGNMENT OF CURSOR POSITION
-JSR s.stdin
-
-SET A, I;return location in A
-SET I, POP
-SET PC, POP
- ;
-
-;:### s.parse
-;:This subroutine isolates the first argument in *v.stdin* by scanning through, then stopping on null or 0x20. Then, it gets the *crp.dshash* of the string. Then, it calls *p.lookup*, sets `B` to the location of stdin and `C` to the location of stdout, and invokes the subroutine returned by *p.lookup*.
-;:
-;:This should also point the process to the starts of the remaining arguments.
-;:
-:s.parse
-SET A, [v.stdout] ;prepare stdout by nullifying the first word
-SET [A], 0x0000   ;to overwrite old output if it exists
-
-SET A, [v.stdin] ;make both A and B the location of stdin
-SET B, A         ;for length-finding later
-
-:s.parse.getFirstArg
-IFC [B], 0x20 ;if [B] is 0x0000 or 0x0020
-  SET PC, s.parse.exit
-ADD B, 1
-SET PC, s.parse.getFirstArg
-
-:s.parse.exit
-SUB B, A ;make B the length of the first argument
-JSR crp.dsHash ;returns the hashvalue in A
-
-JSR p.lookup
-
-SET PUSH, I
-SET PUSH, J
-SET PUSH, X
-SET PUSH, Y
-SET PUSH, Z
-IAG B
-SET PUSH, B ;push IA
-
-SET B, s.args
-SET C, [v.stdout]
-
-JSR A ;calls the subroutine returned by *p.lookup*
-
-IAS POP
-SET Z, POP
-SET Y, POP
-SET X, POP
-SET J, POP
-SET I, POP
-
-SET A, 0
-SET B, [v.scrnLoc]
-HWI [HW.LEM1802]
-
-SET PC, POP
- ;
-
-;:### s.drawPrompt (pointer)
-;:Draws a prompt using *env.cwds* and *v.sPrompt* at *pointer* and sets *v.promptLoc* to the location following the prompt.
-;:
-;:**returns** the location following the prompt
-;:
-:s.drawPrompt
-
-SET B, A
-SET A, v.sPrompt
-JSR sv.write
-
-SET [v.promptLoc], A
-
-SET PC, POP
- ;
-
-;:### s.stdin (startPointer)
-;:Performs a C-style copy from *startPointer* to *v.stdin*, replacing un-(single)quoted spaces with zeros.
-;:
-:s.stdin
-SET PUSH, I
-SET PUSH, J
-SET PUSH, X
-SET I, A
-SET X, 1 ;the argument indexing index ($1, $2)
-SET B, [v.stdin]
-
-SET [s.args], B ;handle $0 separately
-
-:s.stdin.loop
-STI [B], [I]
-AND [B], 0x007F
-
-IFE [B], 0x27 ;single quote
-  XOR [s.stdin.quoteflag], 1 ;flip state
-  
-IFN [s.stdin.quoteflag], 1 ;unless they're quoted
-  IFE [B], 0x20 ;set spaces
-    JSR s.stdin.newarg
-
-ADD B, 1
-
-IFN [I], 0
-  SET PC, s.stdin.loop
-
-SET [B], 0
-IFL X, 15
-  SET [s.args + J], 0 ;zero the pointer following the last argument
-SET X, POP
-SET J, POP
-SET I, POP
-SET PC, POP
-
-:s.stdin.newarg
-SET [B], 0
-SET C, B
-ADD C, 1
-IFL X, 15
-  SET [s.args + X], C
-ADD X, 1
-SET PC, POP
-
-
-:s.stdin.quoteflag DAT 0 ;is 1 if iterator is inside quotes
-;:s.stdin.escflag DAT 0 ;is 1 if "\" was the most recent character
-
-;:s.stdin.args ;for handling arguments
-;DAT 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
- ;
-
-;:### s.stdout (outputPointer)
-;:Does a C-style copy from *v.stdout* to *outputPointer*.
-:s.stdout
-JSR sv.getNewLine
-
-SET B, A ;output
-SET A, [v.stdout] ;input
-SET PC, sv.write ;process to screen (null-terminated)
- ;
-;;RESERVED SPACE
-
-;for keeping track of where arguments are
-:s.args
-DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-
-:s.stdin.space
-DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-:s.stdout.space
-DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-
-;current working directory in ascii
-:v.cwds
-DAT 0x202f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
- ;;
-
-; ; ; ;
-;RETURNS INCORRECT VALUE IF DOING HASHGET ON AN UNPRESENT VALUE
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; DATALIB ; Data Managing Library ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;:DataLib is a library for managing arbitrary amounts of data with relative speed and efficiency.
-;:
-
-;:## Hash Table
-;:Subroutines for creating and searching hash tables, which are sorted tables that store values under names
-;:
-
-;:### dl.makeHashTable (headerPointer, indicies, startingLength)
-;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. *length* is not the total length of the table, but rather the number of occupied indicies.
-;:**returns** *headerPointer*
-;:
-:dl.makeHashTable
-SET [A], 0x5468 ;"hT" magic number
-SET [A+1], B ;indicies
-SET [A+2], C ;length
-SET [A+3], 0 ;reserved
-SET PC, POP
- ;
-
-;:### dl.hashGet (searchTerm, hashTablePointer)
-;:Searches the hash table at *hashTablePointer* for *searchTerm* in the lookup portion of it. It returns the value in the value portion associated with the searchTerm.
-;:
-;:**returns** value associated by the hash table with *searchTerm*, or 1 if it could not be found
-;:**development version** 
-;:
-:dl.hashGet
-SET PUSH, [B+1] ;store the number of indicies
-
-SET C, [B+2] ;length
-ADD B, 4 ;location
-JSR dl.searchValTable
-
-IFE A, 1
-  SET PC, dl.hashGet.exf
-
-ADD A, POP ;make A an index in the value table
-SET A, [A] ;return the value, rather than the index
-SET PC, POP
-
-:dl.hashGet.exf
-;A is 1
-SET B, POP
-SET PC, POP
- ;
-
-;:### dl.hashInsert (lookupValue, insertValue, hashTablePointer)
-;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table. This is designed to work very well with the 16-bit hashing algorithm crp.dsHash.
-;:
-;:**under development**
-;:
-:dl.hashInsert
-SET PUSH, B ;store *insertValue*
-SET PUSH, [C+1] ;store *indicies* from header
-SET PUSH, C ;store pointer to header
-
-SET B, C
-ADD B, 4 ;start of sortedTable (for lookups)
-SET C, [C+2] ;length of sortedTable
-
-JSR dl.sortedInsert
-
-SET C, POP
-ADD [C+2], 1 ;add one to the length
-
-ADD A, POP ;retrieve *indicies* from stack
-
-SET B, A
-SET A, POP ;retrieve *insertValue* from stack
-
-SET PC, dl.unsortedInsert
- ;
-
-;:## Sorted Table
-;:Subroutines for creating and searching sorted tables
-;:
-
-;:### dl.sortedInsert (insertValue, tableLocation, tableLength)
-;:Inserts *insertValue* into the sorted table at *tableLocation* of *tableLength*, maintaining the sortedness of the table.
-;:
-;:**returns** location of insert<strike>, or 1 if the value is already present in the table</strike>
-;:
-:dl.sortedInsert
-SET PUSH, A
-JSR dl.findInsertIndex
-
-;NEED TO HANDLE DUPLICATE ENTRY
-
-SET B, A
-SET A, POP
-SET PC, dl.unsortedInsert ;exit when this subroutine exits
- ;
-
-;:### dl.searchValTable (searchTerm, tableLocation, tableLength)
-;:Performs a binary search on the table at *tableLocation* (with length *tableLength*) for *searchTerm* and returns the memory location
-;:
-:dl.searchValTable
-IFE C, 0 ;if *tableLength* is zero, return the tableLocation
-  SET PC, dl.searchValTable.noLength
-
-IFE C, 1
-  SET PC, dl.searchValTable.lengthOne
-
-SET PUSH, I
-
-:dl.searchValTable.recheck
-SET I, C
-SHR I, 1 ;divide by 2
-ADD I, B
-
-IFE [I], A
-SET PC, dl.searchValTable.found
-
-IFE C, 1
-  SET PC, dl.searchValTable.exf
-
-IFG A, [I]
-  SET PC, dl.searchValTable.toolow
-
-IFL A, [I]
-  SET PC, dl.searchValTable.toohigh
-
-SET PC, dl.searchValTable.recheck
-
-:dl.searchValTable.toohigh
-SET C, I
-SUB C, B
-SET PC, dl.searchValTable.recheck
-
-:dl.searchValTable.toolow
-ADD C, B
-SUB C, I
-SET B, I
-SET PC, dl.searchValTable.recheck
-
-:dl.searchValTable.found
-SET A, I
-SET I, POP
-SET PC, POP
-
-:dl.searchValTable.noLength
-SET A, B
-SET PC, POP
-
-:dl.searchValTable.lengthOne
-IFG A, [B] ;if *insertValue* is greater than the existing value
-  ADD B, 1 ;look at the second value
-
-SET A, B ;return B
-SET PC, POP
-
-:dl.searchValTable.exf
-SET A, 1
-SET I, POP
-SET PC, POP
- ;
-
-;:### dl.findInsertIndex (searchTerm, tableLocation, tableLength)
-;:Returns the index at which *searchTerm* should be inserted to keep the table at *tableLocation* with length *tableLength* sorted.
-;:
-:dl.findInsertIndex
-JSR dl.searchValTable
-
-IFE A, 1 ;if the value isn't there
-  ADD A, B ;add B to make it the index to insert at
-
-;DO SOMETHING IF A != 1 AND LENGTH ISN'T LOW
-  
-SET PC, POP
- ;
- 
-;:### dl.unsortedInsert (insertValue, insertLocation)
-;:Inserts *insertValue* at *insertLocation* and pushes the value it would replace upward in memory recursively until only a null is overwritten.
-;:**returns** *insertLocation*
-;:
-:dl.unsortedInsert
-SET PUSH, I
-SET PUSH, X ;SHOULD JUST USE A
-SET PUSH, Y ;SHOULD JUST USE B
-
-SET PUSH, B
-SET I, B
-SET X, A
-
-:dl.unsortedInsert.loop
-IFE X, 0
-  SET PC, dl.unsortedInsert.exit
-SET Y, [I]
-STI [I], X
-SET X, Y
-
-SET PC, dl.unsortedInsert.loop
-
-:dl.unsortedInsert.exit
-SET A, POP
-SET Y, POP
-SET X, POP
-SET I, POP
-SET PC, POP
- ;
- ;;
- 
-
-:screendata
-:ht dat 0,0,0,0
-
-; ; ; ;
-SET PC, __BOOT
-;;;;;;;
-; ENV ;
-;;;;;;;
-:env.cwds DAT 0
-:env.fs DAT 0
-:env.heap DAT 0
- ;;
-
-; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; HWMAN ; Hardware Manager ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;:The Hardware Manager is designed to be run to place a layer of abstraction between the software and connected hardware. HWM detects known hardware and maps their port numbers to memory locations, which are accessible through labels.
-;:For example, to send a hardware interrupt to a connected LEM1802, one might normally use the command `HWI 0`, or `HWI 1`. This might change between emulators and ingame, however. HWM allows such syntax as `HWI [LEM1802]`.
-;:
-;:## Supported Hardware
-;:*Items marked with an asterisk do not have intialization routines called automatically.
-;:- *[Generic Clock](http://dcpu.com/highnerd/rc_1/clock.txt)
-:HW.GenericClock DAT 0
-;:- *[LEM1802](http://dcpu.com/highnerd/rc_1/lem1802.txt)
-:HW.LEM1802 DAT 0
-;:
-:HW.GenericKeyboard DAT 0
-;:
-;:## Subroutines
-;:
-
-;:### HWM
-;:Maps the ports of all recognized hardware to specific points in memory, which are accessible through labels. Upon recognizing a piece of hardware, it will map it to a memory location and do an automatic `JSR` to a label of the form `HWinit.x`, where *x* is the name of the hardware recognized in either full form (`HWinit.LEM1802`) or definition camel case (`HWinit.GenericClock`) if the name of the hardware cannot be represented by labels in its full form.
-;:
-:HWM
-JSR pushReg
-
-HWN I ;I is the number of attached devices
-SET J, 0 ;J will be the iterator
-
-:HWM.loop
-HWQ J
-
-IFE A, 0xf615
-  IFE B, 0x7349
-    SET [HW.LEM1802], J
-
-IFE A, 0xb402
-  IFE B, 0x12d0
-    SET [HW.GenericClock], J
-    
-IFE A, 0x7406
-  IFE B, 0x30cf
-    SET [HW.GenericKeyboard], J
-
-ADD J, 1
-
-IFN I, J
-  SET PC, HWM.loop
-  
-SET PC, popReg
- ;
- 
-;:### HWF.LEM1802
-;:Finds the LEM1802 in as few cycles as possible and sets the memory location at the label *LEM1802* to its port number without mapping other hardware. This is intended to be run at boottime in order to quickly start the monitor and display a boot screen.
-;:**Under development**
-;:
-
-;:### pushReg
-;:Pushes all registers to the stack.
-;:
-:pushReg
-SET [pushReg.ReturnLocation], POP
-SET PUSH, A
-SET PUSH, B
-SET PUSH, C
-SET PUSH, X
-SET PUSH, Y
-SET PUSH, Z
-SET PUSH, I
-SET PUSH, J
-SET PC, [pushReg.ReturnLocation]
-:pushReg.ReturnLocation DAT 0 ;needed in order to return after pushing values
- ;
-
-;:### popReg
-;:Pops all registers from the stack, then pops PC from the stack. **This must be called by `SET PC, popReg`.** Otherwise, the registers will be popped incorrectly.
-;:
-:popReg
-SET J, POP
-SET I, POP
-SET Z, POP
-SET Y, POP
-SET X, POP
-SET C, POP
-SET B, POP
-SET A, POP
-SET PC, POP
- ;
-
-; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; HEAPMAN ; Heap Manager   ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;:# Heap Manager
-;:
-
-;:### heap.init
-;:(location, length, blocksize)
-;:heap.init reserves a 4 word header followed by a bit map of all blocks. The size of the bit map is (*maxlength*/*blocksize*)/16. *length* is actually the length of the heap, excluding the header and bit map.
-;:
-;:The header consists of a magic word, **0x9ea9**, the location of the first block in memory, the size of each block, and the maximum length of the heap.
-;:
-;:**This subroutine clears all of the space given to it.**
-;:
-;:**returns** location of header
-;:
-
-:heap.init
-SET PUSH, I
-SET PUSH, J
-SET PUSH, X
-
-SET [env.heap], A
-
-SET I, A
-SET PUSH, A
-SET A, B
-
-DIV A, C
-SET X, A ;store the number of blocks
-DIV A, 16 ;OPTIMIZE WITH SHR
-
-ADD A, PEEK
-ADD A, 4 ;make A the location of the start of the first block
-
-STI [I], 0x9EA9	;0
-STI [I], A
-STI [I], C
-STI [I], B
-
-SET PUSH, B
-SET PUSH, A
-
-:heap.init.map
-SET A, 0xFFFF
-SHR A, X
-STI [I], A
-
-IFL X, 16
-  SET PC, heap.init.map.exit
-
-SUB X, 16
-IFN X, 0
-  SET PC, heap.init.map
-
-:heap.init.map.exit
-
-SET A, POP
-SET I, A
-ADD I, POP ;create ending location
-
-:heap.init.loop ;clear backwards
-IFE I, A
-  SET PC, heap.init.exit
-STD [I], 0
-SET PC, heap.init.loop
-
-:heap.init.exit
-SET A, POP
-SET X, POP
-SET J, POP
-SET I, POP
-SET PC, POP
- ;
-
-;:### heap.alloc (length)
-;:Reserves the first consecutive *length* of memory in the heap.
-;:
-;:**returns** the location of the reserved memory, <strike>or 1 if no such block of memory is available</strike>
-;:**UNDER DEVELOPMENT; DO NOT USE**
-;:
-:heap.alloc
-SET PUSH, I
-SET PUSH, J
-
-SET B, [env.heap+2] ;make B the length of the blocks
-DIV A, B ;make A the number of blocks needed
-SET I, A
-
-SET B, env.heap+4 ;make B the location of the map
-
-SET J, 0
-:heap.alloc.checkbits
-SET C, [B]
-SHR C, J
-
-ADD J, 1
-IFN J, 16
-  SET PC, heap.alloc.checkbits.checks
-
-ADD B, 1 ;SHOULD CHECK FOR THE END OF THE USAGEMAP
-SET J, 0
-
-:heap.alloc.checkbits.checks
-
-IFC C, 0x8000	;if the leftmost bit is 0,
-  SUB I, 1		;subtract one from the number of blocks remaining
-
-IFB C, 0x8000	;if the leftmost bit in 1,
-  SET I, A		;reset the counter
-
-IFN I, 0		;continue scanning
-  SET PC, heap.alloc.checkbits
-
-;NEED TO FIND THE LOCATION OF THE FIRST BLOCK
-;NEED TO RESERVE THOSE BLOCKS
- ;;
-
-; ; ; ;
-;;;;;;;;;;;;;;;;;;
-; KeyboardDaemon ;
-;;;;;;;;;;;;;;;;;;
-;:An instance of KeyboardDemon should be registered to any process that requires detection of keypresses. It requests an interrupt value from the operating system, and, when it detects that interrupt, writes the pressed key, if it is ASCII, to the location registered on its instantiation. (That location is, of course, incremented.)
-;:
-
-
-:v.kd.writePointer DAT 0
-
-;:### kd.init (writePointer)
-;:
-:kd.init
-
-
-
-; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;
-; Monitor Preallocation ;
-;;;;;;;;;;;;;;;;;;;;;;;;;
-;:# Monitor Preallocation
-;:Functions as a reserved spot for the font and video RAM of the LEM1802.
-;:
-
-;:### fontRAM
-;:Contains the default font shown [here](http://github.com/cubeOS/cubeOS-alpha/raw/master/font/defaultFont.png).
-;:
-
-:fontRAM
-DAT 0xb79e, 0x388e, 0x722c, 0x75f4, 0x19bb, 0x7f8f, 0x85f9, 0xb158, 0x242e, 0x2400, 0x082a, 0x0800, 0x0008, 0x0000, 0x0808, 0x0808, 0x00ff, 0x0000, 0x00f8, 0x0808, 0x08f8, 0x0000, 0x080f, 0x0000, 0x000f, 0x0808, 0x00ff, 0x0808, 0x08f8, 0x0808, 0x08ff, 0x0000, 0x080f, 0x0808, 0x08ff, 0x0808, 0x6633, 0x99cc, 0x9933, 0x66cc, 0xfef8, 0xe080, 0x7f1f, 0x0701, 0x0107, 0x1f7f, 0x80e0, 0xf8fe, 0x5500, 0xaa00, 0x55aa, 0x55aa, 0xffaa, 0xff55, 0x0f0f, 0x0f0f, 0xf0f0, 0xf0f0, 0x0000, 0xffff, 0xffff, 0x0000, 0xffff, 0xffff, 0x0000, 0x0000, 0x005f, 0x0000, 0x0300, 0x0300, 0x3e14, 0x3e00, 0x266b, 0x3200, 0x611c, 0x4300, 0x3629, 0x7650, 0x0002, 0x0100, 0x1c22, 0x4100, 0x4122, 0x1c00, 0x1408, 0x1400, 0x081c, 0x0800, 0xC020, 0x0000, 0x0808, 0x0800, 0x0040, 0x0000, 0x601c, 0x0300, 0x3e49, 0x3e00, 0x427f, 0xC000, 0x6259, 0x4600, 0x2249, 0x3600, 0x0f08, 0x7f00, 0x2745, 0x3900, 0x3e49, 0x3200, 0x6119, 0x0700, 0x3649, 0x3600, 0x2649, 0x3e00, 0x0024, 0x0000, 0xC024, 0x0000, 0x0814, 0x2200, 0x1414, 0x1400, 0x2214, 0x0800, 0x0259, 0x0600, 0x3e59, 0x5e00, 0x7e09, 0x7e00, 0x7f49, 0x3600, 0x3e41, 0x2200, 0x7f41, 0x3e00, 0x7f49, 0x4100, 0x7f09, 0x0100, 0x3e41, 0x7a00, 0x7f08, 0x7f00, 0x417f, 0x4100, 0x2040, 0x3f00, 0x7f08, 0x7700, 0x7f40, 0xC000, 0x7f06, 0x7f00, 0x7f01, 0x7e00, 0x3e41, 0x3e00, 0x7f09, 0x0600, 0x3e61, 0x7e00, 0x7f09, 0x7600, 0x2649, 0x3200, 0x017f, 0x0100, 0x3f40, 0x7f00, 0x1f60, 0x1f00, 0x7f30, 0x7f00, 0x7708, 0x7700, 0x0778, 0x0700, 0x7149, 0x4700, 0x007f, 0x4100, 0x031c, 0x6000, 0x417f, 0x0000, 0x0201, 0x0200, 0x8080, 0x8000, 0x0001, 0x0200, 0x2454, 0x7800, 0x7f44, 0x3800, 0x3844, 0x2800, 0x3844, 0x7f00, 0x3854, 0x5800, 0x087e, 0x0900, 0x4854, 0x3c00, 0x7f04, 0x7800, 0x047d, 0x0000, 0x2040, 0x3d00, 0x7f10, 0x6c00, 0x017f, 0x0000, 0x7c18, 0x7c00, 0x7c04, 0x7800, 0x3844, 0x3800, 0x7c14, 0x0800, 0x0814, 0x7c00, 0x7c04, 0x0800, 0x4854, 0x2400, 0x043e, 0x4400, 0x3c40, 0x7c00, 0x1c60, 0x1c00, 0x7c30, 0x7c00, 0x6c10, 0x6c00, 0x4c50, 0x3c00, 0x6454, 0x4c00, 0x0836, 0x4100, 0x0077, 0x0000, 0x4136, 0x0800, 0x0201, 0x0201, 0x0205, 0x0200
-
-
-;:### videoRAM
-;:Contains the cubeOS logo/splash screen, shown [here](https://github.com/cubeOS/cubeOS-alpha/raw/master/logo/cubeOSLogo.png).
-;:
-:videoRAM
-DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
-DAT 0,0,0xF01F,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B,  0xF01B,0xF01B,0xF01B,0xF01B, 0xF01B, 0xF01F,0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0xF057,0xF065,0,0,  0,0,0,0, 0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0xC01C,0xC01C,0,  0,0xC01C,0xC01C,0,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0xC01D,0xC01F,0xC01F,0xC01F,  0xC01F,0xC01F,0xC01F,0xC01E,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0xC01F,0x0C43,0x0C55,  0x0C42,0x0C45,0xC01F,0,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0,0xC01F,0xC01F,  0xC01F,0xC01F,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01F, 0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0,0,0xC01B,  0xC01B,0,0,0,  0,0,0,0,  0,0,0,0,  0,0xF01F,0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0xF053,0xF063,0xF069,0xF065,  0xF06E,0xF063,0xF065,0,  0,0,0,0,  0,0,0,0, 0,0xF01F,0,0
-DAT 0,0,0xF01F,0,  0,0,0,0, 0,0,0,0,  0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0xF01F,0,0
-DAT 0,0,0xF01F,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01F,0,0
-DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
- ;
- ;;
-
-; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; PACKAGE ; Dash Package Handler ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-:v.tableLen DAT 0 ;number of commands in the tables
-
-;:### p.init
-;:Initializes all of the pre-defined packages and their respective commands so that they can be accessed in a table.
-;:
-:p.init
-SET A, p.hashTable
-SET B, 128
-SET C, 0
-JSR dl.makeHashTable
-
-;">loadcalls" is replaced by the calls necessary to load included packages
-;>loadcalls
-
-SET PC, POP
- ;
- 
-;:### p.loadPackage (pointer)
-;:Loads a package by adding the *identifier*'s crp.dsHash value and a pointer to the first instruction to the hash table. See Packages for more details.
-;:
-;:**returns** <strike>0 if successful,</strike> 1 if invalid package format
-;:
-:p.loadPackage
-IFE [A], 0xffab
-  IFE [A+1], 0xcdff
-    SET PC, p.loadPackage.continue
-
-SET PC, exf ;fail if not invalid header
-
-:p.loadPackage.continue
-ADD A, 2
-
-SET B, A
-
-:p.loadPackage.findNullinIdentifier
-ADD B, 1
-IFN [B], 0
-  SET PC, p.loadPackage.findNullinIdentifier
-
-SET PUSH, B ;store the location of the null before instructions
-SUB B, A ;make B the length of the identifier
-;A is the start of the identifier
-
-JSR crp.dsHash
-
-;A is now the dsHash of the identifier
-SET B, POP ;B is a pointer the null
-ADD B, 1 ;B is now a pointer to the first instruction
-SET C, p.hashTable ;C is a pointer to the hash table
-SET PC, dl.hashInsert ;add the package to the table and exit with subroutine
- ;
- 
-;:### p.lookup (key)
-;:Looks up a package in *p.hashTable* with *key*.
-;:**returns** a pointer to the main subroutine of the package
-;:
-:p.lookup
-SET B, p.hashTable
-JSR dl.hashGet ;returns value in A
-
-IFE A, 1 ;If the value is not found,
-  SET A, p.nocmd ;print "invalid command" statement
-
-SET PC, POP
- ;
-
-:p.hashTable
-DAT 0, 0, 0, 0
-
-:p.hashTableLookup ;(128)
-DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-
-:p.hashTableValue ;(128)
-DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-
-:p.nocmd
-SET A, p.nocmd.text
-SET B, [v.stdout]
-SET PC, typ.cCopy
-
-:p.nocmd.text
-DAT 0x7001, "Invalid command.", 0 ;THIS SHOULD BE PACKED TEXT
-
-;:## Packages
-;:Packages are loaded by the DASH Package Handler at boot time. Standard packages are included in the module, and other packages can be loaded by calling p.loadPackage with a pointer to the header of the package.
-;:Packages are identified by the magic number `0xffab cdff`, and contain a null-terminated string, the *identifier*. The index after the null in that string is the first instruction of the package.
-;:Packages are invoked in the DASH Shell by typing the *identifier*, letter for letter. Packages have by definition one modifier, and can hence have only one entry point. (A package cannot define two new top-level commands.) A package can, however, do its own parsing once it is invoked by reading `stdin`. This allows for such combinations as are seen in `git init`, `git pull`, `git push`, et cetera.
-;:
-
-;">packages" is replaced by the contents of package files.
-;>packages
-
- ;;
-
-; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; PINKIEPIE ; Interrupt Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1795,7 +851,7 @@ SET PC, POP
 ;:
 ;:
 ;:
-:sv.write ;NEEDS TESTING
+:sv.write
 IFC [A], 0x007F ;if the last 7 bits are 0b0000 000
   SET PC, sv.write.exitEarly ;exit early
 
@@ -1808,24 +864,24 @@ SET [sv.write.v.color], 0xF000 ;default to white on black
 
 :sv.write.loop
 SET A, [I]
-
-IFC A, 0xFF80
-	set pc, sv.write.loopalt
-
 AND A, 0x007F
 
-set a, j
-set push, i
-ifg a, 0x1F
-	jsr typ.cUnpack.loop
-sub sp, 1
+set a, i
+set b, j
+ifl a, 0x20
+	set pc, commandcodes
+jsr typ.cUnpack
 
-IFE A, 0x01
+ife [b], 0
+	add pc, 3
+add b, 1
+		sub pc, 3
+set j, b
+add i, 1
+
+:commandcodes
+IFN A, 0x01
   SET PC, sv.write.s.color
-  
-:sv.write.loopalt ;If the character is printable continue here, else figure out what it is
-  
-AND A, 0x007F
 
 BOR A, [sv.write.v.color]
 
@@ -2192,6 +1248,791 @@ SET PC, POP
  ;;
 
 ; ; ; ;
+;;;;;;;;;;;;;;;;;;
+; KeyboardDaemon ;
+;;;;;;;;;;;;;;;;;;
+;:An instance of KeyboardDemon should be registered to any process that requires detection of keypresses. It requests an interrupt value from the operating system, and, when it detects that interrupt, writes the pressed key, if it is ASCII, to the location registered on its instantiation. (That location is, of course, incremented.)
+;:
+
+
+:v.kd.writePointer DAT 0
+
+;:### kd.init (writePointer)
+;:
+:kd.init
+
+
+
+; ; ; ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; HWMAN ; Hardware Manager ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:The Hardware Manager is designed to be run to place a layer of abstraction between the software and connected hardware. HWM detects known hardware and maps their port numbers to memory locations, which are accessible through labels.
+;:For example, to send a hardware interrupt to a connected LEM1802, one might normally use the command `HWI 0`, or `HWI 1`. This might change between emulators and ingame, however. HWM allows such syntax as `HWI [LEM1802]`.
+;:
+;:## Supported Hardware
+;:*Items marked with an asterisk do not have intialization routines called automatically.
+;:- *[Generic Clock](http://0x10c.com/highnerd/rc_1/clock.txt)
+:HW.GenericClock DAT 0
+;:- *[LEM1802](http://0x10c.com/highnerd/rc_1/lem1802.txt)
+:HW.LEM1802 DAT 0
+;:- *[Generic Keyboard](http://0x10c.com/highnerd/rc_1/keyboard.txt)
+:HW.GenericKeyboard DAT 0
+;:- *[Speaker](http://bitbucket.org/benedek/dcpu-16/src/477043e85337/doc/speaker.txt)
+:HW.Speaker DAT 0
+;:
+;:## Subroutines
+;:
+
+;:### HWM
+;:Maps the ports of all recognized hardware to specific points in memory, which are accessible through labels. Upon recognizing a piece of hardware, it will map it to a memory location and do an automatic `JSR` to a label of the form `HWinit.x`, where *x* is the name of the hardware recognized in either full form (`HWinit.LEM1802`) or definition camel case (`HWinit.GenericClock`) if the name of the hardware cannot be represented by labels in its full form.
+;:
+:HWM
+JSR pushReg
+
+HWN I ;I is the number of attached devices
+SET J, 0 ;J will be the iterator
+
+:HWM.loop
+HWQ J
+
+IFE A, 0xf615
+  IFE B, 0x7349
+    SET [HW.LEM1802], J
+
+IFE A, 0xb402
+  IFE B, 0x12d0
+    SET [HW.GenericClock], J
+    
+IFE A, 0x7406
+  IFE B, 0x30cf
+    SET [HW.GenericKeyboard], J
+
+IFE A, 0x0001
+  IFE B, 0x0206
+    SET [HW.Speaker], J
+
+ADD J, 1
+
+IFN I, J
+  SET PC, HWM.loop
+  
+SET PC, popReg
+ ;
+ 
+;:### HWF.LEM1802
+;:Finds the LEM1802 in as few cycles as possible and sets the memory location at the label *LEM1802* to its port number without mapping other hardware. This is intended to be run at boottime in order to quickly start the monitor and display a boot screen.
+;:**Under development**
+;:
+
+;:### pushReg
+;:Pushes all registers to the stack.
+;:
+:pushReg
+SET [pushReg.ReturnLocation], POP
+SET PUSH, A
+SET PUSH, B
+SET PUSH, C
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+SET PUSH, I
+SET PUSH, J
+SET PC, [pushReg.ReturnLocation]
+:pushReg.ReturnLocation DAT 0 ;needed in order to return after pushing values
+ ;
+
+;:### popReg
+;:Pops all registers from the stack, then pops PC from the stack. **This must be called by `SET PC, popReg`.** Otherwise, the registers will be popped incorrectly.
+;:
+:popReg
+SET J, POP
+SET I, POP
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET C, POP
+SET B, POP
+SET A, POP
+SET PC, POP
+ ;
+
+; ; ; ;
+;RETURNS INCORRECT VALUE IF DOING HASHGET ON AN UNPRESENT VALUE
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; DATALIB ; Data Managing Library ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;:DataLib is a library for managing arbitrary amounts of data with relative speed and efficiency.
+;:
+
+;:## Hash Table
+;:Subroutines for creating and searching hash tables, which are sorted tables that store values under names
+;:
+
+;:### dl.makeHashTable (headerPointer, indicies, startingLength)
+;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. *length* is not the total length of the table, but rather the number of occupied indicies.
+;:**returns** *headerPointer*
+;:
+:dl.makeHashTable
+SET [A], 0x5468 ;"hT" magic number
+SET [A+1], B ;indicies
+SET [A+2], C ;length
+SET [A+3], 0 ;reserved
+SET PC, POP
+ ;
+
+;:### dl.hashGet (searchTerm, hashTablePointer)
+;:Searches the hash table at *hashTablePointer* for *searchTerm* in the lookup portion of it. It returns the value in the value portion associated with the searchTerm.
+;:
+;:**returns** value associated by the hash table with *searchTerm*, or 1 if it could not be found
+;:**development version** 
+;:
+:dl.hashGet
+SET PUSH, [B+1] ;store the number of indicies
+
+SET C, [B+2] ;length
+ADD B, 4 ;location
+JSR dl.searchValTable
+
+IFE A, 1
+  SET PC, dl.hashGet.exf
+
+ADD A, POP ;make A an index in the value table
+SET A, [A] ;return the value, rather than the index
+SET PC, POP
+
+:dl.hashGet.exf
+;A is 1
+SET B, POP
+SET PC, POP
+ ;
+
+;:### dl.hashInsert (lookupValue, insertValue, hashTablePointer)
+;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table. This is designed to work very well with the 16-bit hashing algorithm crp.dsHash.
+;:
+;:**under development**
+;:
+:dl.hashInsert
+SET PUSH, B ;store *insertValue*
+SET PUSH, [C+1] ;store *indicies* from header
+SET PUSH, C ;store pointer to header
+
+SET B, C
+ADD B, 4 ;start of sortedTable (for lookups)
+SET C, [C+2] ;length of sortedTable
+
+JSR dl.sortedInsert
+
+SET C, POP
+ADD [C+2], 1 ;add one to the length
+
+ADD A, POP ;retrieve *indicies* from stack
+
+SET B, A
+SET A, POP ;retrieve *insertValue* from stack
+
+SET PC, dl.unsortedInsert
+ ;
+
+;:## Sorted Table
+;:Subroutines for creating and searching sorted tables
+;:
+
+;:### dl.sortedInsert (insertValue, tableLocation, tableLength)
+;:Inserts *insertValue* into the sorted table at *tableLocation* of *tableLength*, maintaining the sortedness of the table.
+;:
+;:**returns** location of insert<strike>, or 1 if the value is already present in the table</strike>
+;:
+:dl.sortedInsert
+SET PUSH, A
+JSR dl.findInsertIndex
+
+;NEED TO HANDLE DUPLICATE ENTRY
+
+SET B, A
+SET A, POP
+SET PC, dl.unsortedInsert ;exit when this subroutine exits
+ ;
+
+;:### dl.searchValTable (searchTerm, tableLocation, tableLength)
+;:Performs a binary search on the table at *tableLocation* (with length *tableLength*) for *searchTerm* and returns the memory location
+;:
+:dl.searchValTable
+IFE C, 0 ;if *tableLength* is zero, return the tableLocation
+  SET PC, dl.searchValTable.noLength
+
+IFE C, 1
+  SET PC, dl.searchValTable.lengthOne
+
+SET PUSH, I
+
+:dl.searchValTable.recheck
+SET I, C
+SHR I, 1 ;divide by 2
+ADD I, B
+
+IFE [I], A
+SET PC, dl.searchValTable.found
+
+IFE C, 1
+  SET PC, dl.searchValTable.exf
+
+IFG A, [I]
+  SET PC, dl.searchValTable.toolow
+
+IFL A, [I]
+  SET PC, dl.searchValTable.toohigh
+
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.toohigh
+SET C, I
+SUB C, B
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.toolow
+ADD C, B
+SUB C, I
+SET B, I
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.found
+SET A, I
+SET I, POP
+SET PC, POP
+
+:dl.searchValTable.noLength
+SET A, B
+SET PC, POP
+
+:dl.searchValTable.lengthOne
+IFG A, [B] ;if *insertValue* is greater than the existing value
+  ADD B, 1 ;look at the second value
+
+SET A, B ;return B
+SET PC, POP
+
+:dl.searchValTable.exf
+SET A, 1
+SET I, POP
+SET PC, POP
+ ;
+
+;:### dl.findInsertIndex (searchTerm, tableLocation, tableLength)
+;:Returns the index at which *searchTerm* should be inserted to keep the table at *tableLocation* with length *tableLength* sorted.
+;:
+:dl.findInsertIndex
+JSR dl.searchValTable
+
+IFE A, 1 ;if the value isn't there
+  ADD A, B ;add B to make it the index to insert at
+
+;DO SOMETHING IF A != 1 AND LENGTH ISN'T LOW
+  
+SET PC, POP
+ ;
+ 
+;:### dl.unsortedInsert (insertValue, insertLocation)
+;:Inserts *insertValue* at *insertLocation* and pushes the value it would replace upward in memory recursively until only a null is overwritten.
+;:**returns** *insertLocation*
+;:
+:dl.unsortedInsert
+SET PUSH, I
+SET PUSH, X ;SHOULD JUST USE A
+SET PUSH, Y ;SHOULD JUST USE B
+
+SET PUSH, B
+SET I, B
+SET X, A
+
+:dl.unsortedInsert.loop
+IFE X, 0
+  SET PC, dl.unsortedInsert.exit
+SET Y, [I]
+STI [I], X
+SET X, Y
+
+SET PC, dl.unsortedInsert.loop
+
+:dl.unsortedInsert.exit
+SET A, POP
+SET Y, POP
+SET X, POP
+SET I, POP
+SET PC, POP
+ ;
+ ;;
+ 
+
+:screendata
+:ht dat 0,0,0,0
+
+; ; ; ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; CRYPT ; Cryptography Lib ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:# Crypt
+;:Cryptography Library
+;:
+
+;:### crp.sum (inputPointer, inputLength)
+;:Performs a BSD-checksum operation.
+;:**returns** the 16-bit hash
+;:
+:crp.sum
+ADD B, A
+SET C, 0
+
+:crp.sum.loop
+SHR C, 1
+BOR C, EX ;checksum = (checksum >> 1) + ((checksum & 1) << 15)
+
+ADD C, [A] ;checksum += ch
+
+ADD A, 1
+
+IFN A, B
+  SET PC, crp.sum.loop
+
+SET A, C
+
+;:### <strike>crp.dsHash (inputPointer, inputLength)</strike>
+;:***depricated***
+;:Reads data of *inputLength* from *inputPointer* and performs a hash function on it.
+;:**returns** the 16-bit hash
+;:
+;:For every value, shift the word *i* left and BOR with EX. XOR all of the resulting values together to produce the hash.
+;:```python
+;:for i in inputLength:
+;:	output ^ (inputPointer[i] << i)
+;:```
+;:
+
+:crp.dsHash
+SET PUSH, I
+SET PUSH, J
+SET I, A
+SET J, 0
+
+SET A, 0
+ADD B, I ;B becomes the exit location
+
+:crp.dsHash.loop
+SET C, [I]
+SHL C, J
+BOR C, EX
+XOR A, C
+
+STI C, 0 ;efficient I and J increment
+IFL I, B
+  SET PC, crp.dsHash.loop
+
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
+
+; ; ; ;
+;;;;;;;;;;;;;;;;
+; DASH ; Shell ;
+;;;;;;;;;;;;;;;;
+;:The DASH Shell is essential to cubeOS's function. It acts as an interpreter for ASCII commands, <strike>which are passed to the package manager in order to directly execute subroutines,</strike> and also handles keyboard input.
+;:
+;:## Usage
+;:At the prompt, the user can use an attached Generic Keyboard to input ASCII and control characters. 
+;:
+;:## Control Characters
+;:
+;:### Control + Delete
+;:Restarts the DASH Shell by calling *s.instance*.
+;:
+;:## Subroutines
+
+:v.sPrompt DAT 0xF001, "$ ", 0
+:v.promptLoc DAT 0
+
+:v.stdin DAT s.stdin.space
+:v.stdout DAT s.stdout.space
+
+;:### s.instance
+;:Prepares a new terminal session at the root directory.
+;:
+;:1. SHOULD Set *v.cwds* to "/ " in packed form (`0x202F`)
+;:2. Clears the screen
+;:3. Calls *s.takeIn*
+;:4. Calls *s.parse*
+;:5. Calls *s.stdout* with the argument being the cursor location when the user pressed enter
+;:6. Loops nonendingly to 3
+;:
+:s.instance
+JSR sv.clear ;clear the screen
+SET A, [v.scrnLoc]
+
+:s.instance.promptLoop
+JSR s.takeIn
+SET PUSH, A ;keep track of cursor location
+
+JSR s.parse
+
+SET A, POP ;restore cursor location for passing to s.stdout
+JSR s.stdout
+
+SET PC, s.instance.promptLoop
+
+SET PC, POP
+ ;
+ 
+;:### s.takeIn (cursorPointer)
+;:Writes a prompt to the screen using *v.sPrompt* and enters a loop to take ASCII input from the keyboard and write it to the screen at *cursorPointer*. It exits when the user presses `enter`.
+;:
+;:**returns** the cursor location on exit
+;:
+:s.takeIn
+SET PUSH, I
+SET I, 0
+
+JSR sv.getNewLine ;get the next blank line after *cursorPointer*
+JSR s.drawPrompt ;draw the prompt using s.drawPrompt
+
+SET A, 1 ;HWI parameter
+
+:s.takeIn.loop
+IFL I, [v.promptLoc]
+  SET I, [v.promptLoc]
+SET [I], 0xf09e ;cursor character
+
+:s.takeIn.wait
+HWI [HW.GenericKeyboard]
+
+IFG C, 0x1f
+  IFL C, 0x80
+    SET PC, s.takeIn.write
+
+IFE C, 0x10
+  SET PC, s.takeIn.backspace
+
+IFE C, 0x11
+  SET PC, s.takeIn.enter
+  
+;INSERT (0x12)
+  
+IFE C, 0x13
+  SET PC, s.takeIn.delete
+  
+SET PC, s.takeIn.wait
+
+
+:s.takeIn.write
+XOR C, 0xF000
+STI [I], C
+
+IFN I, [v.scrnEnd] ;write normally
+  SET PC, s.takeIn.loop
+
+:s.takeIn.write.scroll
+SUB [v.promptLoc], [v.scrnWidth] ;make prompt scroll, too
+JSR sv.scrollUp ;scroll everything up
+SET PC, s.takeIn.loop
+
+
+:s.takeIn.backspace
+STD [I], 0
+SET [I], 0
+SET PC, s.takeIn.loop
+ ;
+
+:s.takeIn.delete
+SET A, 2 ;changes interrupt action, so must be reset afterward
+SET B, 0x91 ;sets B to the *Control* key
+HWI [HW.GenericKeyboard] ;C becomes 1 if *Control* is pressed
+
+IFE C, 1 ;exit if 
+  SET PC, s.instance
+
+SET A, 1 ;reset interrupt action
+SET PC, s.takeIn.loop
+ ;
+
+:s.takeIn.enter
+SET [I], 0
+SET A, [v.promptLoc]
+SET B, I ;UNNECESSARY ASSIGNMENT OF CURSOR POSITION
+JSR s.stdin
+
+SET A, I;return location in A
+SET I, POP
+SET PC, POP
+ ;
+
+;:### s.parse
+;:This subroutine isolates the first argument in *v.stdin* by scanning through, then stopping on null or 0x20. Then, it gets the *crp.dshash* of the string. Then, it calls *p.lookup*, sets `B` to the location of stdin and `C` to the location of stdout, and invokes the subroutine returned by *p.lookup*.
+;:
+;:This should also point the process to the starts of the remaining arguments.
+;:
+:s.parse
+SET A, [v.stdout] ;prepare stdout by nullifying the first word
+SET [A], 0x0000   ;to overwrite old output if it exists
+
+SET A, [v.stdin] ;make both A and B the location of stdin
+SET B, A         ;for length-finding later
+
+:s.parse.getFirstArg
+IFC [B], 0x20 ;if [B] is 0x0000 or 0x0020
+  SET PC, s.parse.exit
+ADD B, 1
+SET PC, s.parse.getFirstArg
+
+:s.parse.exit
+SUB B, A ;make B the length of the first argument
+JSR crp.dsHash ;returns the hashvalue in A
+
+JSR p.lookup
+
+SET PUSH, I
+SET PUSH, J
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+IAG B
+SET PUSH, B ;push IA
+
+SET B, s.args
+SET C, [v.stdout]
+
+JSR A ;calls the subroutine returned by *p.lookup*
+
+IAS POP
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET J, POP
+SET I, POP
+
+SET A, 0
+SET B, [v.scrnLoc]
+HWI [HW.LEM1802]
+
+SET PC, POP
+ ;
+
+;:### s.drawPrompt (pointer)
+;:Draws a prompt using *env.cwds* and *v.sPrompt* at *pointer* and sets *v.promptLoc* to the location following the prompt.
+;:
+;:**returns** the location following the prompt
+;:
+:s.drawPrompt
+
+SET B, A
+SET A, v.sPrompt
+JSR sv.write
+
+SET [v.promptLoc], A
+
+SET PC, POP
+ ;
+
+;:### s.stdin (startPointer)
+;:Performs a C-style copy from *startPointer* to *v.stdin*, replacing un-(single)quoted spaces with zeros.
+;:
+:s.stdin
+SET PUSH, I
+SET PUSH, J
+SET PUSH, X
+SET I, A
+SET X, 1 ;the argument indexing index ($1, $2)
+SET B, [v.stdin]
+
+SET [s.args], B ;handle $0 separately
+
+:s.stdin.loop
+STI [B], [I]
+AND [B], 0x007F
+
+IFE [B], 0x27 ;single quote
+  XOR [s.stdin.quoteflag], 1 ;flip state
+  
+IFN [s.stdin.quoteflag], 1 ;unless they're quoted
+  IFE [B], 0x20 ;set spaces
+    JSR s.stdin.newarg
+
+ADD B, 1
+
+IFN [I], 0
+  SET PC, s.stdin.loop
+
+SET [B], 0
+IFL X, 15
+  SET [s.args + J], 0 ;zero the pointer following the last argument
+SET X, POP
+SET J, POP
+SET I, POP
+SET PC, POP
+
+:s.stdin.newarg
+SET [B], 0
+SET C, B
+ADD C, 1
+IFL X, 15
+  SET [s.args + X], C
+ADD X, 1
+SET PC, POP
+
+
+:s.stdin.quoteflag DAT 0 ;is 1 if iterator is inside quotes
+;:s.stdin.escflag DAT 0 ;is 1 if "\" was the most recent character
+
+;:s.stdin.args ;for handling arguments
+;DAT 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
+ ;
+
+;:### s.stdout (outputPointer)
+;:Does a C-style copy from *v.stdout* to *outputPointer*.
+:s.stdout
+JSR sv.getNewLine
+
+SET B, A ;output
+SET A, [v.stdout] ;input
+SET PC, sv.write ;process to screen (null-terminated)
+ ;
+;;RESERVED SPACE
+
+;for keeping track of where arguments are
+:s.args
+DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+:s.stdin.space
+DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+:s.stdout.space
+DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+;current working directory in ascii
+:v.cwds
+DAT 0x202f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+ ;;
+
+; ; ; ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; HEAPMAN ; Heap Manager   ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;:# Heap Manager
+;:
+
+;:### heap.init
+;:(location, length, blocksize)
+;:heap.init reserves a 4 word header followed by a bit map of all blocks. The size of the bit map is (*maxlength*/*blocksize*)/16. *length* is actually the length of the heap, excluding the header and bit map.
+;:
+;:The header consists of a magic word, **0x9ea9**, the location of the first block in memory, the size of each block, and the maximum length of the heap.
+;:
+;:**This subroutine clears all of the space given to it.**
+;:
+;:**returns** location of header
+;:
+
+:heap.init
+SET PUSH, I
+SET PUSH, J
+SET PUSH, X
+
+SET [env.heap], A
+
+SET I, A
+SET PUSH, A
+SET A, B
+
+DIV A, C
+SET X, A ;store the number of blocks
+DIV A, 16 ;OPTIMIZE WITH SHR
+
+ADD A, PEEK
+ADD A, 4 ;make A the location of the start of the first block
+
+STI [I], 0x9EA9	;0
+STI [I], A
+STI [I], C
+STI [I], B
+
+SET PUSH, B
+SET PUSH, A
+
+:heap.init.map
+SET A, 0xFFFF
+SHR A, X
+STI [I], A
+
+IFL X, 16
+  SET PC, heap.init.map.exit
+
+SUB X, 16
+IFN X, 0
+  SET PC, heap.init.map
+
+:heap.init.map.exit
+
+SET A, POP
+SET I, A
+ADD I, POP ;create ending location
+
+:heap.init.loop ;clear backwards
+IFE I, A
+  SET PC, heap.init.exit
+STD [I], 0
+SET PC, heap.init.loop
+
+:heap.init.exit
+SET A, POP
+SET X, POP
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
+
+;:### heap.alloc (length)
+;:Reserves the first consecutive *length* of memory in the heap.
+;:
+;:**returns** the location of the reserved memory, <strike>or 1 if no such block of memory is available</strike>
+;:**UNDER DEVELOPMENT; DO NOT USE**
+;:
+:heap.alloc
+SET PUSH, I
+SET PUSH, J
+
+SET B, [env.heap+2] ;make B the length of the blocks
+DIV A, B ;make A the number of blocks needed
+SET I, A
+
+SET B, env.heap+4 ;make B the location of the map
+
+SET J, 0
+:heap.alloc.checkbits
+SET C, [B]
+SHR C, J
+
+ADD J, 1
+IFN J, 16
+  SET PC, heap.alloc.checkbits.checks
+
+ADD B, 1 ;SHOULD CHECK FOR THE END OF THE USAGEMAP
+SET J, 0
+
+:heap.alloc.checkbits.checks
+
+IFC C, 0x8000	;if the leftmost bit is 0,
+  SUB I, 1		;subtract one from the number of blocks remaining
+
+IFB C, 0x8000	;if the leftmost bit in 1,
+  SET I, A		;reset the counter
+
+IFN I, 0		;continue scanning
+  SET PC, heap.alloc.checkbits
+
+;NEED TO FIND THE LOCATION OF THE FIRST BLOCK
+;NEED TO RESERVE THOSE BLOCKS
+ ;;
+
+; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; PACKAGE ; Dash Package Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2209,25 +2050,28 @@ JSR dl.makeHashTable
 
 ;">loadcalls" is replaced by the calls necessary to load included packages
 
-SET A, package.benchmark
-JSR p.loadPackage
-
-SET A, package.echo
-JSR p.loadPackage
-
-SET A, package.etype
-JSR p.loadPackage
-
-SET A, package.inferno
-JSR p.loadPackage
-
 SET A, package.ls
+JSR p.loadPackage
+
+SET A, package.test
+JSR p.loadPackage
+
+SET A, package.rainbow
+JSR p.loadPackage
+
+SET A, package.val
 JSR p.loadPackage
 
 SET A, package.pwd
 JSR p.loadPackage
 
-SET A, package.rainbow
+SET A, package.inferno
+JSR p.loadPackage
+
+SET A, package.benchmark
+JSR p.loadPackage
+
+SET A, package.echo
 JSR p.loadPackage
 
 SET A, package.story
@@ -2236,10 +2080,7 @@ JSR p.loadPackage
 SET A, package.sum
 JSR p.loadPackage
 
-SET A, package.test
-JSR p.loadPackage
-
-SET A, package.val
+SET A, package.etype
 JSR p.loadPackage
 
 
@@ -2319,6 +2160,145 @@ DAT 0x7001, "Invalid command.", 0 ;THIS SHOULD BE PACKED TEXT
 ;:
 
 ;">packages" is replaced by the contents of package files.
+;:### package.ls
+;:Writes the names all of the links (files and directories) in the current working directory to stdout.
+;:
+;:**author** SashaCrofter
+;:
+
+:package.ls
+
+DAT 0xffab, 0xcdff
+DAT "ls",0
+SET PUSH, I
+
+SET [C], 0xf001
+ADD C, 1
+
+SET PUSH, C
+
+SET I, 0xA000 ;NEEDS ALLOCATED HEAP SPACE BEFORE MOVING TO A PROCESS MODEL
+
+;SET A, [B+1]
+;- get sector from relative or absolute filepath ;only modifies A
+
+SET A, 0
+SET B, I ;continuous memory location
+JSR cat.open ;open root directory
+
+SET A, I
+ADD A, 5 ;set A to the first text location
+
+SET B, POP ;set B to the output location
+
+SET I, [I+3] ;set C to the content length
+SHR I, 4 ;set C to the number of links (divide by 16)
+
+:package.ls.loop
+IFE I, 0
+  SET PC, package.ls.exit ;exit if all of the links have been listed
+
+SET PUSH, A ;store the input location
+JSR typ.cCopy
+
+SET B, A ;set B to the end of the output location
+SET [B], 0x000A ;LF (\n)
+ADD B, 1
+
+SET A, POP ;set A to the input location
+ADD A, 16 ;set A to the location of the next link
+
+SUB I, 1
+SET PC, package.ls.loop
+
+:package.ls.exit
+SET I, POP
+SET PC, POP
+ ;
+:package.test
+DAT 0xffab, 0xcdff
+DAT "test", 0
+
+SET A, 0
+SET B, 0xA000
+JSR cat.open
+
+SET A, package.test.newfilename
+SET B, 0xA015 ;the first word
+JSR typ.cCopy
+
+SET A, 0xA000
+SET B, 0
+JSR cat.write
+
+SET PC, POP
+
+:package.test.newfilename DAT "newfilename", 0
+;:### package.rainbow
+;:Prints gawdgasm in glorious rainbowy letters
+;:
+;:**author** dylwhich
+;:
+
+:package.rainbow
+DAT 0xffab, 0xcdff
+DAT "rainbow", 0
+
+;sets the color
+SET A, package.gawd.text
+SET B, C ;make B point to stdout
+SET PC, typ.cCopy
+
+:package.gawd.text
+DAT 0xc001, "R", 0xe001, "A", 0xa001, "I", 0x2001, "N", 0xb001, "B", 0x9001, "O", 0xd001, "W", 0
+;:### package.val
+;:Returns the hex value for a given ASCII character
+;:
+;:**author** dylwhich
+;:
+
+:package.val
+DAT 0xffab, 0xcdff
+DAT "val", 0
+
+SET A, [B+1]
+SET A, [A]
+SET B, C
+SET [B], 0xf001
+ADD B, 1
+JSR typ.htoascii
+
+SET [B], 0
+SET PC, POP
+;:### package.pwd
+;:Prints the current working directory.
+;:
+;:**author** dylwhich
+;:
+
+:package.pwd
+DAT 0xffab, 0xcdff
+DAT "pwd", 0
+
+;sets the color
+SET [C], 0xf001
+ADD C, 1
+
+SET A, v.cwds
+SET B, C
+SET PC, typ.cUnpack
+:package.inferno
+
+DAT 0xffab, 0xcdff
+DAT "inferno",0
+
+
+SET A, pack.inferno.text
+SET B, C
+SET PC, typ.cCopy
+
+:pack.inferno.text DAT 0xF001, "Lasciate ogne speranza, voi ch'intrate.", 0
+ ;
 :package.benchmark
 DAT 0xffab, 0xcdff
 DAT "benchmark", 0
@@ -2382,6 +2362,21 @@ SET B, C
 SET [B], 0xf001
 ADD B, 1
 SET PC, typ.cCopy
+:package.story
+DAT 0xffab, 0xcdff
+DAT "story", 0
+
+SET A, package.story.text
+SET B, C
+SET PC, typ.cCopy
+
+:package.story.text
+DAT 0x5468, 0x6520, 0x6c61, 0x7374, 0x2071, 0x7565, 0x7374, 0x696f, 0x6e20, 0x7761, 0x7320, 0x6173, 0x6b65, 0x6420, 0x666f, 0x7220, 0x7468, 0x6520, 0x6669, 0x7273, 0x7420, 0x7469, 0x6d65, 0x2c20, 0x6861, 0x6c66, 0x2069, 0x6e20, 0x6a65, 0x7374, 0x2c20, 0x6f6e, 0x204d, 0x6179, 0x2032, 0x312c, 0x2032, 0x3036, 0x312c, 0x2061, 0x7420, 0x6120, 0x7469, 0x6d65, 0x2077, 0x6865, 0x6e20, 0x6875, 0x6d61, 0x6e69, 0x7479, 0x2066, 0x6972, 0x7374, 0x2073, 0x7465, 0x7070, 0x6564, 0x2069, 0x6e74, 0x6f20, 0x7468, 0x6520, 0x6c69, 0x6768, 0x742e, 0x2054, 0x6865, 0x2071, 0x7565, 0x7374, 0x696f, 0x6e20, 0x6361, 0x6d65, 0x2061, 0x626f, 0x7574, 0x2061, 0x7320, 0x6120, 0x7265, 0x7375, 0x6c74, 0x206f, 0x6620, 0x6120, 0x6669, 0x7665, 0x2064, 0x6f6c, 0x6c61, 0x7220, 0x6265, 0x7420, 0x6f76, 0x6572, 0x2068, 0x6967, 0x6862, 0x616c, 0x6c73, 0x2c20, 0x616e, 0x6420, 0x6974, 0x2068, 0x6170, 0x7065, 0x6e65, 0x6420, 0x7468, 0x6973, 0x2077, 0x6179, 0x3a0a, 0x0000
+:package.sum
+DAT 0xffab, 0xcdff
+DAT "sum", 0
+
+
 ;:### package.etype
 ;:*eTYPE*
 ;:THE most ADVANCED text editor for the DCPU-16!
@@ -2615,160 +2610,6 @@ dat 0x0
 
 ;.reserve 768
 DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-:package.inferno
-
-DAT 0xffab, 0xcdff
-DAT "inferno",0
-
-
-SET A, pack.inferno.text
-SET B, C
-SET PC, typ.cCopy
-
-:pack.inferno.text DAT 0xF001, "Lasciate ogne speranza, voi ch'intrate.", 0
- ;
-;:### package.ls
-;:Writes the names all of the links (files and directories) in the current working directory to stdout.
-;:
-;:**author** SashaCrofter
-;:
-
-:package.ls
-
-DAT 0xffab, 0xcdff
-DAT "ls",0
-SET PUSH, I
-
-SET [C], 0xf001
-ADD C, 1
-
-SET PUSH, C
-
-SET I, 0xA000 ;NEEDS ALLOCATED HEAP SPACE BEFORE MOVING TO A PROCESS MODEL
-
-;SET A, [B+1]
-;- get sector from relative or absolute filepath ;only modifies A
-
-SET A, 0
-SET B, I ;continuous memory location
-JSR cat.open ;open root directory
-
-SET A, I
-ADD A, 5 ;set A to the first text location
-
-SET B, POP ;set B to the output location
-
-SET I, [I+3] ;set C to the content length
-SHR I, 4 ;set C to the number of links (divide by 16)
-
-:package.ls.loop
-IFE I, 0
-  SET PC, package.ls.exit ;exit if all of the links have been listed
-
-SET PUSH, A ;store the input location
-JSR typ.cCopy
-
-SET B, A ;set B to the end of the output location
-SET [B], 0x000A ;LF (\n)
-ADD B, 1
-
-SET A, POP ;set A to the input location
-ADD A, 16 ;set A to the location of the next link
-
-SUB I, 1
-SET PC, package.ls.loop
-
-:package.ls.exit
-SET I, POP
-SET PC, POP
- ;
-;:### package.pwd
-;:Prints the current working directory.
-;:
-;:**author** dylwhich
-;:
-
-:package.pwd
-DAT 0xffab, 0xcdff
-DAT "pwd", 0
-
-;sets the color
-SET [C], 0xf001
-ADD C, 1
-
-SET A, v.cwds
-SET B, C
-SET PC, typ.cUnpack
-;:### package.rainbow
-;:Prints gawdgasm in glorious rainbowy letters
-;:
-;:**author** dylwhich
-;:
-
-:package.rainbow
-DAT 0xffab, 0xcdff
-DAT "rainbow", 0
-
-;sets the color
-SET A, package.gawd.text
-SET B, C ;make B point to stdout
-SET PC, typ.cCopy
-
-:package.gawd.text
-DAT 0xc001, "R", 0xe001, "A", 0xa001, "I", 0x2001, "N", 0xb001, "B", 0x9001, "O", 0xd001, "W", 0
-:package.story
-DAT 0xffab, 0xcdff
-DAT "story", 0
-
-SET A, package.story.text
-SET B, C
-SET PC, typ.cCopy
-
-:package.story.text
-DAT 0x5468, 0x6520, 0x6c61, 0x7374, 0x2071, 0x7565, 0x7374, 0x696f, 0x6e20, 0x7761, 0x7320, 0x6173, 0x6b65, 0x6420, 0x666f, 0x7220, 0x7468, 0x6520, 0x6669, 0x7273, 0x7420, 0x7469, 0x6d65, 0x2c20, 0x6861, 0x6c66, 0x2069, 0x6e20, 0x6a65, 0x7374, 0x2c20, 0x6f6e, 0x204d, 0x6179, 0x2032, 0x312c, 0x2032, 0x3036, 0x312c, 0x2061, 0x7420, 0x6120, 0x7469, 0x6d65, 0x2077, 0x6865, 0x6e20, 0x6875, 0x6d61, 0x6e69, 0x7479, 0x2066, 0x6972, 0x7374, 0x2073, 0x7465, 0x7070, 0x6564, 0x2069, 0x6e74, 0x6f20, 0x7468, 0x6520, 0x6c69, 0x6768, 0x742e, 0x2054, 0x6865, 0x2071, 0x7565, 0x7374, 0x696f, 0x6e20, 0x6361, 0x6d65, 0x2061, 0x626f, 0x7574, 0x2061, 0x7320, 0x6120, 0x7265, 0x7375, 0x6c74, 0x206f, 0x6620, 0x6120, 0x6669, 0x7665, 0x2064, 0x6f6c, 0x6c61, 0x7220, 0x6265, 0x7420, 0x6f76, 0x6572, 0x2068, 0x6967, 0x6862, 0x616c, 0x6c73, 0x2c20, 0x616e, 0x6420, 0x6974, 0x2068, 0x6170, 0x7065, 0x6e65, 0x6420, 0x7468, 0x6973, 0x2077, 0x6179, 0x3a0a, 0x0000
-:package.sum
-DAT 0xffab, 0xcdff
-DAT "sum", 0
-
-
-:package.test
-DAT 0xffab, 0xcdff
-DAT "test", 0
-
-SET A, 0
-SET B, 0xA000
-JSR cat.open
-
-SET A, package.test.newfilename
-SET B, 0xA015 ;the first word
-JSR typ.cCopy
-
-SET A, 0xA000
-SET B, 0
-JSR cat.write
-
-SET PC, POP
-
-:package.test.newfilename DAT "newfilename", 0
-;:### package.val
-;:Returns the hex value for a given ASCII character
-;:
-;:**author** dylwhich
-;:
-
-:package.val
-DAT 0xffab, 0xcdff
-DAT "val", 0
-
-SET A, [B+1]
-SET A, [A]
-SET B, C
-SET [B], 0xf001
-ADD B, 1
-JSR typ.htoascii
-
-SET [B], 0
-SET PC, POP
 
 
  ;;
