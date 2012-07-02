@@ -1,0 +1,18 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; TASKER ; Process Manager ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+:v.tusk.IDiterator DAT 1000 ;the iterator through which to get unique IDs
+:v.tusk.runPID DAT 0 ;the ID of the process that is currently running
+
+:v.tusk.PIDloc DAT tusk.PIDs
+
+;:### tusk.newProcess
+;:Registers a new process of unique ID. Adds the process id to the table at *v.tusk.PIDloc*.
+;:
+;:**under development**
+;:
+:tusk.newProcess
+
+:tusk.PIDs ;64 open spaces
+DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
