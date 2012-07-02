@@ -1699,10 +1699,32 @@ SUB B, A ;make B the length of the first argument
 JSR crp.dsHash ;returns the hashvalue in A
 
 JSR p.lookup
+
+SET PUSH, I
+SET PUSH, J
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+IAG B
+SET PUSH, B ;push IA
+
 SET B, s.args
 SET C, [v.stdout]
 
-SET PC, A ;calls the subroutine returned by *p.lookup*
+JSR A ;calls the subroutine returned by *p.lookup*
+
+IAS POP
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET J, POP
+SET I, POP
+
+SET A, 0
+SET B, [v.scrnLoc]
+HWI [HW.LEM1802]
+
+SET PC, POP
  ;
 
 ;:### s.drawPrompt (pointer)
