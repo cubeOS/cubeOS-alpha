@@ -1986,6 +1986,9 @@ JSR p.loadPackage
 SET A, package.sum
 JSR p.loadPackage
 
+SET A, package.etype
+JSR p.loadPackage
+
 
 SET PC, POP
  ;
@@ -1996,7 +1999,7 @@ SET PC, POP
 ;:**returns** <strike>0 if successful,</strike> 1 if invalid package format
 ;:
 :p.loadPackage
-IFE [A], 0xffab ;ONLY CHECKS FIRST WORD
+IFE [A], 0xffab
   IFE [A+1], 0xcdff
     SET PC, p.loadPackage.continue
 
@@ -2270,6 +2273,260 @@ DAT 0xffab, 0xcdff
 DAT "sum", 0
 
 
+;:### package.etype
+;:*eTYPE*
+;:THE most ADVANCED text editor for the DCPU-16!
+;:Made by (Not)encore
+
+:package.etype ;Header
+
+DAT 0xffab, 0xcdff
+DAT "etype",0
+
+;Hardware getting
+:getscreenlabel
+	hwq j
+	ife a, 0xF615
+		ife b, 0x7349
+			set [HW.LEM1802], j
+	add j, 1
+	ifn a, 0xF615
+		ifn b, 0x7349
+			set pc, getscreenlabel
+set j, 0
+:getkeyboardlabel
+	hwq j
+	ife a, 0x7406
+		ife b, 0x30cf
+			set [HW.GenericKeyboard], j
+	add j, 1
+	ifn a, 0x7406
+		ifn b, 0x30cf
+			set pc, getkeyboardlabel
+
+;Proper program
+set a, 0
+set b, vram
+set c, 0
+set x, 0
+set y, 0
+set z, vram
+set i, 0
+set j, 0
+hwi [HW.LEM1802] ;HWI's the screen
+set b, 1
+set a, 3
+hwi [HW.GenericKeyboard]
+set b, 0
+set a, 0
+set c, 0x9F ;-----V
+bor c, [color] ;--V
+    set x, b
+    add x, z
+    set [x], c ;Sets cursor + colour. ;Makes the screen look inputtable.
+set y, 384
+
+:keyget ;Gets keystate then lets the handler handle it.
+set a, 1
+hwi [HW.GenericKeyboard]
+ifn c, 0
+    set pc, keyhandle
+set pc, keyget
+    
+:keyhandle ;decides what to do, whether the character is printable or not.
+ifg c, 0x1F ;If the character is in the writable range 0x20-0x7F, we let :asciihandle handle it.
+    ifl c, 0x80
+        set pc, charhandle ;Not JSR'd because asciihandle does stuff with the c register
+ife c, 0x10 ;If the character is a backspace, it is handled by :backspacehandle
+    ifg b, 0
+        jsr backspacehandle
+ife c, 0x11 ;If the character is an enter, it is handled by :enterhandle
+    jsr enterhandle
+ifg c, 0x7F
+    ifl c, 0x82
+        jsr arrowhandle
+ife c, 0x91 ;If the character is control, turn on the control flag.
+	xor i, 0x0002
+set pc, keyget
+
+:charhandle ;Handles showable characters
+ifb i, 0x2 ;Checks if the control bit is down.
+	set pc, controlhandle
+ifb i, 0x4 ;Checks if the page bit is down.
+	set pc, pagehandle
+bor c, [color]
+    set x, b
+    add x, z
+    set [x], c
+add b, 1
+ife b, y
+    jsr lineplus ;If B is larger then VRAM then lineplus.
+set c, 0x9F ;-----V
+bor c, [color] ;--V
+    set x, b
+    add x, z
+    set [x], c ;Sets cursor + colour.
+set pc, keyget
+
+:lineplus ;Adds a page to the document.
+set a, 0
+set b, vram
+add b, 384
+hwi [HW.LEM1802]
+add z, 1
+set b, 0
+set pc, pop
+
+:backspacehandle ;Handles backspaces
+    set x, b
+    add x, z
+    set [x], 0xF020
+ifn z, 0
+sub b, 1
+set c, 0x9F ;-----V
+bor c, [color] ;--V
+    set x, b
+    add x, z
+    set [x], c ;Sets cursor + colour.
+set pc, pop
+
+:enterhandle ;Handles enter.
+    set x, b
+    add x, z
+    set [x], 0xF020
+add b, 32
+div b, 32
+mul b, 32
+ife b, y
+	ifn z, 1
+		jsr lineplus ;If B is larger then VRAM then lineplus.
+set c, 0x9F ;-----V
+bor c, [color] ;--V
+    set x, b
+    add x, z
+    set [x], c ;Sets cursor + colour.
+set pc, pop
+
+:arrowhandle ;Handles vertical arrow keys.
+    set x, b
+    add x, z
+    set [x], 0xF020
+ife c, 0x80
+    ifg b, 31
+        sub b, 32
+ife c, 0x81
+    ifl b, 353
+        add b, 32
+    set c, 0x9F ;-----V
+bor c, [color] ;------V
+    set x, b
+    add x, z
+    set [x], c ;Sets cursor + colour.
+set pc, pop
+
+:controlhandle ;Handles control key.
+ifn c, 0x70
+	and [color], 0x0FFF
+ifn c, 0x71
+	and [color], 0x0FFF
+ife c, 0x6B ;Control k makes blacK
+	bor i, 0x8
+ife c, 0x62 ;Control b makes BLUE
+	add [color], 0x1000
+ife c, 0x67 ;Control g makes GREEN
+	add [color], 0x2000
+ife c, 0x74 ;Control t makes TEAL
+	add [color], 0x3000
+ife c, 0x72 ;Control r makes RED
+	add [color], 0x4000
+ife c, 0x76 ;Control v makes VIOLET
+	add [color], 0x5000
+ife c, 0x6E ;Control n makes browN or burNt orange
+	add [color], 0x6000
+ife c, 0x77 ;Control W makes WHITE
+	add [color], 0xF000
+ife c, 0x4B ;Shift+Control k makes highlighted blacK
+	add [color], 0x8000
+ife c, 0x42 ;Shift+Control b makes highlighted BLUE
+	add [color], 0x9000
+ife c, 0x47 ;Shift+Control g makes highlighted GREEN
+	add [color], 0xA000
+ife c, 0x54 ;Shift+Control t makes highlighted TEAL
+	add [color], 0xB000
+ife c, 0x52 ;Shift+Control r makes highlighted RED
+	add [color], 0xC000
+ife c, 0x56 ;Shift+Control v makes highlighted VIOLET
+	add [color], 0xD000
+ife c, 0x4E ;Shift+Control n makes highlighted browN or burNt orange
+	add [color], 0xE000
+ife c, 0x57 ;Shift+Control W makes lowlighted WHITE
+	add [color], 0x7000
+ife c, 0x70 ;Control P flips the page handle bit.
+	xor i, 0x4
+ife c, 0x71 ;Control q quits
+	bor i, 0x8
+and i, 0xFFFC
+set c, 0x9F ;-----V
+bor c, [color] ;--V
+    set x, b
+    add x, z
+    set [x], c ;Changes cursor colour.
+set pc, keyget
+
+:pagehandle ;Handles page.
+ife c, 0x6B ;k makes blacK
+	add [color], 0x0000
+ife c, 0x62 ;b makes BLUE
+	add [color], 0x0100
+ife c, 0x67 ;g makes GREEN
+	add [color], 0x0200
+ife c, 0x74 ;t makes TEAL
+	add [color], 0x0300
+ife c, 0x72 ;r makes RED
+	add [color], 0x0400
+ife c, 0x76 ;v makes VIOLET
+	add [color], 0x0500
+ife c, 0x6E ;n makes browN or burNt orange
+	add [color], 0x0600
+ife c, 0x77 ;W makes WHITE
+	add [color], 0x0F00
+ife c, 0x4B ;Shift+k makes highlighted blacK
+	add [color], 0x0800
+ife c, 0x42 ;Shift+b makes highlighted BLUE
+	add [color], 0x0900
+ife c, 0x47 ;Shift+g makes highlighted GREEN
+	add [color], 0x0A00
+ife c, 0x54 ;Shift+t makes highlighted TEAL
+	add [color], 0x0B00
+ife c, 0x52 ;Shift+r makes highlighted RED
+	add [color], 0x0C00
+ife c, 0x56 ;Shift+v makes highlighted VIOLET
+	add [color], 0x0D00
+ife c, 0x4E ;Shift+n makes highlighted browN or burNt orange
+	add [color], 0x0E00
+ife c, 0x57 ;Shift+W makes lowlighted WHITE
+	add [color], 0x0700
+and i, 0xFFF8
+set c, 0x9F ;-----V
+bor c, [color] ;--V
+    set x, b
+    add x, z
+    set [x], c ;Changes cursor colour.
+set pc, keyget
+
+:color ;Character colour
+dat 0xF000
+
+:keyboard ;Keyboard slot
+dat 0x0
+
+:screen ;Screen slot
+dat 0x0
+
+:vram ;VRAM
+
+;.reserve 768
+DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 
  ;;
