@@ -35,7 +35,7 @@ SET PC, POP
 ;:
 ;:
 ;:
-:sv.write ;NEEDS TESTING
+:sv.write
 IFC [A], 0x007F ;if the last 7 bits are 0b0000 000
   SET PC, sv.write.exitEarly ;exit early
 
@@ -48,16 +48,12 @@ SET [sv.write.v.color], 0xF000 ;default to white on black
 
 :sv.write.loop
 SET A, [I]
-
-IFC A, 0xFF80
-	set pc, sv.write.loopalt
-
 AND A, 0x007F
 
-set a, i
-set b, j
 ifl a, 0x20
 	set pc, commandcodes
+set a, i
+set b, j
 jsr typ.cUnpack
 
 ife [b], 0
@@ -70,10 +66,6 @@ add i, 1
 :commandcodes
 IFN A, 0x01
   SET PC, sv.write.s.color
-  
-:sv.write.loopalt ;If the character is printable continue here, else figure out what it is
-  
-AND A, 0x007F
 
 BOR A, [sv.write.v.color]
 
