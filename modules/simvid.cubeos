@@ -35,7 +35,7 @@ SET PC, POP
 ;:
 ;:
 ;:
-:sv.write
+:sv.write ;NEEDS TESTING
 IFC [A], 0x007F ;if the last 7 bits are 0b0000 000
   SET PC, sv.write.exitEarly ;exit early
 
