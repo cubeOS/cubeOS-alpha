@@ -1801,14 +1801,6 @@ DAT 0x202f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
  ;;
 
 ; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;
-; KEEPER PROCESS MANAGER ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;
-;:
-
-;:### k.addProcess ()
-
-; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; HEAPMAN ; Heap Manager   ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1946,9 +1938,6 @@ JSR dl.makeHashTable
 ;">loadcalls" is replaced by the calls necessary to load included packages
 
 SET A, package.ls
-JSR p.loadPackage
-
-SET A, package.cat
 JSR p.loadPackage
 
 SET A, package.test
@@ -2104,11 +2093,6 @@ SET PC, package.ls.loop
 SET I, POP
 SET PC, POP
  ;
-:package.cat
-DAT 0xffab, 0xcdff
-DAT "cat", 0
-
-
 :package.test
 DAT 0xffab, 0xcdff
 DAT "test", 0
