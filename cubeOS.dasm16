@@ -811,10 +811,11 @@ SET PC, POP
 ;:
 ;:
 :sv.write
+IFC [A], 0x007F ;if the last 7 bits are 0b0000 000
+  SET PC, sv.write.exitEarly ;exit early
+
 SET PUSH, I
 SET PUSH, J
-
-SET X, sv.write.v.color
 
 SET I, A
 SET J, B
@@ -839,6 +840,12 @@ SET [J], [I] ;write the terminating null
 SET A, J
 SET J, POP
 SET I, POP
+SET PC, POP
+
+:sv.write.exitEarly
+SET [B], 0x0000 ;make the first word in the output null
+SET A, B ;return the index that sv.write would have written to
+         ;if there had been content
 SET PC, POP
 
 :sv.write.s.color
@@ -1554,7 +1561,7 @@ SET PC, POP
 ;:The DASH Shell is essential to cubeOS's function. It acts as an interpreter for ASCII commands, <strike>which are passed to the package manager in order to directly execute subroutines,</strike> and also handles keyboard input.
 ;:
 ;:## Usage
-;:At the prompt, which is of the form "*CWD*$", the user can use an attached Generic Keyboard to input ASCII and control characters. 
+;:At the prompt, the user can use an attached Generic Keyboard to input ASCII and control characters. 
 ;:
 ;:## Control Characters
 ;:
@@ -1685,8 +1692,11 @@ SET PC, POP
 ;:This should also point the process to the starts of the remaining arguments.
 ;:
 :s.parse
-SET A, [v.stdin]
-SET B, A
+SET A, [v.stdout] ;prepare stdout by nullifying the first word
+SET [A], 0x0000   ;to overwrite old output if it exists
+
+SET A, [v.stdin] ;make both A and B the location of stdin
+SET B, A         ;for length-finding later
 
 :s.parse.getFirstArg
 IFC [B], 0x20 ;if [B] is 0x0000 or 0x0020
