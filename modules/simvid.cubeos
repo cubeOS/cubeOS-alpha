@@ -36,6 +36,9 @@ SET PC, POP
 ;:
 ;:
 :sv.write
+IFC [A], 0x007F ;if the last 7 bits are 0b0000 000
+  SET PC, sv.write.exitEarly ;exit early
+
 SET PUSH, I
 SET PUSH, J
 
@@ -62,6 +65,10 @@ SET [J], [I] ;write the terminating null
 SET A, J
 SET J, POP
 SET I, POP
+SET PC, POP
+
+:sv.write.exitEarly
+SET [B], 0x0000
 SET PC, POP
 
 :sv.write.s.color
