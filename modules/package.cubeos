@@ -25,10 +25,13 @@ SET PC, POP
 ;:**returns** <strike>0 if successful,</strike> 1 if invalid package format
 ;:
 :p.loadPackage
-IFN [A], 0xffab ;ONLY CHECKS FIRST WORD
-  IFN [A+1], 0xcdff
-    SET PC, exf ;fail if not invalid header
+IFE [A], 0xffab
+  IFE [A+1], 0xcdff
+    SET PC, p.loadPackage.continue
 
+SET PC, exf ;fail if not invalid header
+
+:p.loadPackage.continue
 ADD A, 2
 
 SET B, A
