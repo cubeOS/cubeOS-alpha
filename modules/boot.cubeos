@@ -16,10 +16,6 @@
 :__BOOT
 JSR HWM
 
-SET A, 0
-SET B, 6
-HWI [HW.GenericClock]
-
 SET A, videoRAM
 SET B, fontRAM
 JSR sv.init ;set up boot screen and screen
@@ -41,11 +37,56 @@ JSR cat.mountSystem ;initialize FS
 
 JSR p.init ;initialize DPH
 
+SET A, 0
+SET B, 6
+HWI [HW.GenericClock]
+
+SET A, 0
+SET B, 0x0FFF
+HWI [HW.Speaker]
+
 SET A, 1
-:__BOOT.bootscreenDisplayLoop
+:__BOOT.wait0
+HWI [HW.GenericClock]
+IFL C, 5
+  SET PC, __BOOT.wait0
+
+SET A, 1
+SET B, 0x3FFF
+HWI [HW.Speaker]
+
+SET A, 1
+:__BOOT.wait1
+HWI [HW.GenericClock]
+IFL C, 10
+  SET PC, __BOOT.wait1
+
+SET A, 1
+SET B, 0x7FFF
+HWI [HW.Speaker]
+
+SET A, 1
+:__BOOT.wait2
+HWI [HW.GenericClock]
+IFL C, 10
+  SET PC, __BOOT.wait2
+
+SET A, 1
+SET B, 0xFFFF
+HWI [HW.Speaker]
+
+SET A, 1
+:__BOOT.wait3
 HWI [HW.GenericClock]
 IFL C, 15
-  SET PC, __BOOT.bootscreenDisplayLoop
+  SET PC, __BOOT.wait3
+
+SET A, 0
+SET B, 0
+HWI [HW.Speaker]
+SET A, 1
+SET B, 0
+HWI [HW.Speaker]
 
 JSR s.instance ;initialize DASH Shell
 
