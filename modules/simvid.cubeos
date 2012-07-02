@@ -56,10 +56,19 @@ AND A, 0x007F
 
 set a, i
 set b, j
-ifg a, 0x1F
-	jsr typ.cUnpack
+ifl a, 0x20
+	set pc, commandcodes
+jsr typ.cUnpack
 
-IFE A, 0x01
+ife [b], 0
+	add pc, 3
+add b, 1
+		sub pc, 3
+set j, b
+add i, 1
+
+:commandcodes
+IFN A, 0x01
   SET PC, sv.write.s.color
   
 :sv.write.loopalt ;If the character is printable continue here, else figure out what it is
