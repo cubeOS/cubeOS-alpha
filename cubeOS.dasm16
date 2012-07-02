@@ -830,8 +830,10 @@ IFC A, 0xFF80
 AND A, 0x007F
 
 set c, j
+set push, i
 ifg a, 0x1F
 	jsr typ.cUnpack.loop
+sub sp, 1
 
 IFE A, 0x01
   SET PC, sv.write.s.color
@@ -2337,27 +2339,6 @@ DAT "sum", 0
 
 DAT 0xffab, 0xcdff
 DAT "etype",0
-
-;Hardware getting
-:getscreenlabel
-	hwq j
-	ife a, 0xF615
-		ife b, 0x7349
-			set [HW.LEM1802], j
-	add j, 1
-	ifn a, 0xF615
-		ifn b, 0x7349
-			set pc, getscreenlabel
-set j, 0
-:getkeyboardlabel
-	hwq j
-	ife a, 0x7406
-		ife b, 0x30cf
-			set [HW.GenericKeyboard], j
-	add j, 1
-	ifn a, 0x7406
-		ifn b, 0x30cf
-			set pc, getkeyboardlabel
 
 ;Proper program
 set a, 0
