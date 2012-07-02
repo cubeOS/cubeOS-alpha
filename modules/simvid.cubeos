@@ -49,10 +49,10 @@ SET [sv.write.v.color], 0xF000 ;default to white on black
 :sv.write.loop
 SET A, [I]
 
-ifc 0xFF80
+IFC A, 0xFF80
 	set pc, sv.write.loopalt
-	
-and a, 0x007F
+
+AND A, 0x007F
 
 set c, j
 ifg a, 0x1F
