@@ -249,24 +249,26 @@ SET B, 1
 JSR cat.newInode
 
 ;TEST LINK
+JSR cat.getSectorPointer ;get the location of the new inode at sector 0
 
-;cat.newInode returns the affected sector
-JSR cat.getSectorPointer ;pointer to root
-ADD A, 3 ;inode content length
+SET PUSH, A
 
-SET [A], 32
-ADD A, 1 ;go to first word after inode
+SET B, 1
+SET C, temp.cat.testdir
+JSR cat.newLink
 
-SET B, A
-SET A, temp.cat.testLink
-SET C, 32
-JSR typ.pCopy
+SET A, POP
+
+SET B, 2
+SET C, temp.cat.testfile
+JSR cat.newLink
 
 SET PC, cat.mountSystem.exit
 
-:temp.cat.testLink
-DAT 1, "TestDir", 0, 0, 0, 0, 0, 0, 0, 0
-DAT 2, "TestFile", 0, 0, 0, 0, 0, 0, 0
+:temp.cat.testdir
+DAT "TestDir", 0
+:temp.cat.testfile
+DAT "TestFile", 0
 
 :cat.mountSystem.exit
 SET A, POP ;return location
@@ -648,16 +650,34 @@ SET PUSH, A ;store A for later
 
 ADD A, [A+2] ;add the length of the existing links
 ADD A, 4 ;add the length of the inode
-;SHOULD CHECK TO SEE IF IT IS OUT OF BOUNDS OF THE SECTOR; IF SO, IT MUST CONTINUE ON TO EITHER THE LINKED SECTOR OR LINK ANOTHER
 
 SET [A], B ;set the link target
 ADD A, 1
-SET B, C
+SET B, A ;B is now the location to copy to
 
+SET PUSH, C ;store C
+SET PUSH, B ;store B
+
+SET A, C
+JSR typ.ffz ;find the first 0 (only modifies A)
+
+;IF LENGTH IS GREATER THAN CAN BE SUPPORTED, DISCARD THE OTHER VALUES AND EXIT FALSE
+
+SET B, A ;B is the length argument
+SET A, PEEK ;A is the location argument
+JSR crp.sum ;get the checksum of the string
+
+SET B, PEEK ;need to use B because PEEK cannot be put inside brackets
+SET [B], A ;set the second word in the link to the checksum
+SET A, POP ;restore the location argument
+ADD A, 1 ;increment it fittingly
+
+SET Y, A ;DEBUG
+SET B, POP
 JSR typ.cCopy ;SHOULD IMPOSE MAXIMUM LENGTH
 
 SET A, POP
-ADD [A+2], 16 ;add the length of the link (always 16) to the length of the inode
+ADD [A+3], 16 ;add the length of the link (always 16) to the length of the inode
 SET PC, ext ;exit successful
  ;
 
@@ -1008,6 +1028,25 @@ DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 ; TYPER ; Data and String Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;:### typ.ffz (pointer)
+;:**F**inds the **f**irst **z**ero after *pointer*, and returns the number of words between *pointer* and that zero.
+;:
+;:**modifies** A
+;:
+:typ.ffz
+SET PUSH, A
+
+:typ.ffz.loop
+IFE [A], 0
+  SET PC, typ.ffz.exit
+
+ADD A, 1
+SET PC, typ.ffz.loop
+
+:typ.ffz.exit
+SUB A, POP
+SET PC, POP
+
 ;:### typ.htoascii (hextet, outputPointer)
 ;:Converts *hextet* (a 16-bit unsigned integer) to ASCII, and writes that ASCII to *outputPointer*. Always produces four ASCII characters.
 ;:
@@ -1234,8 +1273,8 @@ SET PC, POP
 :HW.GenericKeyboard DAT 0xffff
 ;:- *[Speaker](http://bitbucket.org/benedek/dcpu-16/src/477043e85337/doc/speaker.txt)
 :HW.Speaker DAT 0xffff
-;:- *[HMU1440](https://gist.github.com/2516406)
-:HW.HMU1440
+;:- *[HMD2043](https://gist.github.com/2516406)
+:HW.HMD2043
 ;:
 ;:## Subroutines
 ;:
@@ -1270,7 +1309,7 @@ IFE A, 0x0001
 
 IFE A, 0x4cae
   IFE B, 0x74fa
-    SET [HW.HMU1440], J
+    SET [HW.HMD2043], J
 
 ADD J, 1
 
@@ -1557,6 +1596,7 @@ IFN A, B
   SET PC, crp.sum.loop
 
 SET A, C
+SET PC, POP
 
 ;:### <strike>crp.dsHash (inputPointer, inputLength)</strike>
 ;:***depricated***
@@ -2015,6 +2055,9 @@ JSR p.loadPackage
 SET A, package.test
 JSR p.loadPackage
 
+SET A, package.tune
+JSR p.loadPackage
+
 SET A, package.rainbow
 JSR p.loadPackage
 
@@ -2193,6 +2236,37 @@ JSR cat.write
 SET PC, POP
 
 :package.test.newfilename DAT "newfilename", 0
+:package.tune
+DAT 0xffab, 0xcdff
+DAT "tune", 0
+
+SET A, 0
+SET B, 174
+HWI [HW.Speaker]
+
+SET A, 0
+SET B, 220
+HWI [HW.Speaker]
+
+SET A, 0
+SET B, 294
+HWI [HW.Speaker]
+
+SET A, 0
+SET B, 2
+HWI [HW.Speaker]
+
+SET A, 0
+SET B, 220
+HWI [HW.Speaker]
+
+SET A, 0
+SET B, 220
+HWI [HW.Speaker]
+
+SET A, 0
+SET B, 0
+HWI [HW.Speaker]
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
 ;:
