@@ -522,7 +522,7 @@ SET PC, ext ;exit successful
 ;:
 
 ;:### cat.getSectorFromSingleRelative (currentOpenDirectoryPointer, relativePath)
-;:Gets the sector pointed to by the link in *currentOpenDirectoryPointer* by *relativePath*. This is **not recursive**. *relativePath* is considered terminated by a slash (`/`).
+;:Gets the sector pointed to by the link in *currentOpenDirectoryPointer* by *relativePath*. This is **not recursive**. *relativePath* is considered terminated by a slash null.
 ;:
 ;:**returns** the target sector if found, or `0xffff` if not
 ;:
@@ -531,8 +531,7 @@ SET PUSH, A ;store A
 SET PUSH, B ;store B
 
 SET A, B
-SET B, 0x2F ;"/"
-JSR typ.ffw ;get the length of the relative path
+JSR typ.ffz ;get the length of the relative path
 
 SET B, A
 SET A, POP
