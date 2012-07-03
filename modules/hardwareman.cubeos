@@ -8,13 +8,13 @@
 ;:## Supported Hardware
 ;:*Items marked with an asterisk do not have intialization routines called automatically.
 ;:- *[Generic Clock](http://0x10c.com/highnerd/rc_1/clock.txt)
-:HW.GenericClock DAT 0
+:HW.GenericClock DAT 0xffff
 ;:- *[LEM1802](http://0x10c.com/highnerd/rc_1/lem1802.txt)
-:HW.LEM1802 DAT 0
+:HW.LEM1802 DAT 0xffff
 ;:- *[Generic Keyboard](http://0x10c.com/highnerd/rc_1/keyboard.txt)
-:HW.GenericKeyboard DAT 0
+:HW.GenericKeyboard DAT 0xffff
 ;:- *[Speaker](http://bitbucket.org/benedek/dcpu-16/src/477043e85337/doc/speaker.txt)
-:HW.Speaker DAT 0
+:HW.Speaker DAT 0xffff
 ;:
 ;:## Subroutines
 ;:
