@@ -13,7 +13,27 @@
 ;:The high-level commands provide a smooth interface with the filesystem that can be used easily by modules and the rest of the operating system.
 ;:
 
+;:### cat.getSector (currentSector, pathPointer)
+;:Uses lower-level subroutines to parse either relative or absolute paths.
+;:
+;:**assumes there is open space at 0xa000**
+;:
+;:**returns** the start sector of the given file (via *pathPointer*,) or `0xffff` if it doesn't exist
+;:
+:cat.getSector
+IFE [B], 0x2f ;if the first character in the path is "/"
+  SET PC, cat.getSector.useAbs
 
+:cat.getSector.call
+SET C, B
+SET B, 0xa000 ;THIS SHOULD NOT BE A STATIC VALUE, BUT RATHER IN THE HEAP
+SET PC, cat.getSectorFromRelative
+
+:cat.getSector.useAbs
+SET A, 0 ;use the root directory as the starting point
+ADD B, 1
+SET PC, cat.getSector.call
+ ;
 
 ;:## Low-level Commands
 ;:The low-level commands are used by the high level commands to provide fast and efficient access to the framework of the filesystem itself.
