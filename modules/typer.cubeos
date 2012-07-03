@@ -11,7 +11,7 @@
 SET PUSH, A
 
 :typ.ffz.loop
-IFE A, 0
+IFE [A], 0
   SET PC, typ.ffz.exit
 
 ADD A, 1
