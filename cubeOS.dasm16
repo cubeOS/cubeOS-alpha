@@ -264,7 +264,7 @@ JSR cat.newLink
 SET PC, cat.mountSystem.exit
 
 :temp.cat.testdir
-DAT "TestTest", 0
+DAT "TestDir", 0
 :temp.cat.testfile
 DAT "TestFile", 0
 
@@ -682,28 +682,45 @@ SET PC, ext ;exit successful
 ;:## Low-Level Parsing Commands
 ;:
 
-;:### cat.getSectorFromSingleRelative (currentSector, relativePath)
-;:Gets the sector pointed to by the link in *currentSector* by *relativePath*. This is **not recursive**. *relativePath* is considered terminated by either a null or a slash (`/`).
+;:### cat.getSectorFromSingleRelative (currentOpenDirectoryPointer, relativePath)
+;:Gets the sector pointed to by the link in *currentOpenDirectoryPointer* by *relativePath*. This is **not recursive**. *relativePath* is considered terminated by a slash (`/`).
+;:
+;:**returns** the target sector if found, or `0xffff` if not
 ;:
 :cat.getSectorFromSingleRelative
-SET PUSH, I
-SET PUSH, J
-SET I, B
+SET PUSH, A ;store A
+SET PUSH, B ;store B
 
-SET B, 0xA000
-JSR cat.open
+SET A, B
+SET B, 0x2F ;"/"
+JSR typ.ffw ;get the length of the relative path
 
-SET J, 0xA005 ;
-SET C, J
+SET B, A
+SET A, POP
+JSR crp.sum ;get the sum of the relative path
 
-:cat.getSectorFromSingleRelative.compare
-IFE [I], 0
-  SET A, 0
-IFE [I], 0x2f ;"/"
-  SET A, 0
+SET B, A ;set B to the sum
 
+
+SET A, POP ;restore the directory pointer
+SET C, [A+3] ;make C the content length
+ADD A, 5 ;make A the location of the first link's sum
+
+:cat.getSectorFromSingleRelative.loop
+IFE [A], B
+  SET PC, cat.getSectorFromSingleRelative.found
+
+ADD A, 16
+SUB C, 16
+IFA C, 0
+  SET PC, cat.getSectorFromSingleRelative.loop
+
+SET A, 0xffff
+SET PC, POP
 
 :cat.getSectorFromSingleRelative.found
+SET A, [A+0xffff] ;set A to the sector that is pointed to by A-1
+SET PC, POP
 
 ; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2232,21 +2249,23 @@ SET PC, POP
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
+SET PUSH, C
+SET PUSH, B
+
 SET A, 0
 SET B, 0xA000
 JSR cat.open
 
-SET A, package.test.newfilename
-SET B, 0xA015 ;the first word
-JSR typ.cCopy
+SET B, POP
 
 SET A, 0xA000
-SET B, 0
-JSR cat.write
+SET B, [B+1]
+JSR cat.getSectorFromSingleRelative
 
+SET B, POP
+JSR typ.htoascii
+SET [A], 0
 SET PC, POP
-
-:package.test.newfilename DAT "newfilename", 0
 :package.tune
 DAT 0xffab, 0xcdff
 DAT "tune", 0
