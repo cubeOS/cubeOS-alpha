@@ -1026,23 +1026,36 @@ DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 ; TYPER ; Data and String Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;:### typ.ffw (pointer, word)
+;:**F**inds the **f**irst **w**ord matching *word* after *pointer*, and returns the number of words between *pointer* and that *word*.
+;:
+;:**modifies** A
+;:
+:typ.ffw
+SET PUSH, A
+
+:typ.ffw.loop
+IFE [A], B
+  SET PC, typ.ffw.exit
+
+ADD A, 1
+SET PC, typ.ffw.loop
+
+:typ.ffw.exit
+SUB A, POP
+SET PC, POP
+ ;
+
 ;:### typ.ffz (pointer)
 ;:**F**inds the **f**irst **z**ero after *pointer*, and returns the number of words between *pointer* and that zero.
 ;:
 ;:**modifies** A
 ;:
 :typ.ffz
-SET PUSH, A
-
-:typ.ffz.loop
-IFE [A], 0
-  SET PC, typ.ffz.exit
-
-ADD A, 1
-SET PC, typ.ffz.loop
-
-:typ.ffz.exit
-SUB A, POP
+SET PUSH, B
+SET B, 0
+JSR typ.ffw ;find first word matching 0
+SET B, POP
 SET PC, POP
 
 ;:### typ.htoascii (hextet, outputPointer)
