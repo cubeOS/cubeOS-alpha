@@ -46,45 +46,12 @@ SET B, 0x0FFF
 HWI [HW.Speaker]
 
 SET A, 1
-:__BOOT.wait0
-HWI [HW.GenericClock]
-IFL C, 5
-  SET PC, __BOOT.wait0
-
-SET A, 1
-SET B, 0x3FFF
-HWI [HW.Speaker]
-
-SET A, 1
-:__BOOT.wait1
-HWI [HW.GenericClock]
-IFL C, 10
-  SET PC, __BOOT.wait1
-
-SET A, 1
-SET B, 0x7FFF
-HWI [HW.Speaker]
-
-SET A, 1
-:__BOOT.wait2
-HWI [HW.GenericClock]
-IFL C, 10
-  SET PC, __BOOT.wait2
-
-SET A, 1
-SET B, 0xFFFF
-HWI [HW.Speaker]
-
-SET A, 1
-:__BOOT.wait3
+:__BOOT.wait
 HWI [HW.GenericClock]
 IFL C, 15
-  SET PC, __BOOT.wait3
+  SET PC, __BOOT.wait
 
 SET A, 0
-SET B, 0
-HWI [HW.Speaker]
-SET A, 1
 SET B, 0
 HWI [HW.Speaker]
 
