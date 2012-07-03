@@ -252,13 +252,11 @@ JSR cat.newInode
 JSR cat.getSectorPointer ;get the location of the new inode at sector 0
 
 SET PUSH, A
-
 SET B, 1
 SET C, temp.cat.testdir
 JSR cat.newLink
 
 SET A, POP
-
 SET B, 2
 SET C, temp.cat.testfile
 JSR cat.newLink
@@ -266,7 +264,7 @@ JSR cat.newLink
 SET PC, cat.mountSystem.exit
 
 :temp.cat.testdir
-DAT "TestDir", 0
+DAT "TestTest", 0
 :temp.cat.testfile
 DAT "TestFile", 0
 
@@ -648,7 +646,7 @@ IFN [A], 1 ;if the sector does not contain a directory
 
 SET PUSH, A ;store A for later
 
-ADD A, [A+2] ;add the length of the existing links
+ADD A, [A+3] ;add the length of the existing links
 ADD A, 4 ;add the length of the inode
 
 SET [A], B ;set the link target
@@ -665,15 +663,15 @@ JSR typ.ffz ;find the first 0 (only modifies A)
 
 SET B, A ;B is the length argument
 SET A, PEEK ;A is the location argument
+
 JSR crp.sum ;get the checksum of the string
+SET Y, A ;debug
 
-SET B, PEEK ;need to use B because PEEK cannot be put inside brackets
+SET B, POP ;restore output location
 SET [B], A ;set the second word in the link to the checksum
-SET A, POP ;restore the location argument
-ADD A, 1 ;increment it fittingly
+ADD B, 1 ;increment location fittingly
 
-SET Y, A ;DEBUG
-SET B, POP
+SET A, POP
 JSR typ.cCopy ;SHOULD IMPOSE MAXIMUM LENGTH
 
 SET A, POP
@@ -2189,7 +2187,7 @@ SET B, I ;continuous memory location
 JSR cat.open ;open root directory
 
 SET A, I
-ADD A, 5 ;set A to the first text location
+ADD A, 6 ;set A to the first text location
 
 SET B, POP ;set B to the output location
 
@@ -2240,33 +2238,63 @@ SET PC, POP
 DAT 0xffab, 0xcdff
 DAT "tune", 0
 
-SET A, 0
-SET B, 174
-HWI [HW.Speaker]
+SET A, [package.tune.beepsub]
+JSR pih.newMsg
 
-SET A, 0
-SET B, 220
-HWI [HW.Speaker]
 
-SET A, 0
-SET B, 294
-HWI [HW.Speaker]
+SET C, package.tune.lengths
+SET Y, [C]
+SET X, package.tune.freqs
 
-SET A, 0
-SET B, 2
-HWI [HW.Speaker]
+SET B, A
+SET A, 2
+HWI [HW.GenericClock]
 
-SET A, 0
-SET B, 220
-HWI [HW.Speaker]
+SET PC, POP
 
-SET A, 0
-SET B, 220
-HWI [HW.Speaker]
+:package.tune.beepsub
+IFE Y, 0
+SET PUSH, PC
+IFE Y, 0
+SET PC, package.tune.beepsub.nextTone
+IFE [C], 0
+SET PC, package.tune.beepsub.end
+SET B, 0
+IFE [X], 0
+IFE [C], 0
+HWI [HW.GenericClock]
+SUB Y, 1
+SET PC, POP
 
+:package.tune.beepsub.nextTone
+ADD X, 1
+ADD C, 1
+SET Y, [C]
+SET A, 0
+SET B, [X]
+HWI [HW.Speaker]
+SET PC, POP
+
+:package.tune.beepsub.end
 SET A, 0
 SET B, 0
 HWI [HW.Speaker]
+SET A, 2
+SET B, 0
+HWI [HW.GenericClock]
+SET PC, POP
+
+:package.tune.X DAT 0
+:package.tune.Y DAT 0
+
+:package.tune.freqs
+DAT 1024, 174, 220, 294, 370, 330, 392, 0, 0
+
+:package.tune.lengths
+DAT 4, 4, 4, 8, 4, 12, 1, 0
+
+:package.tune.space
+DAT 0, 0, 0, 0
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
 ;:
