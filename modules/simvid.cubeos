@@ -48,7 +48,7 @@ SET [sv.write.v.color], 0xF000 ;default to white on black
 
 :sv.write.loop
 SET A, [I]
-ifg A, 0x00FF
+ifb A, 0xFF80
 	set pc, sv.write.unpack
 AND A, 0x007F
 
