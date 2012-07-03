@@ -5,11 +5,11 @@ import sys, os, glob, subprocess
 kernel = ""
 location = os.path.dirname(os.path.abspath(sys.argv[0])) + os.sep
 
-modLoc = location + "modules/"
+modLoc = location + "modules" + os.sep
 moduleExtention = ".cubeos"
 modules = []
 
-packLoc = location + "../cubeOS-packages/stdlib/"
+packLoc = location + os.pardir + os.sep + "cubeOS-packages" + os.sep + "stdlib" + os.sep
 packageExtention = ".package"
 
 packageModule = modLoc + "package" + moduleExtention
