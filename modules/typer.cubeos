@@ -2,6 +2,25 @@
 ; TYPER ; Data and String Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;:### typ.ffz (pointer)
+;:**F**inds the **f**irst **z**ero after *pointer*, and returns the number of words between *pointer* and that zero.
+;:
+;:**modifies** A
+;:
+:typ.ffz
+SET PUSH, A
+
+:typ.ffz.loop
+IFE A, 0
+  SET PC, typ.ffz.exit
+
+ADD A, 1
+SET PC, typ.ffz.loop
+
+:typ.ffz.exit
+SUB A, POP
+SET PC, POP
+
 ;:### typ.htoascii (hextet, outputPointer)
 ;:Converts *hextet* (a 16-bit unsigned integer) to ASCII, and writes that ASCII to *outputPointer*. Always produces four ASCII characters.
 ;:
