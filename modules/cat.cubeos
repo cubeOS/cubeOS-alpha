@@ -100,12 +100,24 @@ SET B, 2
 SET C, temp.cat.testfile
 JSR cat.newLink
 
+SET A, 1
+SET B, 1
+JSR cat.newInode
+
+JSR cat.getSectorPointer
+
+SET B, 3
+SET C, temp.cat.testfile2
+JSR cat.newLink
+
 SET PC, cat.mountSystem.exit
 
 :temp.cat.testdir
 DAT "TestDir", 0
 :temp.cat.testfile
 DAT "TestFile", 0
+:temp.cat.testfile2
+DAT "TestFile2", 0
 
 :cat.mountSystem.exit
 SET A, POP ;return location
@@ -521,6 +533,70 @@ SET PC, ext ;exit successful
 ;:## Low-Level Parsing Commands
 ;:
 
+;:### cat.getSectorFromRelative (currentSector, spaceForOpenFile, relativePath)
+;:
+;:
+:cat.getSectorFromRelative
+SET PUSH, I
+SET PUSH, J
+
+SET I, C
+
+SET PUSH, A ;store A
+
+SET A, C
+JSR typ.ffz ;modifies A
+
+SET J, A ;make J the length
+ADD J, C ;make J the ending location for the path
+
+:cat.getSectorFromRelative.sepArgs
+IFE [C], 0x2f ;if the current character is a slash
+  SET [C], 0 ;set it to 0
+
+ADD C, 1
+IFN C, J
+  SET PC, cat.getSectorFromRelative.sepArgs
+
+SET A, POP ;restore A
+SET PUSH, B ;for recurring usage
+
+:cat.getSectorFromRelative.recurse
+ ;A will be the sector to read from
+SET B, PEEK
+
+JSR cat.open
+
+SET B, I
+SET A, PEEK ;restore memory location
+JSR cat.getSectorFromSingleRelative
+
+IFE A, 0xffff
+  SET PC, cat.getSectorFromRelative.found
+
+SET PUSH, A
+
+SET A, I
+JSR typ.ffz ;get first zero ;only modifies A
+ADD A, I ;make a location, not a length
+SET I, A
+
+SET A, POP
+
+IFE I, J
+  SET PC, cat.getSectorFromRelative.found
+ADD I, 1 ;go to beginning of next word
+
+SET PC, cat.getSectorFromRelative.recurse
+
+:cat.getSectorFromRelative.found
+
+SET C, POP
+SET J, POP
+SET I, POP
+SET PC, POP
+
+
 ;:### cat.getSectorFromSingleRelative (currentOpenDirectoryPointer, relativePath)
 ;:Gets the sector pointed to by the link in *currentOpenDirectoryPointer* by *relativePath*. This is **not recursive**. *relativePath* is considered terminated by a slash null.
 ;:
@@ -538,7 +614,6 @@ SET A, POP
 JSR crp.sum ;get the sum of the relative path
 
 SET B, A ;set B to the sum
-
 
 SET A, POP ;restore the directory pointer
 SET C, [A+3] ;make C the content length
