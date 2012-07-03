@@ -48,23 +48,12 @@ SET [sv.write.v.color], 0xF000 ;default to white on black
 
 :sv.write.loop
 SET A, [I]
+ifg A, 0x00FF
+	set pc, sv.write.unpack
 AND A, 0x007F
 
-ifl a, 0x20
-	set pc, commandcodes
-set a, i
-set b, j
-jsr typ.cUnpack
-
-ife [b], 0
-	add pc, 3
-add b, 1
-		sub pc, 3
-set j, b
-add i, 1
-
-:commandcodes
-IFN A, 0x01
+:sv.write.char
+IFE A, 0x01
   SET PC, sv.write.s.color
 
 BOR A, [sv.write.v.color]
@@ -86,6 +75,21 @@ SET [B], 0x0000 ;make the first word in the output null
 SET A, B ;return the index that sv.write would have written to
          ;if there had been content
 SET PC, POP
+
+:sv.write.unpack
+set push, [I]
+and [I], 0x007F
+BOR [I], [sv.write.v.color]
+set [J], [I]
+add J, 1
+set [I], pop
+set push, [I]
+shr [I], 8
+and [I], 0x007F
+BOR [I], [sv.write.v.color]
+sti [J], [I]
+set [I], pop
+set pc, sv.write.loop
 
 :sv.write.s.color
 SET [sv.write.v.color], [I]
