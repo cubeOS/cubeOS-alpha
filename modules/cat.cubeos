@@ -492,19 +492,19 @@ SET [A], B ;set the link target
 ADD A, 1
 SET B, A ;B is now the location to copy to
 
-SET PUSH, C ;store C
-SET PUSH, B ;store B
-
 SET A, C
 JSR typ.ffz ;find the first 0 (only modifies A)
 
 ;IF LENGTH IS GREATER THAN CAN BE SUPPORTED, DISCARD THE OTHER VALUES AND EXIT FALSE
 
+SET PUSH, C ;store C
+SET PUSH, B ;store B
+
+
 SET B, A ;B is the length argument
-SET A, PEEK ;A is the location argument
+SET A, C ;A is the location argument
 
 JSR crp.sum ;get the checksum of the string
-SET Y, A ;debug
 
 SET B, POP ;restore output location
 SET [B], A ;set the second word in the link to the checksum
