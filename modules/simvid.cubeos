@@ -50,10 +50,10 @@ SET [sv.write.v.color], 0xF000 ;default to white on black
 SET A, [I]
 AND A, 0x007F
 
-set a, i
-set b, j
 ifl a, 0x20
 	set pc, commandcodes
+set a, i
+set b, j
 jsr typ.cUnpack
 
 ife [b], 0
