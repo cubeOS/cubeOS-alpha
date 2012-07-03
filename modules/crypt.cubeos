@@ -26,6 +26,7 @@ IFN A, B
   SET PC, crp.sum.loop
 
 SET A, C
+SET PC, POP
 
 ;:### <strike>crp.dsHash (inputPointer, inputLength)</strike>
 ;:***depricated***
