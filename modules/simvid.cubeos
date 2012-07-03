@@ -50,21 +50,7 @@ SET [sv.write.v.color], 0xF000 ;default to white on black
 SET A, [I]
 AND A, 0x007F
 
-set a, i
-set b, j
-ifl a, 0x20
-	set pc, commandcodes
-jsr typ.cUnpack
-
-ife [b], 0
-	add pc, 3
-add b, 1
-		sub pc, 3
-set j, b
-add i, 1
-
-:commandcodes
-IFN A, 0x01
+IFE A, 0x01
   SET PC, sv.write.s.color
 
 BOR A, [sv.write.v.color]
