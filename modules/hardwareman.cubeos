@@ -51,7 +51,7 @@ IFE A, 0x0001
 
 IFE A, 0x4cae
   IFE B, 0x74fa
-    SET [HW.HMU1440], J
+    SET [HW.HMD2043], J
 
 ADD J, 1
 
