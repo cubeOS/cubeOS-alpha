@@ -573,6 +573,12 @@ JSR typ.ffz ;modifies A
 SET J, A ;make J the length
 ADD J, C ;make J the ending location for the path
 
+IFN [J+0xffff], 0x2f ;if the character before the ending location is not "/"
+  SET PC, cat.getSectorFromRelative.sepArgs ;skip the next little bit
+
+SUB J, 1 ;reduce the ending location by 1
+SET [J], 0 ;set the "/" to 0
+
 :cat.getSectorFromRelative.sepArgs
 IFE [C], 0x2f ;if the current character is a slash
   SET [C], 0 ;set it to 0
