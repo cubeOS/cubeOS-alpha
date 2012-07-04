@@ -174,6 +174,42 @@ DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,
 ;:The high-level commands provide a smooth interface with the filesystem that can be used easily by modules and the rest of the operating system.
 ;:
 
+;:### cat.newFile (currentSector, pathPointer, type)
+;:Creates a new, empty file of *type* at *pathPointer*. Type can be either 1, for directory, or 0, for file.
+;:
+;:**assumes there is open space at 0xa000**
+;:**currently only supports making files in the current directory**
+;:
+;:**returns** the sector number of the new file
+;:
+:cat.newFile
+SET PUSH, A
+SET PUSH, B
+
+JSR cat.getOpenSector ;only modifies A
+
+SET B, C
+JSR cat.newInode
+
+SET C, POP ;restore filename pointer
+SET B, A ;target inode
+SET A, PEEK ;peek current directory
+
+SET PUSH, C ;store filename pointer
+SET PUSH, B ;store target inode
+
+SET B, 0xa000
+JSR cat.open
+
+SET A, 0xa000
+SET B, POP
+SET C, POP
+JSR cat.newLink
+
+SET A, 0xa000
+SET B, POP ;restore current directory
+SET PC, cat.write
+
 ;:### cat.getSector (currentSector, pathPointer)
 ;:Uses lower-level subroutines to parse either relative or absolute paths.
 ;:
@@ -2191,10 +2227,16 @@ JSR p.loadPackage
 SET A, package.val
 JSR p.loadPackage
 
+SET A, package.touch
+JSR p.loadPackage
+
 SET A, package.pwd
 JSR p.loadPackage
 
 SET A, package.inferno
+JSR p.loadPackage
+
+SET A, package.mkdir
 JSR p.loadPackage
 
 SET A, package.benchmark
@@ -2454,6 +2496,14 @@ JSR typ.htoascii
 
 SET [B], 0
 SET PC, POP
+:package.touch
+DAT 0xffab, 0xcdff
+DAT "touch", 0
+
+SET A, [v.cwd]
+SET B, [B+1]
+SET C, 2 ;file
+SET PC, cat.newFile
 ;:### package.pwd
 ;:Prints the current working directory.
 ;:
@@ -2483,6 +2533,14 @@ SET PC, typ.cCopy
 
 :pack.inferno.text DAT 0xF001, "Lasciate ogne speranza, voi ch'intrate.", 0
  ;
+:package.mkdir
+DAT 0xffab, 0xcdff
+DAT "mkdir", 0
+
+SET A, [v.cwd]
+SET B, [B+1]
+SET C, 1 ;directory
+SET PC, cat.newFile
 :package.benchmark
 DAT 0xffab, 0xcdff
 DAT "benchmark", 0
