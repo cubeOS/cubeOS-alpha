@@ -193,6 +193,10 @@ SET PC, cat.getSectorFromRelative
 :cat.getSector.useAbs
 SET A, 0 ;use the root directory as the starting point
 ADD B, 1
+
+IFE [B], 0 ;if "/" was the only character in the path
+  SET PC, POP ;exit with sector number set to 0
+
 SET PC, cat.getSector.call
  ;
 
@@ -2029,8 +2033,9 @@ DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 :s.stdout.space
 DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
-;current working directory in ascii
-:v.cwds
+:v.cwd ;current working directory sector number
+DAT 0
+:v.cwds ;current working directory in ascii
 DAT 0x202f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
  ;;
 
@@ -2195,6 +2200,9 @@ JSR p.loadPackage
 SET A, package.benchmark
 JSR p.loadPackage
 
+SET A, package.cd
+JSR p.loadPackage
+
 SET A, package.echo
 JSR p.loadPackage
 
@@ -2293,11 +2301,8 @@ DAT 0x7001, "Invalid command.", 0 ;THIS SHOULD BE PACKED TEXT
 :package.ls
 
 DAT 0xffab, 0xcdff
-DAT "ls",0
+DAT "ls", 0
 SET PUSH, I
-
-SET [C], 0xf001
-ADD C, 1
 
 SET PUSH, C
 
@@ -2306,7 +2311,7 @@ SET I, 0xA000 ;NEEDS ALLOCATED HEAP SPACE BEFORE MOVING TO A PROCESS MODEL
 ;SET A, [B+1]
 ;- get sector from relative or absolute filepath ;only modifies A
 
-SET A, 0
+SET A, [v.cwd] ;use the current working directory
 SET B, I ;continuous memory location
 JSR cat.open ;open root directory
 
@@ -2336,6 +2341,7 @@ SUB I, 1
 SET PC, package.ls.loop
 
 :package.ls.exit
+SET [B+0xffff], 0 ;set the last newline to 0, so it prints cleanly
 SET I, POP
 SET PC, POP
  ;
@@ -2531,6 +2537,31 @@ SET J, POP
 SET I, POP
 SET PC, POP
 
+:package.cd
+DAT 0xffab, 0xcdff
+DAT "cd", 0
+
+SET PUSH, C ;store stdout
+
+SET A, [v.cwd] ;A is the current working directory
+SET B, [B+1] ;B is a pointer to the path
+JSR cat.getSector ;find the sector
+
+SET C, POP ;restore stdout
+
+IFE A, 0xffff
+  SET PC, package.cd.fileNotFound
+
+SET [v.cwd], A
+SET PC, POP
+
+:package.cd.fileNotFound
+SET A, package.cd.fileNotFoundText
+SET B, C
+SET PC, typ.cCopy
+
+:package.cd.fileNotFoundText
+DAT "File not found.", 0
 :package.echo
 DAT 0xffab, 0xcdff
 DAT "echo", 0
