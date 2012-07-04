@@ -1,9 +1,10 @@
-CubeOS filesystem
-File format specification
-Words			|Usage
-0x0000-0x0004	|Inode
-0x0005-(n-1)	|File contents
-n				|EOF (0x0004)
+CubeOS (CAT) Filesystem
+General File Format Specification
+
+Words         | Usage
+0x0000-0x0004 | Inode
+0x0005-(n-1)  | File contents
+n             | EOF (0x0004)
 
 Inode:
 0x0001: Inode type (0x0000: unused, 0x0001: directory, 0x0002: file)
