@@ -32,6 +32,10 @@ SET PC, cat.getSectorFromRelative
 :cat.getSector.useAbs
 SET A, 0 ;use the root directory as the starting point
 ADD B, 1
+
+IFE [B], 0 ;if "/" was the only character in the path
+  SET PC, POP ;exit with sector number set to 0
+
 SET PC, cat.getSector.call
  ;
 
