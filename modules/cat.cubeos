@@ -6,7 +6,6 @@
 ;:
 ;:In order to act on a file or directory, it must be "opened." This copies the inode's contents to a temporary position (as provided by the program opening it.) Some of the subroutines below act on opened directories, so as to add links. When one is finished with a directory or file, one must "write" it back into its strip.
 ;:
-;:**STILL UNDER HEAVY DEVELOPMENT. DO NOT USE**
 ;:
 
 ;:## High-level Commands
@@ -28,6 +27,7 @@ SET PUSH, B
 JSR cat.getOpenSector ;only modifies A
 
 SET B, C
+SET C, PICK 1
 JSR cat.newInode
 
 SET C, POP ;restore filename pointer
@@ -85,8 +85,6 @@ SET PC, cat.getSector.call
 ;:**returns** location of first word in header
 ;:
 
-;SHOULD KEEP TRACK OF WHERE FILESYSTEM IS SO IT CAN ADD NEW STRIPS AND DO SEARCHES
-
 :cat.mountSystem
 SET [env.fs], A
 
@@ -95,9 +93,7 @@ SET PUSH, J
 SET PUSH, X
 SET PUSH, A ;store location for retrieval at the end
 SET I, A
-DIV B, C ;make B the maximum number of sectors ;SHOULD 
-
-;should find the maximum number of sectors, but doesn't
+DIV B, C ;make B the maximum number of sectors
 
 :cat.mountSystem.initHeader
 STI [I], 0xC001 ;magic number, cat v1.0
@@ -112,8 +108,7 @@ STI [I], 0 ;sectors in use
 SET [A+2], I ;sector map start
 SET PUSH, B ;store B
 SET C, B ;we will change B later
-DIV C, 16 ;find number of words needed to represent sector use states
-;OPTIMIZE DIV WITH SHR
+SHR C, 4 ;find number of words needed to represent sector use states
 ADD C, I ;C becomes sector map end location
 
 :cat.mountSystem.initSectorMap.loop
@@ -145,39 +140,8 @@ SET [A+4], I
 :cat.mountSystem.initializeRoot
 SET A, 0
 SET B, 1
+SET C, 0
 JSR cat.newInode
-
-;TEST LINK
-JSR cat.getSectorPointer ;get the location of the new inode at sector 0
-
-SET PUSH, A
-SET B, 1
-SET C, temp.cat.testdir
-JSR cat.newLink
-
-SET A, POP
-SET B, 2
-SET C, temp.cat.testfile
-JSR cat.newLink
-
-SET A, 1
-SET B, 1
-JSR cat.newInode
-
-JSR cat.getSectorPointer
-
-SET B, 3
-SET C, temp.cat.testfile2
-JSR cat.newLink
-
-SET PC, cat.mountSystem.exit
-
-:temp.cat.testdir
-DAT "TestDir", 0
-:temp.cat.testfile
-DAT "TestFile", 0
-:temp.cat.testfile2
-DAT "TestFile2", 0
 
 :cat.mountSystem.exit
 SET A, POP ;return location
@@ -237,7 +201,6 @@ SET PC, POP
 
 ;:### cat.write (inputPointer, sectorNumber)
 ;:Obeying sector joins, copies the entire contents of an open file at *inputPointer* to the sector at *sectorNumber*, linking new sectors as needed and unlinking old ones if they become unnecessary.
-;:**under development**
 ;:
 :cat.write
 SET PUSH, I
@@ -398,7 +361,7 @@ SET B, POP
 SET PC, POP
  ;
 
-;:### cat.newInode (sector, type)
+;:### cat.newInode (sector, type, parentSector)
 ;:Creates a new inode of *type* and length 0 at *sector*. It also marks the corresponding sector in sector map as used.
 ;:Types are 0, for unused, 1, for directory, and 2, for file.
 ;:
@@ -411,7 +374,7 @@ SET PUSH, A ;store A for returning
 JSR cat.getSectorPointer ;make A a pointer to the start of that sector
 
 SET [A], B
-SET [A+1], 0 ;the number of links pointing to the inode
+SET [A+1], C ;the parent sector of the inode
 SET [A+2], 0 ;reserved high order word content size
 SET [A+3], 0 ;low order word content size
 
@@ -437,7 +400,7 @@ SET PC, POP
  ;
 
 ;:### cat.rmInode (sector)
-;:Marks *sector* unused in the sector map, <strike>unlinks the rest of the strip</strike>, and marks its inode unused.
+;:Marks *sector* unused in the sector map, unlinks the rest of the strip, and marks its inode unused.
 ;:
 ;:**modifies** A <br />
 ;:**returns** *sector*
@@ -547,7 +510,7 @@ SET PC, POP
 
 
 ;:### cat.newLink (directoryPointer, targetStripStartSector, namePointer)
-;:Creates a new link under the given sector, extending the length of the inode automatically <strike>and overflowing to the next open sector (updating sector usage and linking) if necessary</strike>.
+;:Creates a new link under the given open file, extending the length of the inode automatically.
 ;:The first word is the *targetStripStartSector*, and the remaining fifteen words are copied literally <strike>(maximum length fourteen)</strike> from the null-terminated word at *namePointer*.
 ;:**returns** 0 if successful, and 1 if the given sector does not contain a directory
 ;:
@@ -663,6 +626,15 @@ SET PC, POP
 ;:**returns** the target sector if found, or `0xffff` if not
 ;:
 :cat.getSectorFromSingleRelative
+
+;IFE [B], 0x2e
+;  IFN [B+1], 0x2e
+;    SET PC, POP ;needs to return current sector number, (maybe 0xfffe?)
+
+IFE [B], 0x2e
+  IFE [B+1], 0x2e
+    SET PC, cat.getSectorFromSingleRelative.returnParent
+
 SET PUSH, A ;store A
 SET PUSH, B ;store B
 
@@ -693,4 +665,8 @@ SET PC, POP
 
 :cat.getSectorFromSingleRelative.found
 SET A, [A+0xffff] ;set A to the sector that is pointed to by A-1
+SET PC, POP
+
+:cat.getSectorFromSingleRelative.returnParent
+SET A, [A+1] ;parent sector
 SET PC, POP
