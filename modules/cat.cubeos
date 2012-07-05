@@ -216,7 +216,8 @@ ADD I, 4 ;include the size of the inode
 SET PUSH, I ;store the size of the input for later
 
 DIV I, J ;set I to the number of sectors needed for the whole file
-ADD I, 1 ;DIV rounds down ;FIND A RELIABLE WAY TO DO THIS
+IFN EX, 0
+  ADD I, 1 ;round up
 
 SET X, A ;make X the storage place for the current input index
 
