@@ -43,7 +43,7 @@ JSR sv.init ;set up boot screen and screen
 
 SET A, 0x2000 ;heap location
 SET B, 0x1000 ;length
-SET C, 0x0080 ;block size (32 blocks)
+SET C, 0x0100 ;block size (16 blocks)
 JSR heap.init
 
 JSR pih.init
@@ -1936,8 +1936,8 @@ JSR p.lookup
 SET PUSH, I
 SET PUSH, J
 SET PUSH, X
-SET PUSH, Y
-SET PUSH, Z
+;SET PUSH, Y
+;SET PUSH, Z
 IAG B
 SET PUSH, B ;push IA
 
@@ -1947,8 +1947,8 @@ SET C, [v.stdout]
 JSR A ;calls the subroutine returned by *p.lookup*
 
 IAS POP
-SET Z, POP
-SET Y, POP
+;SET Z, POP
+;SET Y, POP
 SET X, POP
 SET J, POP
 SET I, POP
@@ -2087,7 +2087,9 @@ SET A, B
 
 DIV A, C
 SET X, A ;store the number of blocks
-DIV A, 16 ;OPTIMIZE WITH SHR
+SHR A, 4 ;divide by 16 and round down
+
+SET Y, X;debug
 
 ADD A, PEEK
 ADD A, 4 ;make A the location of the start of the first block
@@ -2151,10 +2153,11 @@ IFN EX, 0
   ADD A, 1 ;round up
 SET I, A ;make I the iterator for number of blocks needed
 
-SET B, X ;make B the location of the map
-ADD B, 4
+SET B, X ;make B the location of the header
+ADD B, 4 ;add the length of the header to make B the location of the bitmap
 
 SET A, [B] ;make A the first word of the usagemap
+SET Y, B ;debug
 
 SET PUSH, I ;store iterator for easy access
 SET J, 0 ;make J the iterator to keep track of the bit number
@@ -2189,10 +2192,12 @@ ADD J, 1 ;increase bit iterator
 
 IFN I, 0 ;if the iterator has not reached zero, continue
   SET PC, heap.alloc.checkbits
-SUB J, 1
 
-SUB B, [X+2] ;set B to the number of full words passed
-SHL B, 4     ;set B to the number of bits passed (MUL 16)
+SET C, X ;set C to the location of the header
+ADD C, 4 ;set C to the location of the bitmap
+
+SUB B, C ;set B to the number of full words passed
+SHL B, 4 ;set B to the number of bits passed (MUL 16)
 
 SUB J, POP ;subtract the number of needed blocks from the
            ;bit iterator to get the first index of the open area
@@ -2200,7 +2205,7 @@ SUB J, POP ;subtract the number of needed blocks from the
 ADD B, J ;add the index of the first block in the open area
          ;in order to get the actual first block index
 
-SET A, B
+SET A, B ;debug output
 
 SET J, POP
 SET I, POP

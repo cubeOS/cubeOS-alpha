@@ -22,7 +22,7 @@ JSR sv.init ;set up boot screen and screen
 
 SET A, 0x2000 ;heap location
 SET B, 0x1000 ;length
-SET C, 0x0080 ;block size (32 blocks)
+SET C, 0x0100 ;block size (16 blocks)
 JSR heap.init
 
 JSR pih.init
