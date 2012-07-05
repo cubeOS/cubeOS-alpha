@@ -16,8 +16,8 @@
 :v.sPrompt DAT 0xF001, "$ ", 0
 :v.promptLoc DAT 0
 
-:v.stdin DAT s.stdin.space
-:v.stdout DAT s.stdout.space
+:v.stdin DAT 0
+:v.stdout DAT 0
 
 ;:### s.instance
 ;:Prepares a new terminal session at the root directory.
@@ -30,6 +30,16 @@
 ;:6. Loops nonendingly to 3
 ;:
 :s.instance
+SET A, 0x80
+JSR tusk.getMem
+SET [v.stdin], A ;v.stdin should not be static here
+
+SET A, 0x80
+JSR tusk.getMem
+SET [v.stdout], A ;v.stdout should not be static here
+
+;SHOULD ALSO REDEFINE THE SCREEN
+
 JSR sv.clear ;clear the screen
 SET A, [v.scrnLoc]
 

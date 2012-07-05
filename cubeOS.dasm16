@@ -1149,6 +1149,23 @@ SET PC, POP
 ;:**under development**
 ;:
 :tusk.newProcess
+SET PC, POP
+
+;:### tusk.getMem (length)
+;:Reserves a *length* amount of memory from the heap using *heap.alloc*<strike>, such that the memory will be freed when the process terminates.</strike>
+;:
+;:**modifies** A
+;:**returns** the first location of the reserved memory
+;:
+:tusk.getMem
+SET PUSH, B
+SET PUSH, C
+
+JSR heap.alloc
+
+SET C, POP
+SET B, POP
+SET PC, POP
 
 :tusk.PIDs ;64 open spaces
 DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -1796,8 +1813,8 @@ SET PC, POP
 :v.sPrompt DAT 0xF001, "$ ", 0
 :v.promptLoc DAT 0
 
-:v.stdin DAT s.stdin.space
-:v.stdout DAT s.stdout.space
+:v.stdin DAT 0
+:v.stdout DAT 0
 
 ;:### s.instance
 ;:Prepares a new terminal session at the root directory.
@@ -1810,6 +1827,20 @@ SET PC, POP
 ;:6. Loops nonendingly to 3
 ;:
 :s.instance
+SET A, 0x80
+JSR tusk.getMem
+SET [v.stdin], A ;v.stdin should not be static here
+
+SET Y, A;debug
+
+SET A, 0x80
+JSR tusk.getMem
+SET [v.stdout], A ;v.stdout should not be static here
+
+SET Z, A;debug
+
+;SHOULD ALSO REDEFINE THE SCREEN
+
 JSR sv.clear ;clear the screen
 SET A, [v.scrnLoc]
 
@@ -2305,6 +2336,9 @@ JSR p.loadPackage
 SET A, package.pwd
 JSR p.loadPackage
 
+SET A, package.showmaps
+JSR p.loadPackage
+
 SET A, package.inferno
 JSR p.loadPackage
 
@@ -2599,6 +2633,18 @@ ADD C, 1
 SET A, v.cwds
 SET B, C
 SET PC, typ.cUnpack
+:package.showmaps
+DAT 0xffab, 0xcdff
+DAT "showmaps", 0
+
+SET I, C
+SET J, 0x20
+:package.showmaps.loop
+STI [I], J
+IFN J, 0x80
+  SET PC, package.showmaps.loop
+
+SET PC, POP
 :package.inferno
 
 DAT 0xffab, 0xcdff
