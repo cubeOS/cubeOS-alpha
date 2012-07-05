@@ -43,10 +43,8 @@ JSR sv.init ;set up boot screen and screen
 
 SET A, 0x2000 ;heap location
 SET B, 0x1000 ;length
-SET C, 0x0100 ;block size (16 blocks)
+SET C, 0x0080 ;block size (32 blocks)
 JSR heap.init
-
-;SHOULD SET VARIABLES TO LOCATION OF HEAP HEADER
 
 JSR pih.init
 
@@ -377,7 +375,8 @@ ADD I, 4 ;include the size of the inode
 SET PUSH, I ;store the size of the input for later
 
 DIV I, J ;set I to the number of sectors needed for the whole file
-ADD I, 1 ;DIV rounds down ;FIND A RELIABLE WAY TO DO THIS
+IFN EX, 0
+  ADD I, 1 ;round up
 
 SET X, A ;make X the storage place for the current input index
 
@@ -2140,40 +2139,76 @@ SET PC, POP
 ;:**UNDER DEVELOPMENT; DO NOT USE**
 ;:
 :heap.alloc
+SET PUSH, X
 SET PUSH, I
 SET PUSH, J
 
-SET B, [env.heap+2] ;make B the length of the blocks
+SET X, [env.heap] ;make X the heap location
+
+SET B, [X+2] ;make B the block length
 DIV A, B ;make A the number of blocks needed
-SET I, A
+IFN EX, 0
+  ADD A, 1 ;round up
+SET I, A ;make I the iterator for number of blocks needed
 
-SET B, env.heap+4 ;make B the location of the map
+SET B, X ;make B the location of the map
+ADD B, 4
 
-SET J, 0
+SET A, [B] ;make A the first word of the usagemap
+
+SET PUSH, I ;store iterator for easy access
+SET J, 0 ;make J the iterator to keep track of the bit number
+
 :heap.alloc.checkbits
-SET C, [B]
-SHR C, J
 
-ADD J, 1
-IFN J, 16
-  SET PC, heap.alloc.checkbits.checks
+IFE J, 16 ;if the last bit in the word has been scanned
+  SET PC, heap.alloc.newword
 
-ADD B, 1 ;SHOULD CHECK FOR THE END OF THE USAGEMAP
+IFC A, 0x8000 ;if the leftmost bit of A is 0,
+  SET PC, heap.alloc.openbit
+
+;if it's 1, note the closed bit
+SET I, PEEK ;reset the iterator
+SHL A, 1
+ADD J, 1 ;increase bit iterator
+SET PC, heap.alloc.checkbits
+
+:heap.alloc.newword ;go to the next word
+ADD B, 1 ;increase the pointer by 1
+
+;SHOULD DETECT THE END OF THE BLOCK MAP
+
+SET A, [B]
 SET J, 0
+SET PC, heap.alloc.checkbits
 
-:heap.alloc.checkbits.checks
+:heap.alloc.openbit
+SUB I, 1
+SHL A, 1
+ADD J, 1 ;increase bit iterator
 
-IFC C, 0x8000	;if the leftmost bit is 0,
-  SUB I, 1		;subtract one from the number of blocks remaining
-
-IFB C, 0x8000	;if the leftmost bit in 1,
-  SET I, A		;reset the counter
-
-IFN I, 0		;continue scanning
+IFN I, 0 ;if the iterator has not reached zero, continue
   SET PC, heap.alloc.checkbits
+SUB J, 1
 
-;NEED TO FIND THE LOCATION OF THE FIRST BLOCK
-;NEED TO RESERVE THOSE BLOCKS
+SUB B, [X+2] ;set B to the number of full words passed
+SHL B, 4     ;set B to the number of bits passed (MUL 16)
+
+SUB J, POP ;subtract the number of needed blocks from the
+           ;bit iterator to get the first index of the open area
+
+ADD B, J ;add the index of the first block in the open area
+         ;in order to get the actual first block index
+
+SET A, B
+
+SET J, POP
+SET I, POP
+SET X, POP
+SET PC, POP
+ ;
+
+
  ;;
 
 ; ; ; ;
@@ -2332,8 +2367,14 @@ SET PUSH, C
 
 SET I, 0xA000 ;NEEDS ALLOCATED HEAP SPACE BEFORE MOVING TO A PROCESS MODEL
 
-;SET A, [B+1]
-;- get sector from relative or absolute filepath ;only modifies A
+SET A, [v.cwd]
+SET B, [B+1]
+IFN [B], 0
+  JSR cat.getSector ;get sector from relative or absolute filepath
+
+
+IFE A, 0xffff
+  SET A, [v.cwd]
 
 SET A, [v.cwd] ;use the current working directory
 SET B, I ;continuous memory location
@@ -2373,13 +2414,10 @@ SET PC, POP
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
-SET PUSH, C
+SET A, 0x40
+JSR heap.alloc
 
-SET B, [B+1]
-SET A, 1
-JSR cat.getSector
-
-SET B, POP
+SET B, C
 JSR typ.htoascii
 SET [A], 0
 SET PC, POP
