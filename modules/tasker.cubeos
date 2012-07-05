@@ -13,6 +13,23 @@
 ;:**under development**
 ;:
 :tusk.newProcess
+SET PC, POP
+
+;:### tusk.getMem (length)
+;:Reserves a *length* amount of memory from the heap using *heap.alloc*<strike>, such that the memory will be freed when the process terminates.</strike>
+;:
+;:**modifies** A
+;:**returns** the first location of the reserved memory
+;:
+:tusk.getMem
+SET PUSH, B
+SET PUSH, C
+
+JSR heap.alloc
+
+SET C, POP
+SET B, POP
+SET PC, POP
 
 :tusk.PIDs ;64 open spaces
 DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
