@@ -1936,8 +1936,8 @@ JSR p.lookup
 SET PUSH, I
 SET PUSH, J
 SET PUSH, X
-;SET PUSH, Y
-;SET PUSH, Z
+SET PUSH, Y
+SET PUSH, Z
 IAG B
 SET PUSH, B ;push IA
 
@@ -1947,8 +1947,8 @@ SET C, [v.stdout]
 JSR A ;calls the subroutine returned by *p.lookup*
 
 IAS POP
-;SET Z, POP
-;SET Y, POP
+SET Z, POP
+SET Y, POP
 SET X, POP
 SET J, POP
 SET I, POP
@@ -2089,8 +2089,6 @@ DIV A, C
 SET X, A ;store the number of blocks
 SHR A, 4 ;divide by 16 and round down
 
-SET Y, X;debug
-
 ADD A, PEEK
 ADD A, 4 ;make A the location of the start of the first block
 
@@ -2157,7 +2155,6 @@ SET B, X ;make B the location of the header
 ADD B, 4 ;add the length of the header to make B the location of the bitmap
 
 SET A, [B] ;make A the first word of the usagemap
-SET Y, B ;debug
 
 SET PUSH, I ;store iterator for easy access
 SET J, 0 ;make J the iterator to keep track of the bit number
@@ -2199,13 +2196,22 @@ ADD C, 4 ;set C to the location of the bitmap
 SUB B, C ;set B to the number of full words passed
 SHL B, 4 ;set B to the number of bits passed (MUL 16)
 
-SUB J, POP ;subtract the number of needed blocks from the
-           ;bit iterator to get the first index of the open area
+SUB J, PEEK ;subtract the number of needed blocks from the
+            ;bit iterator to get the first index of the open area
+            ;but keep the number of blocks needed for later
 
 ADD B, J ;add the index of the first block in the open area
          ;in order to get the actual first block index
 
-SET A, B ;debug output
+SET A, B   ;set A to the block index
+SET B, POP ;set B to the number of blocks needed
+SET C, 1   ;set C to "mark the blocks used"
+JSR heap.mark
+
+MUL A, [X+2] ;multiply by the length of each block
+ADD A, [X+1] ;add the location of the first block in memory
+             ;to produce the location of the first word of the first
+             ;reserved block
 
 SET J, POP
 SET I, POP
@@ -2213,7 +2219,51 @@ SET X, POP
 SET PC, POP
  ;
 
+;:### heap.mark (block, number, used/unused)
+;:Marks *number* of blocks used or unused, starting from the index *block*. `1` in *used/unused* denotes `used`, and `0` denotes `unused`.
+;:
+;:**return** *block*
+;:
+:heap.mark
+SET PUSH, A
+SET PUSH, X
+SET X, [env.heap]
+ADD X, 4 ;make X a pointer to the first word in the bitmap
 
+SUB B, 1 ;for use later
+SET PUSH, C ;store used/unused type
+SET PUSH, B ;store B
+SET PUSH, A ;store A
+
+SHR A, 4 ;divide by 16, to get the word index
+ADD A, X ;make A a pointer to the relevant word
+
+SET B, POP ;restore the block index
+AND B, 0x000f ;get the bit index
+
+SET C, 0x8000 ;set the leftmost bit
+ASR C, POP    ;make the leftmost *number* bits 1
+
+SHR C, B ;make C apply to all of the blocks to be reserved
+
+SET B, POP ;restore used/unused
+IFE B, 1
+  SET PC, heap.mark.used
+
+:heap.mark.unused
+XOR C, 0xffff ;flip the bits to reflect what needs to be changed
+AND [A], C    ;set the bits that need to be changed to 0
+
+SET X, POP
+SET PC, POP
+
+:heap.mark.used
+BOR [A], C ;set the bits that need to be changed to 1
+
+SET X, POP
+SET A, POP ;return *blocks*
+SET PC, POP
+ ;
  ;;
 
 ; ; ; ;
@@ -2419,10 +2469,13 @@ SET PC, POP
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
-SET A, 0x40
+SET PUSH, C
+
+SET A, 0x90
 JSR heap.alloc
 
-SET B, C
+
+SET B, POP
 JSR typ.htoascii
 SET [A], 0
 SET PC, POP
