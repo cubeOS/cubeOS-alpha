@@ -11,6 +11,9 @@
 ;:**returns** the 16-bit hash
 ;:
 :crp.sum
+IFE [A], 0
+  SET PC, ext ;set A to zero and exit
+
 ADD B, A
 SET C, 0
 
