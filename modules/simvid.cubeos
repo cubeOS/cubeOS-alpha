@@ -25,7 +25,23 @@ ADD B, 0x180
 SET [v.scrnEnd], B
 SET PC, POP
  ;
- 
+
+;:### sv.newWindow
+;:Reserves screen space in the heap, maps the screen to it.
+;:
+;:**returns** the first index in the new screen location
+;:
+:sv.newWindow
+SET A, 0x120
+JSR tusk.getMem ;reserve 384 words
+
+SET B, A
+SET A, 0
+HWI [HW.LEM1802] ;remap the screen to this heap location
+
+SET A, B ;return the location of the screen
+SET PC, POP
+
 ;:### sv.write (inputPointer, outputPointer)
 ;:Writes ASCII to the screen using special characters to act as directives. (This does not perform preprocessing such as translating normal ASCII into those special characters.) Special characters are as follows.
 ;:**returns** the location of the null following the written text
