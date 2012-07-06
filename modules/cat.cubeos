@@ -634,9 +634,9 @@ SET PC, POP
 ;:
 :cat.getSectorFromSingleRelative
 
-;IFE [B], 0x2e
-;  IFN [B+1], 0x2e
-;    SET PC, POP ;needs to return current sector number, (maybe 0xfffe?)
+IFE [B], 0x2e
+  IFE [B+1], 0
+    SET PC, cat.getSectorFromSingleRelative.returnCurrent
 
 IFE [B], 0x2e
   IFE [B+1], 0x2e
@@ -672,6 +672,10 @@ SET PC, POP
 
 :cat.getSectorFromSingleRelative.found
 SET A, [A+0xffff] ;set A to the sector that is pointed to by A-1
+SET PC, POP
+
+:cat.getSectorFromSingleRelative.returnCurrent
+SET A, [v.cwd]
 SET PC, POP
 
 :cat.getSectorFromSingleRelative.returnParent
