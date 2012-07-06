@@ -1,0 +1,7 @@
+# This file contains path configuration so that python can invoke
+# the das assembler and Benedek's DCPU-16 emulator.
+# Linux users can use "which das" and "which dcpu-16" to find
+# the locations of each, assuming they are installed on the PATH.
+
+daslocation="/home/sasha/bin/das"
+emulocation="/usr/local/bin/dcpu-16"
