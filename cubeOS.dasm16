@@ -958,7 +958,23 @@ ADD B, 0x180
 SET [v.scrnEnd], B
 SET PC, POP
  ;
- 
+
+;:### sv.newWindow
+;:Reserves screen space in the heap, maps the screen to it.
+;:
+;:**returns** the first index in the new screen location
+;:
+:sv.newWindow
+SET A, 0x120
+JSR tusk.getMem ;reserve 384 words
+
+SET B, A
+SET A, 0
+HWI [HW.LEM1802] ;remap the screen to this heap location
+
+SET A, B ;return the location of the screen
+SET PC, POP
+
 ;:### sv.write (inputPointer, outputPointer)
 ;:Writes ASCII to the screen using special characters to act as directives. (This does not perform preprocessing such as translating normal ASCII into those special characters.) Special characters are as follows.
 ;:**returns** the location of the null following the written text
@@ -1937,7 +1953,7 @@ SET PC, POP
  ;
 
 ;:### s.parse
-;:This subroutine isolates the first argument in *v.stdin* by scanning through, then stopping on null or 0x20. Then, it gets the *crp.dshash* of the string. Then, it calls *p.lookup*, sets `B` to the location of stdin and `C` to the location of stdout, and invokes the subroutine returned by *p.lookup*.
+;:This subroutine isolates the first argument in *v.stdin* by scanning through, then stopping on null or 0x20. Then, it gets the *crp.sum* of the string. Then, it calls *p.lookup*, sets `B` to the location of stdin and `C` to the location of stdout, and invokes the subroutine returned by *p.lookup*.
 ;:
 ;:This should also point the process to the starts of the remaining arguments.
 ;:
@@ -1956,7 +1972,7 @@ SET PC, s.parse.getFirstArg
 
 :s.parse.exit
 SUB B, A ;make B the length of the first argument
-JSR crp.dsHash ;returns the hashvalue in A
+JSR crp.sum ;returns the hashvalue in A
 
 JSR p.lookup
 
@@ -2359,7 +2375,7 @@ SET PC, POP
  ;
  
 ;:### p.loadPackage (pointer)
-;:Loads a package by adding the *identifier*'s crp.dsHash value and a pointer to the first instruction to the hash table. See Packages for more details.
+;:Loads a package by adding the *identifier*'s *crp.sum* value and a pointer to the first instruction to the hash table. See Packages for more details.
 ;:
 ;:**returns** <strike>0 if successful,</strike> 1 if invalid package format
 ;:
@@ -2384,7 +2400,7 @@ SET PUSH, B ;store the location of the null before instructions
 SUB B, A ;make B the length of the identifier
 ;A is the start of the identifier
 
-JSR crp.dsHash
+JSR crp.sum
 
 ;A is now the dsHash of the identifier
 SET B, POP ;B is a pointer the null

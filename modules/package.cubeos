@@ -20,7 +20,7 @@ SET PC, POP
  ;
  
 ;:### p.loadPackage (pointer)
-;:Loads a package by adding the *identifier*'s crp.dsHash value and a pointer to the first instruction to the hash table. See Packages for more details.
+;:Loads a package by adding the *identifier*'s *crp.sum* value and a pointer to the first instruction to the hash table. See Packages for more details.
 ;:
 ;:**returns** <strike>0 if successful,</strike> 1 if invalid package format
 ;:
@@ -45,7 +45,7 @@ SET PUSH, B ;store the location of the null before instructions
 SUB B, A ;make B the length of the identifier
 ;A is the start of the identifier
 
-JSR crp.dsHash
+JSR crp.sum
 
 ;A is now the dsHash of the identifier
 SET B, POP ;B is a pointer the null
