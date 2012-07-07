@@ -30,6 +30,8 @@
 ;:6. Loops nonendingly to 3
 ;:
 :s.instance
+JSR tusk.newProcess
+
 SET A, 0x80
 JSR tusk.getMem
 SET [v.stdin], A ;v.stdin should not be static here

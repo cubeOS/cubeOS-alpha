@@ -46,8 +46,6 @@ SET B, 0x1000 ;length
 SET C, 0x0100 ;block size (16 blocks)
 JSR heap.init
 
-;SUB PC, 1 ;debug
-
 JSR pih.init
 
 SET A, 0x8000
@@ -1164,13 +1162,36 @@ SET PC, POP
 :v.tusk.runPID DAT 0 ;the ID of the process that is currently running
 
 :v.tusk.PIDloc DAT tusk.PIDs
+:v.tusk.memStack DAT 0 ;should be replaced with a file or heapspace
+                       ;carrying a bunch of pointers to memstacks
 
 ;:### tusk.newProcess
-;:Registers a new process of unique ID. Adds the process id to the table at *v.tusk.PIDloc*.
+;:Registers a new process of unique ID. <strike>Adds the process id to the table at *v.tusk.PIDloc*.</strike>
 ;:
 ;:**under development**
 ;:
 :tusk.newProcess
+SET PUSH, A
+SET PUSH, B
+SET PUSH, C
+
+SET [v.tusk.runPID], [v.tusk.IDiterator] ;change to the new process
+ADD [v.tusk.IDiterator], 1 ;increase iterator by 1
+
+SET A, 0x40 ;reserve enough space for 31 memory slots (2 words per slot)
+JSR heap.alloc
+
+SET B, A
+ADD B, 1 ;make B the index after A
+
+SET [A], B ;make the first word in the memstack its stack pointer
+
+SET [v.tusk.memStack], A
+SET Y, [v.tusk.memStack] ;debug
+
+SET C, POP
+SET B, POP
+SET A, POP
 SET PC, POP
 
 ;:### tusk.getMem (length)
@@ -1182,12 +1203,28 @@ SET PC, POP
 :tusk.getMem
 SET PUSH, B
 SET PUSH, C
+SET PUSH, Y ;for the stack pointer
+SET PUSH, X ;for the location the stack pointer is at
+SET Y, SP
 
+SET X, [v.tusk.memStack]
+SET SP, [X] ;recover from the stack pointer
+SET Z, SP
+
+;SET PUSH, A ;push length to the memstack
 JSR heap.alloc
+;SET PUSH, A ;push location to the memstack
 
+SET [X], SP ;update the stack pointer carrier
+
+SET SP, Y
+SET X, POP
+SET Y, POP
 SET C, POP
 SET B, POP
 SET PC, POP
+
+;:### tusk.dropMem ()
 
 :tusk.PIDs ;64 open spaces
 DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -1756,6 +1793,7 @@ SET PC, POP
 ;:
 :dl.unsortedInsert
 SET PUSH, I
+SET PUSH, J
 SET PUSH, X ;SHOULD JUST USE A
 SET PUSH, Y ;SHOULD JUST USE B
 
@@ -1777,6 +1815,7 @@ SET A, POP
 SET Y, POP
 SET X, POP
 SET I, POP
+SET J, POP
 SET PC, POP
  ;
  ;;
@@ -1888,6 +1927,8 @@ SET PC, POP
 ;:6. Loops nonendingly to 3
 ;:
 :s.instance
+JSR tusk.newProcess
+
 SET A, 0x80
 JSR tusk.getMem
 SET [v.stdin], A ;v.stdin should not be static here
@@ -1922,6 +1963,7 @@ SET PC, POP
 ;:
 :s.takeIn
 SET PUSH, I
+SET PUSH, J
 SET I, 0
 
 JSR sv.getNewLine ;get the next blank line after *cursorPointer*
@@ -1994,6 +2036,7 @@ JSR s.stdin
 
 SET A, I;return location in A
 SET I, POP
+SET J, POP
 SET PC, POP
  ;
 
@@ -2305,6 +2348,34 @@ SET X, POP
 SET PC, POP
  ;
 
+;:### heap.free (location, length)
+;:Marks the blocks specified by *location* and *length* as free, and clears them.
+;:
+;:**returns** *location*
+;:
+:heap.free
+SET PUSH, A
+
+SET C, [env.heap]
+
+SUB A, [C+1] ;subtract the first block's location from A
+DIV A, [C+2] ;divide by the size of a block, to get the
+             ;block index, rounding down
+
+;DIV A, [C+2] not coming out evenly (EX != 0) implies corruption
+;of some sort. Impose a check here?
+
+DIV B, [C+2] ;make B the number of blocks implied by *length*
+IFN EX, 0    ;rounding up, as the allocation subroutine does
+  ADD B, 1
+
+SET C, 0 ;"unused"
+JSR heap.mark
+
+SET A, POP
+SET PC, POP
+ ;
+
 ;:### heap.mark (block, number, used/unused)
 ;:Marks *number* of blocks used or unused, starting from the index *block*. `1` in *used/unused* denotes `used`, and `0` denotes `unused`.
 ;:
@@ -2341,6 +2412,7 @@ XOR C, 0xffff ;flip the bits to reflect what needs to be changed
 AND [A], C    ;set the bits that need to be changed to 0
 
 SET X, POP
+SET A, POP
 SET PC, POP
 
 :heap.mark.used
@@ -2563,8 +2635,11 @@ DAT "test", 0
 
 SET PUSH, C
 
-SET A, 0x90
-JSR heap.alloc
+SET A, 0x110
+JSR tusk.getMem
+
+SET B, 0x110
+JSR heap.free
 
 
 SET B, POP
