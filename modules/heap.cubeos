@@ -18,45 +18,50 @@
 :heap.init
 SET PUSH, I
 SET PUSH, J
-SET PUSH, X
 
 SET [env.heap], A
 
 SET I, A
-SET PUSH, A
+SET PUSH, A ;store the location for returning
 SET A, B
 
-DIV A, C
-SET X, A ;store the number of blocks
-SHR A, 4 ;divide by 16 and round down
+DIV A, C ;find the number of necessary blocks
+IFN EX, 0
+  ADD A, 1 ;round up
 
-ADD A, PEEK
+         ;make A the number of words needed for the bitmap:
+SHR A, 4 ;divide by 16
+IFE EX, 0
+  SET PC, heap.init.evenbitmap ;if that goes evenly, skip the next step
+
+ADD A, 1 ;round up
+SET PUSH, A ;for restoring at the end of this part
+SET PUSH, B ;for use in this part
+
+ADD A, I ;add the heap offset
+ADD A, 4 ;add the size of the header
+         ;to make A the location of the last word in the bitmap
+
+SET [A], 0xffff ;set it to be filled
+SET B, PICK 2   ;set B to the number of blocks
+AND B, 0x000f   ;make B the number of blocks left in the last word of memory
+SHR [A], B      ;set B number of blocks to 0 in the bitmap
+
+SET B, POP ;restore B
+SET A, POP ;restore the number of words needed for the bitmap
+
+:heap.init.evenbitmap
+
+;A is already the number of words needed for the bitmap
+ADD A, I ;add the header offset
 ADD A, 4 ;make A the location of the start of the first block
 
-STI [I], 0x9EA9	;0
+STI [I], 0x9EA9
 STI [I], A
 STI [I], C
 STI [I], B
 
-SET PUSH, B
-SET PUSH, A
-
-:heap.init.map
-SET A, 0xFFFF
-SHR A, X
-STI [I], A
-
-IFL X, 16
-  SET PC, heap.init.map.exit
-
-SUB X, 16
-IFN X, 0
-  SET PC, heap.init.map
-
-:heap.init.map.exit
-
-SET A, POP
-SET I, A
+SET I, A   ;since A is already the starting location, 
 ADD I, POP ;create ending location
 
 :heap.init.loop ;clear backwards
@@ -66,8 +71,6 @@ STD [I], 0
 SET PC, heap.init.loop
 
 :heap.init.exit
-SET A, POP
-SET X, POP
 SET J, POP
 SET I, POP
 SET PC, POP
