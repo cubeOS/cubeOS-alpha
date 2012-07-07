@@ -74,7 +74,7 @@ SET A, 0
 SET B, 0
 HWI [HW.Speaker]
 
-JSR s.instance ;initialize DASH Shell
+JSR s.instance ;spawn an instance of the DASH Shell
 
 SET PC, halt
 
@@ -1179,18 +1179,24 @@ SET PC, POP
 ;:### tusk.newProcess
 ;:Registers a new process of unique ID. <strike>Adds the process id to the table at *v.tusk.PIDloc*.</strike>
 ;:
+;:**modifies** A
+;:**returns** a pointer to the first memory for the process's use
 ;:**under development**
 ;:
 :tusk.newProcess
-SET PUSH, A
 SET PUSH, B
 SET PUSH, C
 
 SET [v.tusk.runPID], [v.tusk.IDiterator] ;change to the new process
 ADD [v.tusk.IDiterator], 1 ;increase iterator by 1
 
-SET A, 0x40 ;reserve enough space for 31 memory slots (2 words per slot)
+SET A, 0x80 ;reserve 128 words, the first 64 for child memory
+            ;and the second for the process's actual use
 JSR heap.alloc
+
+SET B, A
+ADD B, 0x40 ;make B the first index of memory for the process's use
+SET PUSH, B
 
 SET B, A
 ADD B, 1 ;make B the index after A
@@ -1198,11 +1204,10 @@ ADD B, 1 ;make B the index after A
 SET [A], B ;make the first word in the memstack its stack pointer
 
 SET [v.tusk.memStack], A
-SET Y, [v.tusk.memStack] ;debug
 
+SET A, POP ;make A the return value (pointer to memory)
 SET C, POP
 SET B, POP
-SET A, POP
 SET PC, POP
 
 ;:### tusk.getMem (length)
@@ -1922,35 +1927,52 @@ SET PC, POP
 ;:## Subroutines
 
 :v.sPrompt DAT 0xF001, "$ ", 0
-:v.promptLoc DAT 0
 
-:v.stdin DAT 0
-:v.stdout DAT 0
+:dash.processMemory
 
-:v.argc DAT 0
+:v.promptLoc ;offset to literal prompt location
+DAT v.promptLoc - dash.processMemory
+
+;;:v.screenLoc DAT 2
+:v.args DAT v.args - dash.processMemory
+;offset of pointer  
+
+
+:v.argc DAT v.argc - dash.processMemory
+;offset to literal argc
+
+
+:v.stdin DAT v.stdin - dash.processMemory
+;offset to pointer to stdin
+
+
+:v.stdout DAT v.stdout - dash.processMemory
+;offset to pointer to stdout
+
+
+:s.stdin.quoteflag DAT s.stdin.quoteflag - dash.processMemory
+;offset to literal; is 1 if iterator is inside quotes
 
 ;:### s.instance
 ;:Prepares a new terminal session at the root directory.
 ;:
-;:1. SHOULD Set *v.cwds* to "/ " in packed form (`0x202F`)
-;:2. Clears the screen
-;:3. Calls *s.takeIn*
-;:4. Calls *s.parse*
-;:5. Calls *s.stdout* with the argument being the cursor location when the user pressed enter
-;:6. Loops nonendingly to 3
-;:
 :s.instance
+SET PUSH, Z ;for memory location storage
+
 JSR tusk.newProcess
+SET Z, A
 
 SET A, 0x80
 JSR tusk.getMem
-SET [v.stdin], A ;v.stdin should not be static here
+SET [Z+v.stdin], A ;store the pointer in memory + v.stdin offset
 
 SET A, 0x80
 JSR tusk.getMem
-SET [v.stdout], A ;v.stdout should not be static here
+SET [Z+v.stdout], A ;store the pointer in memory + v.stdout offset
 
-;SHOULD ALSO REDEFINE THE SCREEN
+;SET A, 0x120 ;384 words, for the screen
+;JSR tusk.getMem
+;SET [Z+v.screenLoc], A
 
 JSR sv.clear ;clear the screen
 SET A, [v.scrnLoc]
@@ -2059,10 +2081,10 @@ SET PC, POP
 ;:This should also point the process to the starts of the remaining arguments.
 ;:
 :s.parse
-SET A, [v.stdout] ;prepare stdout by nullifying the first word
+SET A, [Z+v.stdout] ;prepare stdout by nullifying the first word
 SET [A], 0x0000   ;to overwrite old output if it exists
 
-SET A, [v.stdin] ;make both A and B the location of stdin
+SET A, [Z+v.stdin] ;make both A and B the location of stdin
 SET B, A         ;for length-finding later
 
 :s.parse.getFirstArg
@@ -2087,8 +2109,8 @@ SET PUSH, B ;push IA
 
 SET X, A ;jump to X
 SET A, [v.argc]   ;argc
-SET B, s.args     ;pointer to argv
-SET C, [v.stdout] ;output location
+SET B, v.args     ;pointer to argv
+SET C, [Z+v.stdout] ;output location
 
 JSR X ;calls the subroutine returned by *p.lookup*
 
@@ -2129,21 +2151,21 @@ SET PC, POP
 SET PUSH, I
 SET PUSH, J
 SET PUSH, X
-SET [v.argc], 1 ;set argc to 1 (including the zeroth argument)
+SET [Z+v.argc], 1 ;set argc to 1 (including the zeroth argument)
 SET I, A
 SET X, 1 ;the argument indexing index ($1, $2)
-SET B, [v.stdin]
+SET B, [Z+v.stdin]
 
-SET [s.args], B ;handle $0 separately
+SET [v.args], B ;handle $0 separately
 
 :s.stdin.loop
 STI [B], [I]
 AND [B], 0x007F
 
 IFE [B], 0x27 ;single quote
-  XOR [s.stdin.quoteflag], 1 ;flip state
+  XOR [Z+s.stdin.quoteflag], 1 ;flip state
   
-IFN [s.stdin.quoteflag], 1 ;unless they're quoted
+IFN [Z+s.stdin.quoteflag], 1 ;unless they're quoted
   IFE [B], 0x20 ;set spaces
     JSR s.stdin.newarg
 
@@ -2154,24 +2176,24 @@ IFN [I], 0
 
 SET [B], 0
 IFL X, 15
-  SET [s.args + J], 0 ;zero the pointer following the last argument
+  SET [v.args + J], 0 ;zero the pointer following the last argument
 SET X, POP
 SET J, POP
 SET I, POP
 SET PC, POP
 
 :s.stdin.newarg
-ADD [v.argc], 1
+ADD [Z+v.argc], 1
 SET [B], 0
 SET C, B
 ADD C, 1
 IFL X, 15
-  SET [s.args + X], C
+  SET [v.args + X], C
 ADD X, 1
 SET PC, POP
 
 
-:s.stdin.quoteflag DAT 0 ;is 1 if iterator is inside quotes
+
 ;:s.stdin.escflag DAT 0 ;is 1 if "\" was the most recent character
 
 ;:s.stdin.args ;for handling arguments
@@ -2184,14 +2206,13 @@ SET PC, POP
 JSR sv.getNewLine
 
 SET B, A ;output
-SET A, [v.stdout] ;input
+SET A, [Z+v.stdout] ;input
 SET PC, sv.write ;process to screen (null-terminated)
  ;
 ;;RESERVED SPACE
 
 ;for keeping track of where arguments are
-:s.args
-DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
 
 :v.cwd ;current working directory sector number
 DAT 0
@@ -2459,6 +2480,9 @@ JSR dl.makeHashTable
 
 ;">loadcalls" is replaced by the calls necessary to load included packages
 
+SET A, package.calc
+JSR p.loadPackage
+
 SET A, package.ls
 JSR p.loadPackage
 
@@ -2478,9 +2502,6 @@ SET A, package.touch
 JSR p.loadPackage
 
 SET A, package.pwd
-JSR p.loadPackage
-
-SET A, package.memview
 JSR p.loadPackage
 
 SET A, package.showmaps
@@ -2590,6 +2611,86 @@ DAT 0x7001, "Invalid command.", 0 ;THIS SHOULD BE PACKED TEXT
 ;:
 
 ;">packages" is replaced by the contents of package files.
+:package.calc
+DAT 0xffab, 0xcdff
+DAT "calc", 0
+;performs calculations given reverse polish notation
+
+; Operator / ASCII value
+; + 2B
+; - 2D
+; * 2A
+; / 2F
+; % 25
+
+
+;iterate backwards over argv, converting each arg to a hextet and pushing to the stack
+;X=position in stack, decremented each run
+;Y=beginning of argv (ignoring $0)
+;Z=end of argv
+;and stdout is not used until the stack is cleared of fixins so yay, convenience
+SET PUSH, C
+SET X, B
+SET Y, B
+ADD X, A
+SET Z, X
+
+:package.calc.pushloop
+SET A, [X]
+;we don't want to convert the operators to ASCII, they already are
+IFN [A], 0x002B
+ IFN [A], 0x002D
+  IFN [A], 0x002A
+   IFN [A], 0x002F
+    IFN [A], 0x0025
+     SET PC, package.calc.val
+SET PUSH, [A]
+SET PC, package.calc.op
+:package.calc.val
+JSR typ.asciitoh
+SET PUSH, A
+:package.calc.op
+SUB X, 1
+IFN X, Y
+SET PC, package.calc.pushloop
+
+;handle each val-val-postfix triplet as a discrete unit (no support for unary operators yet)
+:package.calc.mathloop
+SUB PC, 1
+SET A, POP
+SET B, POP
+SET C, POP
+
+;+
+IFE C, 0x002B
+ADD A, B
+
+;-
+IFE C, 0x002D
+SUB A, B
+
+;*
+IFE C, 0x002A
+MUL A, B
+
+;/
+IFE C, 0x002F
+DIV A, B
+
+;%
+IFE C, 0x0025
+MOD A, B
+
+;push the result back onto the stack
+SET PUSH, A
+
+SUB X, 1
+IFN X, Z
+SET PC, package.calc.mathloop
+
+SET A, POP
+SET B, POP
+SET PC, typ.htoascii
 ;:### package.ls
 ;:Writes the names all of the links (files and directories) in the current working directory to stdout.
 ;:
@@ -2653,23 +2754,20 @@ SET PC, POP
 DAT 0xffab, 0xcdff
 DAT "memdump", 0
 
+SET Y, A
 SET A, [B+1]
 SET PUSH, C
 SET PUSH, [B+2]
 JSR typ.asciitoh
 SET X, A
+IFN Y, 0x0003
+ SET PC, package.memdump.onearg
 SET A, POP
 JSR typ.asciitoh
 SET Y, A
+
+:package.memdump.skip
 SET B, POP
-
-;IFG X, Y
-;SET A, 1
-;IFG X, Y
-;SET PC, POP
-
-IFE Y, 0x0000
-SET Y, 0xffff
 SET Z, X
 ADD Y, 1
 
@@ -2681,8 +2779,14 @@ SET B, A
 ADD B, 1
 ADD Z, 1
 IFN Z, Y
-SET PC, package.memdump.loop
+ SET PC, package.memdump.loop
 SET PC, POP
+
+:package.memdump.onearg
+SET Y, X
+;discard the pushed $2 because we don't want it and it technically doesn't exist
+SET 0, POP
+SET PC, package.memdump.skip
 :package.test
 DAT 0xffab, 0xcdff
 DAT "test", 0
@@ -2759,16 +2863,6 @@ ADD C, 1
 SET A, v.cwds
 SET B, C
 SET PC, typ.cUnpack
-:package.memview
-DAT 0xffab, 0xcdff
-DAT "memview", 0
-
-SET A, [B+1]
-SET PUSH, C
-JSR typ.asciitoh
-SET A, [A]
-SET B, POP
-SET PC, typ.htoascii
 :package.showmaps
 DAT 0xffab, 0xcdff
 DAT "showmaps", 0

@@ -12,18 +12,24 @@
 ;:### tusk.newProcess
 ;:Registers a new process of unique ID. <strike>Adds the process id to the table at *v.tusk.PIDloc*.</strike>
 ;:
+;:**modifies** A
+;:**returns** a pointer to the first memory for the process's use
 ;:**under development**
 ;:
 :tusk.newProcess
-SET PUSH, A
 SET PUSH, B
 SET PUSH, C
 
 SET [v.tusk.runPID], [v.tusk.IDiterator] ;change to the new process
 ADD [v.tusk.IDiterator], 1 ;increase iterator by 1
 
-SET A, 0x40 ;reserve enough space for 31 memory slots (2 words per slot)
+SET A, 0x80 ;reserve 128 words, the first 64 for child memory
+            ;and the second for the process's actual use
 JSR heap.alloc
+
+SET B, A
+ADD B, 0x40 ;make B the first index of memory for the process's use
+SET PUSH, B
 
 SET B, A
 ADD B, 1 ;make B the index after A
@@ -31,11 +37,10 @@ ADD B, 1 ;make B the index after A
 SET [A], B ;make the first word in the memstack its stack pointer
 
 SET [v.tusk.memStack], A
-SET Y, [v.tusk.memStack] ;debug
 
+SET A, POP ;make A the return value (pointer to memory)
 SET C, POP
 SET B, POP
-SET A, POP
 SET PC, POP
 
 ;:### tusk.getMem (length)
