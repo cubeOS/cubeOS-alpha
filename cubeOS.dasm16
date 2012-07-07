@@ -1203,23 +1203,23 @@ SET PC, POP
 :tusk.getMem
 SET PUSH, B
 SET PUSH, C
-SET PUSH, Y ;for the stack pointer
-SET PUSH, X ;for the location the stack pointer is at
-SET Y, SP
+;SET PUSH, Y ;for the stack pointer
+;SET PUSH, X ;for the location the stack pointer is at
+;SET Y, SP
 
-SET X, [v.tusk.memStack]
-SET SP, [X] ;recover from the stack pointer
-SET Z, SP
+;SET X, [v.tusk.memStack]
+;SET SP, [X] ;recover from the stack pointer
+;SET Z, SP
 
 ;SET PUSH, A ;push length to the memstack
 JSR heap.alloc
 ;SET PUSH, A ;push location to the memstack
 
-SET [X], SP ;update the stack pointer carrier
+;SET [X], SP ;update the stack pointer carrier
 
-SET SP, Y
-SET X, POP
-SET Y, POP
+;SET SP, Y
+;SET X, POP
+;SET Y, POP
 SET C, POP
 SET B, POP
 SET PC, POP
@@ -1916,6 +1916,8 @@ SET PC, POP
 :v.stdin DAT 0
 :v.stdout DAT 0
 
+:v.argc DAT 0
+
 ;:### s.instance
 ;:Prepares a new terminal session at the root directory.
 ;:
@@ -2072,10 +2074,12 @@ SET PUSH, Z
 IAG B
 SET PUSH, B ;push IA
 
-SET B, s.args
-SET C, [v.stdout]
+SET X, A ;jump to X
+SET A, [v.argc]   ;argc
+SET B, s.args     ;pointer to argv
+SET C, [v.stdout] ;output location
 
-JSR A ;calls the subroutine returned by *p.lookup*
+JSR X ;calls the subroutine returned by *p.lookup*
 
 IAS POP
 SET Z, POP
@@ -2084,9 +2088,9 @@ SET X, POP
 SET J, POP
 SET I, POP
 
-SET A, 0
-SET B, [v.scrnLoc]
-HWI [HW.LEM1802]
+;SET A, 0
+;SET B, [v.scrnLoc]
+;HWI [HW.LEM1802]
 
 SET PC, POP
  ;
@@ -2114,6 +2118,7 @@ SET PC, POP
 SET PUSH, I
 SET PUSH, J
 SET PUSH, X
+SET [v.argc], 1 ;set argc to 1 (including the zeroth argument)
 SET I, A
 SET X, 1 ;the argument indexing index ($1, $2)
 SET B, [v.stdin]
@@ -2145,6 +2150,7 @@ SET I, POP
 SET PC, POP
 
 :s.stdin.newarg
+ADD [v.argc], 1
 SET [B], 0
 SET C, B
 ADD C, 1
@@ -2445,10 +2451,10 @@ JSR dl.makeHashTable
 SET A, package.ls
 JSR p.loadPackage
 
-SET A, package.test
+SET A, package.memdump
 JSR p.loadPackage
 
-SET A, package.tune
+SET A, package.test
 JSR p.loadPackage
 
 SET A, package.rainbow
@@ -2461,6 +2467,9 @@ SET A, package.touch
 JSR p.loadPackage
 
 SET A, package.pwd
+JSR p.loadPackage
+
+SET A, package.memview
 JSR p.loadPackage
 
 SET A, package.showmaps
@@ -2629,82 +2638,55 @@ SET [B+0xffff], 0 ;set the last newline to 0, so it prints cleanly
 SET I, POP
 SET PC, POP
  ;
+:package.memdump
+DAT 0xffab, 0xcdff
+DAT "memdump", 0
+
+SET A, [B+1]
+SET PUSH, C
+SET PUSH, [B+2]
+JSR typ.asciitoh
+SET X, A
+SET A, POP
+JSR typ.asciitoh
+SET Y, A
+SET B, POP
+
+;IFG X, Y
+;SET A, 1
+;IFG X, Y
+;SET PC, POP
+
+IFE Y, 0x0000
+SET Y, 0xffff
+SET Z, X
+ADD Y, 1
+
+:package.memdump.loop
+SET A, [Z]
+JSR typ.htoascii
+SET [A], 0x0020
+SET B, A
+ADD B, 1
+ADD Z, 1
+IFN Z, Y
+SET PC, package.memdump.loop
+SET PC, POP
 :package.test
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
-SET PUSH, C
+;SET A, 0x110
+;JSR tusk.getMem
 
-SET A, 0x110
-JSR tusk.getMem
-
-SET B, 0x110
-JSR heap.free
+;SET B, 0x110
+;JSR heap.free
 
 
-SET B, POP
+SET B, C
 JSR typ.htoascii
 SET [A], 0
 SET PC, POP
-:package.tune
-DAT 0xffab, 0xcdff
-DAT "tune", 0
-
-SET A, [package.tune.beepsub]
-JSR pih.newMsg
-
-
-SET C, package.tune.lengths
-SET Y, [C]
-SET X, package.tune.freqs
-
-SET B, A
-SET A, 2
-HWI [HW.GenericClock]
-
-SET PC, POP
-
-:package.tune.beepsub
-IFE Y, 0
-SET PUSH, PC
-IFE Y, 0
-SET PC, package.tune.beepsub.nextTone
-IFE [C], 0
-SET PC, package.tune.beepsub.end
-SET B, 0
-IFE [X], 0
-IFE [C], 0
-HWI [HW.GenericClock]
-SUB Y, 1
-SET PC, POP
-
-:package.tune.beepsub.nextTone
-ADD X, 1
-ADD C, 1
-SET Y, [C]
-SET A, 0
-SET B, [X]
-HWI [HW.Speaker]
-SET PC, POP
-
-:package.tune.beepsub.end
-SET A, 0
-SET B, 0
-HWI [HW.Speaker]
-SET A, 2
-SET B, 0
-HWI [HW.GenericClock]
-SET PC, POP
-
-
-:package.tune.freqs
-DAT 1024, 174, 220, 294, 370, 330, 392, 0, 0
-
-:package.tune.lengths
-DAT 4, 4, 4, 8, 4, 12, 1, 0
-
-:package.tune.space
-DAT 0, 0, 0, 0
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
 ;:
@@ -2766,6 +2748,16 @@ ADD C, 1
 SET A, v.cwds
 SET B, C
 SET PC, typ.cUnpack
+:package.memview
+DAT 0xffab, 0xcdff
+DAT "memview", 0
+
+SET A, [B+1]
+SET PUSH, C
+JSR typ.asciitoh
+SET A, [A]
+SET B, POP
+SET PC, typ.htoascii
 :package.showmaps
 DAT 0xffab, 0xcdff
 DAT "showmaps", 0

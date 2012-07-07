@@ -19,6 +19,8 @@
 :v.stdin DAT 0
 :v.stdout DAT 0
 
+:v.argc DAT 0
+
 ;:### s.instance
 ;:Prepares a new terminal session at the root directory.
 ;:
@@ -175,10 +177,12 @@ SET PUSH, Z
 IAG B
 SET PUSH, B ;push IA
 
-SET B, s.args
-SET C, [v.stdout]
+SET X, A ;jump to X
+SET A, [v.argc]   ;argc
+SET B, s.args     ;pointer to argv
+SET C, [v.stdout] ;output location
 
-JSR A ;calls the subroutine returned by *p.lookup*
+JSR X ;calls the subroutine returned by *p.lookup*
 
 IAS POP
 SET Z, POP
@@ -187,9 +191,9 @@ SET X, POP
 SET J, POP
 SET I, POP
 
-SET A, 0
-SET B, [v.scrnLoc]
-HWI [HW.LEM1802]
+;SET A, 0
+;SET B, [v.scrnLoc]
+;HWI [HW.LEM1802]
 
 SET PC, POP
  ;
@@ -217,6 +221,7 @@ SET PC, POP
 SET PUSH, I
 SET PUSH, J
 SET PUSH, X
+SET [v.argc], 1 ;set argc to 1 (including the zeroth argument)
 SET I, A
 SET X, 1 ;the argument indexing index ($1, $2)
 SET B, [v.stdin]
@@ -248,6 +253,7 @@ SET I, POP
 SET PC, POP
 
 :s.stdin.newarg
+ADD [v.argc], 1
 SET [B], 0
 SET C, B
 ADD C, 1
