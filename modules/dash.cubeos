@@ -137,6 +137,7 @@ JSR s.stdin
 
 SET A, I;return location in A
 SET I, POP
+SET J, POP
 SET PC, POP
  ;
 
