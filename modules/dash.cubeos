@@ -64,6 +64,7 @@ SET PC, POP
 ;:
 :s.takeIn
 SET PUSH, I
+SET PUSH, J
 SET I, 0
 
 JSR sv.getNewLine ;get the next blank line after *cursorPointer*
