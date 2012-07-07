@@ -163,6 +163,34 @@ SET X, POP
 SET PC, POP
  ;
 
+;:### heap.free (location, length)
+;:Marks the blocks specified by *location* and *length* as free, and clears them.
+;:
+;:**returns** *location*
+;:
+:heap.free
+SET PUSH, A
+
+SET C, [env.heap]
+
+SUB A, [C+1] ;subtract the first block's location from A
+DIV A, [C+2] ;divide by the size of a block, to get the
+             ;block index, rounding down
+
+;DIV A, [C+2] not coming out evenly (EX != 0) implies corruption
+;of some sort. Impose a check here?
+
+DIV B, [C+2] ;make B the number of blocks implied by *length*
+IFN EX, 0    ;rounding up, as the allocation subroutine does
+  ADD B, 1
+
+SET C, 0 ;"unused"
+JSR heap.mark
+
+SET A, POP
+SET PC, POP
+ ;
+
 ;:### heap.mark (block, number, used/unused)
 ;:Marks *number* of blocks used or unused, starting from the index *block*. `1` in *used/unused* denotes `used`, and `0` denotes `unused`.
 ;:
@@ -199,6 +227,7 @@ XOR C, 0xffff ;flip the bits to reflect what needs to be changed
 AND [A], C    ;set the bits that need to be changed to 0
 
 SET X, POP
+SET A, POP
 SET PC, POP
 
 :heap.mark.used
