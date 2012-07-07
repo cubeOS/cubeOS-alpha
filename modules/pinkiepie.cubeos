@@ -71,6 +71,17 @@ SET B, POP
 RFI 0
  ;
 
+;:### pih.chOSMsg (msg, location)
+;:Redefines the OS (msg < 64) interrupt message to point at *location*.
+;:
+;:**modifies** A
+;:
+;:**returns** *msg*
+;:
+:pih.chOSMsg
+SET [pih.cmdtable + A], B
+SET PC, POP
+
 ;:### pih.newMsg (location)
 ;:Finds the first unused message greater than or equal to 64, but less than or equal to 127. It then makes *location* the location to jump to when that interrupt is triggered.
 ;:
