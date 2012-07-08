@@ -1211,36 +1211,63 @@ SET B, POP
 SET PC, POP
 
 ;:### tusk.getMem (length)
-;:Reserves a *length* amount of memory from the heap using *heap.alloc*<strike>, such that the memory will be freed when the process terminates.</strike>
+;:Reserves a *length* amount of memory from the heap using *heap.alloc*, and stores *length* and the location of the reserved memory on the "memory stack," which allows that memory to be freed either when the process calls *tusk.free* or when it terminates.
 ;:
 ;:**modifies** A
 ;:**returns** the first location of the reserved memory
 ;:
 :tusk.getMem
 SET PUSH, B
+SET PUSH, C ;for the location the stack pointer is at
+
+SET C, [v.tusk.memStack]
+SET C, [C] ;v.tusk.memStack points to the pointer
+
+SET [C], A ;push length to the memstack
+ADD C, 1
+
 SET PUSH, C
-;SET PUSH, Y ;for the stack pointer
-;SET PUSH, X ;for the location the stack pointer is at
-;SET Y, SP
-
-;SET X, [v.tusk.memStack]
-;SET SP, [X] ;recover from the stack pointer
-;SET Z, SP
-
-;SET PUSH, A ;push length to the memstack
 JSR heap.alloc
-;SET PUSH, A ;push location to the memstack
+SET C, POP
 
-;SET [X], SP ;update the stack pointer carrier
+SET [C], A ;push location to the memstack
+ADD C, 1
 
-;SET SP, Y
-;SET X, POP
-;SET Y, POP
+SET B, [v.tusk.memStack]
+SET [B], C ;update the stack pointer carrier
+
 SET C, POP
 SET B, POP
 SET PC, POP
 
 ;:### tusk.dropMem ()
+;:
+;:
+;:**does not modify registers**
+;:
+:tusk.dropMem
+SET PUSH, A
+SET PUSH, B
+SET PUSH, C
+
+SET C, [v.tusk.memStack]
+SET C, [C] ;v.tusk.memStack pionts to a pointer
+
+SET A, [C]        ;retreive the location from the stack
+SET B, [C+0xffff] ;retreive the length from the stack
+
+SET PUSH, B
+SUB C, 2 ;decrement the stack
+SET B, [v.tusk.memStack]
+SET [B], C
+SET B, POP
+
+JSR heap.free ;location, length
+
+SET C, POP
+SET B, POP
+SET A, POP
+SET PC, POP
 
 :tusk.PIDs ;64 open spaces
 DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -2303,7 +2330,6 @@ SET PC, POP
 ;:Reserves the first consecutive *length* of memory in the heap.
 ;:
 ;:**returns** the location of the reserved memory, <strike>or 1 if no such block of memory is available</strike>
-;:**UNDER DEVELOPMENT; DO NOT USE**
 ;:
 :heap.alloc
 SET PUSH, X
@@ -2484,6 +2510,9 @@ SET A, package.calc
 JSR p.loadPackage
 
 SET A, package.ls
+JSR p.loadPackage
+
+SET A, package.testbin
 JSR p.loadPackage
 
 SET A, package.memdump
@@ -2750,6 +2779,32 @@ SET [B+0xffff], 0 ;set the last newline to 0, so it prints cleanly
 SET I, POP
 SET PC, POP
  ;
+:package.testbin
+DAT 0xffab, 0xcdff
+DAT "testbin", 0
+
+SET A, 0
+SET B, [B+1]
+SET C, 2
+JSR cat.newFile
+
+SET PUSH, A
+SET B, 0xa000
+JSR cat.open
+
+SET A, package.testbin.binary
+SET B, 0xa004
+JSR typ.cCopy
+
+SET [0xa003], 5 ;the length of the binary is 5 words
+
+SET A, 0xa004
+SET B, POP
+JSR cat.write
+
+:package.testbin.binary
+DAT 0x7d41, 0x0030, 0x8842, 0x8541, 0x6381, 0 ;simple binary executable
+
 :package.memdump
 DAT 0xffab, 0xcdff
 DAT "memdump", 0
@@ -2791,15 +2846,14 @@ SET PC, package.memdump.skip
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
-;SET A, 0x110
-;JSR tusk.getMem
-
-;SET B, 0x110
-;JSR heap.free
-
+SET A, 0x110
+JSR tusk.getMem
 
 SET B, C
 JSR typ.htoascii
+
+JSR tusk.dropMem
+
 SET [A], 0
 SET PC, POP
 ;:### package.rainbow
