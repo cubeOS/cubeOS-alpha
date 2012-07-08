@@ -4,34 +4,6 @@
     <link rel="stylesheet" href="css/styles.css"/>
 	<link rel="shortcut icon" href="img/cubeOSIcon.png">
 	<title>CubeOS</title>
-    
-    <script type = "text/javascript">
-	function filesize (url) {
-		var req = this.window.ActiveXObject ? new ActiveXObject("Microsoft.XMLHTTP") : new XMLHttpRequest();
-		if (!req) {
-			throw new Error('XMLHttpRequest not supported');
-		}
-	 
-		req.open('HEAD', url, false);
-		req.send(null);
-	 
-		if (!req.getResponseHeader) {
-			try {
-				throw new Error('No getResponseHeader!');
-				} catch (e) {
-					return false;
-				}
-			} else if (!req.getResponseHeader('Content-Length')) {
-				try {
-					throw new Error('No Content-Length!');
-				} catch (e2) {
-					return false;
-				}
-			} else {
-				return req.getResponseHeader('Content-Length');
-			}
-		}
-	</script>
 
 </head>
 <body>
@@ -57,10 +29,14 @@
             <tr>
             <td>In-Dev Kernel</td>
 			<td>
-            <script type ="text/javascript">
-				var x = filesize('https://raw.github.com/cubeOS/cubeOS-alpha/master/cubeOS.dasm16');
-				document.write(x);
-			</script>
+            	
+                <script language="php">
+	
+					$filename = 'https://raw.github.com/cubeOS/cubeOS-alpha/master/cubeOS.dasm16';
+					echo $filename . ': ' . filesize($filename) . ' bytes';
+					
+				</script>
+                
             </td>
             <td><a href="https://raw.github.com/cubeOS/cubeOS-alpha/master/cubeOS.dasm16">Download</a></td>
             </tr>
