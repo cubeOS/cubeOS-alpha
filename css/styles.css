@@ -84,12 +84,13 @@ a.news:hover {
 	
 }
 
-.odd {
-	padding: 5px;
+table {
+	width: 100%;
+	border: 1px solid #CCC;
+	text-align: left;
 	background-color: #DDD;
 }
 
-.even {
-	padding: 5px;
-	background-color: #CCC;
+td {
+	background-color: #EEE;
 }
