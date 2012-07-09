@@ -32,11 +32,16 @@ ADD B, 0x40 ;make B the first index of memory for the process's use
 SET PUSH, B
 
 SET B, A
-ADD B, 1 ;make B the index after A
+ADD B, 2 ;make B the index after the dview pointer
 
 SET [A], B ;make the first word in the memstack its stack pointer
 
-SET [v.tusk.memStack], A
+SET PUSH, A ;store memStack pointer
+
+SET A, [HW.LEM1802]
+JSR dview.init
+
+SET [v.tusk.memStack], POP
 
 SET A, POP ;make A the return value (pointer to memory)
 SET C, POP
