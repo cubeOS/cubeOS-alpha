@@ -29,6 +29,7 @@ a:hover {
 	text-align: center;
 	text-shadow: 1px 1px 3px #000;
 	font-family: cubeos;
+	display: block;
 }
 
 .mids {
