@@ -5,23 +5,23 @@ import sys, os, glob, subprocess
 kernel = ""
 location = os.path.dirname(os.path.abspath(sys.argv[0])) + os.sep
 
-modLoc = os.path.join(location, "modules")
+modLoc = location + "modules" + os.sep
 moduleExtention = ".cubeos"
 modules = []
 
-packLoc = os.path.join(location, os.pardir, "cubeOS-packages", "stdlib")
+packLoc = location + os.pardir + os.sep + "cubeOS-packages" + os.sep + "stdlib" + os.sep
 packageExtention = ".package"
 
-packageModule = os.path.join(modLoc, "package" + moduleExtention)
+packageModule = modLoc + "package" + moduleExtention
 builtPackageModule = ""
 packageLoads = ""
 packages = ""
 
 # Create a list of all modules
-modules.append(os.path.join(modLoc, "environment" + moduleExtention))
-modules.append(os.path.join(modLoc, "boot" + moduleExtention))
+modules.append(modLoc + "environment" + moduleExtention)
+modules.append(modLoc + "boot" + moduleExtention)
 
-for files in glob.glob(os.path.join(modLoc, "*" + moduleExtention)):
+for files in glob.glob(modLoc + "*" + moduleExtention):
 	if files != modules[0] and files != modules[1] and files != packageModule:
 		modules.append(files)
 
@@ -42,7 +42,7 @@ for i in range(0, len(modules)):
 kernel += builtPackageModule
 
 # Overwrite old kernel
-kernelf = open(os.path.join(location, "cubeOS.dasm16"), 'w')
+kernelf = open(location + "cubeOS.dasm16", 'w')
 kernelf.seek(0)
 kernelf.write(kernel)
 kernelf.truncate()
