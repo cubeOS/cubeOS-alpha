@@ -48,7 +48,6 @@ HWI C ;the LEM1802 port
 
 SET A, B ;return the screen location
 SET PC, POP
- ;
 
 ;:### dview.close ()
 ;:Closes the latest window for the currently running process, remapping to the one opened before that.
@@ -56,16 +55,3 @@ SET PC, POP
 :dview.close
 SET A, [v.tusk.memStack] ;get the running process's memory
 SET A, [A+1] ;get the current dview instance's memory
-
-JSR tusk.dropMem ;does not modify registers
-
-SUB [B], 1
-
-SET C, [B+1] ;get the LEM1802 port
-
-SET A, 0 ;MEM_MAP_SCREEN
-SET B, [B] ;the screen location to map to
-HWI C
-
-SET PC, POP
- ;
