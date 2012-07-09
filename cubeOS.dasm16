@@ -1199,11 +1199,16 @@ ADD B, 0x40 ;make B the first index of memory for the process's use
 SET PUSH, B
 
 SET B, A
-ADD B, 1 ;make B the index after A
+ADD B, 2 ;make B the index after the dview pointer
 
 SET [A], B ;make the first word in the memstack its stack pointer
 
-SET [v.tusk.memStack], A
+SET PUSH, A ;store memStack pointer
+
+SET A, [HW.LEM1802]
+JSR dview.init
+
+SET [v.tusk.memStack], POP
 
 SET A, POP ;make A the return value (pointer to memory)
 SET C, POP
@@ -1957,10 +1962,10 @@ SET PC, POP
 
 :dash.processMemory
 
-:v.promptLoc ;offset to literal prompt location
-DAT v.promptLoc - dash.processMemory
+:v.promptLoc DAT v.promptLoc - dash.processMemory
+;offset to literal prompt location
 
-;;:v.screenLoc DAT 2
+
 :v.args DAT v.args - dash.processMemory
 ;offset of pointer  
 
@@ -2489,6 +2494,61 @@ SET PC, POP
  ;;
 
 ; ; ; ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; DVIEW ; Windowing System ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:### dview.init (LEM1802port)
+;:Reserves 32 words of memory on the stack for containing screen object locations, the first of which is a pointer to the currently active screen. Screens are added and removed as a "stack."
+;:
+;:**returns** dview memory location
+;:
+:dview.init
+SET PUSH, A
+
+SET A, 0x20
+JSR tusk.getMem
+
+SET [A], A
+ADD [A], 2 ;make the pointer its location plus one
+
+SET [A+1], POP
+
+SET PC, POP
+ ;
+
+;:### dview.newScrn ()
+;:Initializes a new screen mapping, adjusts the dview pointers to work with this new screen, and remaps the screen.
+;:
+;:**returns** the screen location
+;:
+:dview.newScreen
+SET A, [v.tusk.memStack] ;get the running process's memory
+SET A, [A+1] ;get the current dview instance's memory
+
+SET B, A
+
+SET A, 0x180 ;enough memory for one full 12x80 screen
+JSR tusk.getMem
+
+SET PUSH, B
+ADD [B], 1 ;up the stack
+SET B, [B]
+SET [B], A ;put the new location on the stack
+
+SET B, POP
+SET C, [B+1] ;get the LEM1802 port
+
+SET A, 0 ;MEM_MAP_SCREEN
+SET B, [B] ;the pointer to the pointer to the screen location
+SET B, [B] ;make B the screen location ;(double instruction intentional)
+HWI C ;the LEM1802 port
+
+SET A, B ;return the screen location
+SET PC, POP
+
+
+; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; PACKAGE ; Dash Package Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2685,7 +2745,6 @@ SET PC, package.calc.pushloop
 
 ;handle each val-val-postfix triplet as a discrete unit (no support for unary operators yet)
 :package.calc.mathloop
-SUB PC, 1
 SET A, POP
 SET B, POP
 SET C, POP
@@ -2846,15 +2905,14 @@ SET PC, package.memdump.skip
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
-SET A, 0x110
-JSR tusk.getMem
 
-SET B, C
-JSR typ.htoascii
+SET A, [HW.LEM1802]
+JSR dview.init
 
-JSR tusk.dropMem
+JSR dview.newScreen
 
-SET [A], 0
+SET [A], 0xf030
+
 SET PC, POP
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters

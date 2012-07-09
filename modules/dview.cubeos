@@ -1,0 +1,57 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; DVIEW ; Windowing System ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:### dview.init (LEM1802port)
+;:Reserves 32 words of memory on the stack for containing screen object locations, the first of which is a pointer to the currently active screen. Screens are added and removed as a "stack."
+;:
+;:**returns** dview memory location
+;:
+:dview.init
+SET PUSH, A
+
+SET A, 0x20
+JSR tusk.getMem
+
+SET [A], A
+ADD [A], 2 ;make the pointer its location plus one
+
+SET [A+1], POP
+
+SET PC, POP
+ ;
+
+;:### dview.newScrn ()
+;:Initializes a new screen mapping for the currently running process, adjusts the dview pointers to work with this new screen, and remaps the screen.
+;:
+;:**returns** the screen location
+;:
+:dview.newScreen
+SET B, [v.tusk.memStack] ;get the running process's memory
+SET B, [B+1] ;get the current dview instance's memory
+
+SET A, 0x180 ;enough memory for one full 12x80 screen
+JSR tusk.getMem
+
+SET PUSH, B
+ADD [B], 1 ;up the stack
+SET B, [B]
+SET [B], A ;put the new location on the stack
+
+SET B, POP
+SET C, [B+1] ;get the LEM1802 port
+
+SET A, 0 ;MEM_MAP_SCREEN
+SET B, [B] ;the pointer to the pointer to the screen location
+SET B, [B] ;make B the screen location ;(double instruction intentional)
+HWI C ;the LEM1802 port
+
+SET A, B ;return the screen location
+SET PC, POP
+
+;:### dview.close ()
+;:Closes the latest window for the currently running process, remapping to the one opened before that.
+;:
+:dview.close
+SET A, [v.tusk.memStack] ;get the running process's memory
+SET A, [A+1] ;get the current dview instance's memory

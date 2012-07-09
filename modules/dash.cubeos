@@ -17,10 +17,10 @@
 
 :dash.processMemory
 
-:v.promptLoc ;offset to literal prompt location
-DAT v.promptLoc - dash.processMemory
+:v.promptLoc DAT v.promptLoc - dash.processMemory
+;offset to literal prompt location
 
-;;:v.screenLoc DAT 2
+
 :v.args DAT v.args - dash.processMemory
 ;offset of pointer  
 
