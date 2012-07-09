@@ -65,20 +65,6 @@ DAT 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39 ; "0" - "9"
 DAT 0x61, 0x62, 0x63, 0x64, 0x65, 0x66 ; "a" - "f"
  ;
 
-;:### typ.wait (cycles)
-;:Waits for *cycles*.
-;:
-:typ.wait
-DIV A, 5
-SUB A, 1
-
-:typ.wait.loop
-SUB A, 1 ;number of cycles taken up by this loop divided by 5
-IFE A, 0
-  SET PC, typ.wait.loop
-
-SET PC, POP
-
 ;:### typ.asciitoh (inputPointer)
 ;:Scans a 4-character string in hex form and produces a single word output containing the value that string represents.
 ;:
