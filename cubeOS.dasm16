@@ -42,8 +42,8 @@ SET B, fontRAM
 JSR sv.init ;set up boot screen and screen
 
 SET A, 0x2000 ;heap location
-SET B, 0x5000 ;length
-SET C, 0x0040 ;block size (64)
+SET B, 0x1000 ;length
+SET C, 0x0100 ;block size (16 blocks)
 JSR heap.init
 
 JSR pih.init
@@ -914,17 +914,6 @@ SET C, POP
 SET B, POP
 RFI 0
  ;
-
-;:### pih.chOSMsg (msg, location)
-;:Redefines the OS (msg < 64) interrupt message to point at *location*.
-;:
-;:**modifies** A
-;:
-;:**returns** *msg*
-;:
-:pih.chOSMsg
-SET [pih.cmdtable + A], B
-SET PC, POP
 
 ;:### pih.newMsg (location)
 ;:Finds the first unused message greater than or equal to 64, but less than or equal to 127. It then makes *location* the location to jump to when that interrupt is triggered.
