@@ -54,6 +54,11 @@ SET PC, POP
 ;:**modifies** A
 ;:**returns** the first location of the reserved memory
 ;:
+:tusk.getMem.int
+SET A, PICK 4 ;restore from original interrupt push
+JSR tusk.getMem ;run the routine
+SET PC, pih.return ;return A
+ ;
 :tusk.getMem
 SET PUSH, B
 SET PUSH, C ;for the location the stack pointer is at
@@ -78,11 +83,18 @@ SET C, POP
 SET B, POP
 SET PC, POP
 
+
+
 ;:### tusk.dropMem ()
 ;:
 ;:
 ;:**does not modify registers**
 ;:
+:tusk.dropMem.int
+SET A, PICK 4 ;restore from original interrupt push
+JSR tusk.getMem ;run the routine
+SET PC, pih.return ;return A
+ ;
 :tusk.dropMem
 SET PUSH, A
 SET PUSH, B
