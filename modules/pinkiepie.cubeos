@@ -19,6 +19,9 @@
 ;:
 :pih.init
 IAS pih
+
+JSR pih.initMessages
+
 SET PC, POP
  ;
  
@@ -60,6 +63,23 @@ RFI 1
 ;:### Messages
 ;:Messages 0-63 are reserved for calls reagarding the OS.
 ;:Messages 64-127 are reserved for programs.
+;:
+:pih.initMessages
+
+;:#### 10: Reserve Heap Space
+;:Reserves the amount of words in A on the heap, and returns the location of the reserved memory in A.
+;:
+
+SET A, 10
+SET B, tusk.getMem.int
+JSR pih.chOSMsg
+
+;:#### 11
+SET A, 11
+SET B, tusk.dropMem.int
+JSR pih.chOSMsg
+
+SET PC, POP
 
 
 :pih.cmdtable
@@ -68,8 +88,22 @@ DAT 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xff
 :pihExit
 SET C, POP
 SET B, POP
-RFI 0
+
+RFI 1
  ;
+
+;:### pih.return ()
+;:Exits the interrupt handler, returning the value that is currently in A in the register A (avoiding clearing it during the return process.)
+;:
+;:**syntax** `SET PC, pih.returnVal` to exit
+;:
+:pih.return
+SET C, POP
+SET B, POP
+
+SET 0, POP ;discard the old A value
+SET PUSH, A ;replace it with the current A value
+RFI 1 ;POP A, POP PC, and disable interrupt queueing
 
 ;:### pih.chOSMsg (msg, location)
 ;:Redefines the OS (msg < 64) interrupt message to point at *location*.
