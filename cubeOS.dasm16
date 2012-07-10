@@ -1240,7 +1240,7 @@ SET [A], B ;make the first word in the memstack its stack pointer
 SET PUSH, A ;store memStack pointer
 
 SET A, [HW.LEM1802]
-JSR dview.init
+;JSR dview.init
 
 SET [v.tusk.memStack], POP
 
@@ -1302,15 +1302,18 @@ SET PUSH, B
 SET PUSH, C
 
 SET C, [v.tusk.memStack]
-SET C, [C] ;v.tusk.memStack pionts to a pointer
+SET C, [C] ;v.tusk.memStack points to a pointer
+           ;the pointer is the open space after the current memory, though
 
-SET A, [C]        ;retreive the location from the stack
-SET B, [C+0xffff] ;retreive the length from the stack
+SET A, [C+0xffff] ;retreive the location from the stack
+SET B, [C+0xfffe] ;retreive the length from the stack
 
 SET PUSH, B
+
 SUB C, 2 ;decrement the stack
 SET B, [v.tusk.memStack]
 SET [B], C
+
 SET B, POP
 
 JSR heap.free ;location, length
@@ -2974,23 +2977,15 @@ SET PC, package.memdump.skip
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
+SET A, 0x40
+JSR tusk.getMem
 
-SET A, [HW.LEM1802]
-JSR dview.init
+SET B, C
+JSR typ.htoascii
 
-JSR dview.newScreen
+JSR tusk.dropMem
 
-SET [A], 0xf030
-
-JSR dview.newScreen
-
-SET [A], 0xf031
-
-;SET A, 50000
-;JSR typ.wait
-
-JSR dview.close
-
+SET [A], 0
 SET PC, POP
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
