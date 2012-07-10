@@ -19,6 +19,9 @@
 ;:
 :pih.init
 IAS pih
+
+JSR pih.initMessages
+
 SET PC, POP
  ;
  
@@ -60,6 +63,22 @@ RFI 1
 ;:### Messages
 ;:Messages 0-63 are reserved for calls reagarding the OS.
 ;:Messages 64-127 are reserved for programs.
+:pih.initMessages
+
+;:#### 10: Reserve Heap Space
+;:Reserves the amount of words in A on the heap, and returns the location of the reserved memory in A.
+;:
+
+SET A, 10
+SET B, tusk.getMem.int
+JSR pih.chOSMsg
+
+;:#### 11
+SET A, 11
+SET B, tusk.dropMem.int
+JSR pih.chOSMsg
+
+SET PC, POP
 
 
 :pih.cmdtable
