@@ -84,6 +84,7 @@ SET C, A
 :typ.asciitoh.loop
 SET A, typ.htoascii.table
 SET B, [C]
+BOR B, 0x0020
 JSR typ.ffw
 
 SHL A, I
