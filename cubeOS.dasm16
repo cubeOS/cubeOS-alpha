@@ -2509,6 +2509,9 @@ SET PUSH, A
 SET A, 0x20
 JSR tusk.getMem
 
+SET B, [v.tusk.memStack]
+SET [B+1], A ;register this instance of dview to the currently running process
+
 SET [A], A
 ADD [A], 2 ;make the pointer its location plus one
 
@@ -2550,8 +2553,10 @@ SET PC, POP
 ;:Closes the latest window for the currently running process, remapping to the one opened before that.
 ;:
 :dview.close
-SET A, [v.tusk.memStack] ;get the running process's memory
-SET A, [A+1] ;get the current dview instance's memory
+SET B, [v.tusk.memStack] ;get the running process's memory
+SET B, [B+1] ;get the current dview instance's memory
+
+
 
 JSR tusk.dropMem ;does not modify registers
 
@@ -2928,6 +2933,15 @@ SET A, [HW.LEM1802]
 JSR dview.init
 
 JSR dview.newScreen
+
+SET [A], 0xf030
+
+JSR dview.newScreen
+
+SET [A], 0xf031
+
+;SET A, 50000
+;JSR typ.wait
 
 JSR dview.close
 
