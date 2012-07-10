@@ -38,10 +38,10 @@ SET [A], B ;make the first word in the memstack its stack pointer
 
 SET PUSH, A ;store memStack pointer
 
-SET A, [HW.LEM1802]
-;JSR dview.init
-
 SET [v.tusk.memStack], POP
+
+SET A, [HW.LEM1802]
+JSR dview.init
 
 SET A, POP ;make A the return value (pointer to memory)
 SET C, POP

@@ -1239,10 +1239,10 @@ SET [A], B ;make the first word in the memstack its stack pointer
 
 SET PUSH, A ;store memStack pointer
 
-SET A, [HW.LEM1802]
-;JSR dview.init
-
 SET [v.tusk.memStack], POP
+
+SET A, [HW.LEM1802]
+JSR dview.init
 
 SET A, POP ;make A the return value (pointer to memory)
 SET C, POP
@@ -2556,20 +2556,20 @@ SET PC, POP
 SET PUSH, A
 
 SET A, 0x20
-JSR tusk.getMem
+JSR heap.alloc
 
 SET B, [v.tusk.memStack]
 SET [B+1], A ;register this instance of dview to the currently running process
 
 SET [A], A
-ADD [A], 2 ;make the pointer its location plus one
+ADD [A], 2 ;make the pointer its location plus two
 
-SET [A+1], POP
+SET [A+1], POP ;make the second word in the memory the relevant LEM1802 port
 
 SET PC, POP
  ;
 
-;:### dview.newScrn ()
+;:### dview.newScreen ()
 ;:Initializes a new screen mapping for the currently running process, adjusts the dview pointers to work with this new screen, and remaps the screen.
 ;:
 ;:**returns** the screen location
@@ -2578,23 +2578,31 @@ SET PC, POP
 SET B, [v.tusk.memStack] ;get the running process's memory
 SET B, [B+1] ;get the current dview instance's memory
 
-SET A, 0x180 ;enough memory for one full 12x80 screen
-JSR tusk.getMem
+SET A, 0x180 ;enough memory for one full 12x32 screen
 
 SET PUSH, B
-ADD [B], 1 ;up the stack
-SET B, [B]
-SET [B], A ;put the new location on the stack
+JSR heap.alloc
+SET B, PEEK
 
-SET B, POP
+SET B, [B] ;the dview memstack pointer points to the first open index
+SET [B], A ;set the new value
+           ;will increase the memstack pointer after the hardware call
+
+SET B, PEEK
+
 SET C, [B+1] ;get the LEM1802 port
 
 SET A, 0 ;MEM_MAP_SCREEN
-SET B, [B] ;the pointer to the pointer to the screen location
-SET B, [B] ;make B the screen location ;(double instruction intentional)
+           ;B points to the word pointing to the new screen location
+SET B, [B] ;so make B the pointer pointing to the new screen location
+SET B, [B] ;literally, then make B the new screen location
 HWI C ;the LEM1802 port
 
 SET A, B ;return the screen location
+
+SET B, POP
+ADD [B], 1 ;move the stack pointer up
+
 SET PC, POP
  ;
 
@@ -2605,17 +2613,22 @@ SET PC, POP
 SET B, [v.tusk.memStack] ;get the running process's memory
 SET B, [B+1] ;get the current dview instance's memory
 
-
-
-JSR tusk.dropMem ;does not modify registers
-
-SUB [B], 1
-
+SUB [B], 1 ;move the memstack pointer down once
 SET C, [B+1] ;get the LEM1802 port
 
+SET PUSH, B ;store B while we remap the screen
+
 SET A, 0 ;MEM_MAP_SCREEN
-SET B, [B] ;the screen location to map to
+SET B, [B]        ;B is now the location of the pointer to the screen memory
+SET B, [B+0xffff] ;B is now the location of the pointer to the screen before
+                  ;the one we are unmapping
 HWI C
+
+SET B, POP ;restore B so that we can free the screen location we are dropping
+SET B, [B] ;make B the literal pointer to the screen memory we are dropping
+SET A, [B] ;make A the literal screen memory we are dropping
+SET B, 0x180 ;make B the length of a 12x32 screen
+JSR heap.free ;free the heap space
 
 SET PC, POP
  ;
@@ -2977,15 +2990,10 @@ SET PC, package.memdump.skip
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
-SET A, 0x40
-JSR tusk.getMem
+JSR dview.newScreen
 
-SET B, C
-JSR typ.htoascii
-
-JSR tusk.dropMem
-
-SET [A], 0
+SET [A], 0xf030
+SUB PC, 1 ;debug
 SET PC, POP
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
