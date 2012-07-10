@@ -49,6 +49,11 @@ SET PUSH, Z ;for memory location storage
 JSR tusk.newProcess
 SET Z, A
 
+JSR dview.newScreen ;get screen location
+
+SET B, fontRAM ;get fontRAM location
+JSR sv.init
+
 SET A, 0x80
 JSR tusk.getMem
 SET [Z+v.stdin], A ;store the pointer in memory + v.stdin offset

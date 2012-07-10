@@ -2043,6 +2043,11 @@ SET PUSH, Z ;for memory location storage
 JSR tusk.newProcess
 SET Z, A
 
+JSR dview.newScreen ;get screen location
+
+SET B, fontRAM ;get fontRAM location
+JSR sv.init
+
 SET A, 0x80
 JSR tusk.getMem
 SET [Z+v.stdin], A ;store the pointer in memory + v.stdin offset
@@ -2678,6 +2683,9 @@ JSR p.loadPackage
 SET A, package.pwd
 JSR p.loadPackage
 
+SET A, package.tdview
+JSR p.loadPackage
+
 SET A, package.showmaps
 JSR p.loadPackage
 
@@ -2993,7 +3001,15 @@ DAT "test", 0
 JSR dview.newScreen
 
 SET [A], 0xf030
-SUB PC, 1 ;debug
+
+SET A, 0xffff
+:package.test.loop
+SUB A, 1
+IFN A, 0
+  SET PC, package.test.loop
+
+JSR dview.close
+
 SET PC, POP
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
@@ -3056,6 +3072,23 @@ ADD C, 1
 SET A, v.cwds
 SET B, C
 SET PC, typ.cUnpack
+:package.tdview
+DAT 0xffab, 0xcdff
+DAT "tdview", 0
+
+JSR dview.newScreen
+
+SET [A], 0xf030
+
+SET A, 0xffff
+:package.tdview.loop
+SUB A, 1
+IFN A, 0
+  SET PC, package.tdview.loop
+
+JSR dview.close
+
+SET PC, POP
 :package.showmaps
 DAT 0xffab, 0xcdff
 DAT "showmaps", 0
