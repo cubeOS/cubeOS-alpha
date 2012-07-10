@@ -2551,6 +2551,11 @@ SET PC, POP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; DVIEW ; Windowing System ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;: **dview** is CubeOS's windowing system.
+;:
+
+;:## Framework
+;:
 
 ;:### dview.init (LEM1802port)
 ;:Reserves 32 words of memory on the stack for containing screen object locations, the first of which is a pointer to the currently active screen. Screens are added and removed as a "stack."
@@ -2635,6 +2640,36 @@ SET A, [B] ;make A the literal screen memory we are dropping
 SET B, 0x180 ;make B the length of a 12x32 screen
 JSR heap.free ;free the heap space
 
+SET PC, POP
+ ;
+
+;:## Screen Handling
+;:
+
+;:### dview.getLoc (xCoord, yCoord)
+;:Gets the memory location for the current screen at point (xCoord, yCoord).
+;:
+;:**modifies** A, B <br />
+;:**returns** literal memory location of that point on the current screen
+;:
+:dview.getLoc
+SET PUSH, C
+SET C, [v.tusk.memStack] ;get the running process's memory
+SET C, [C+1] ;get the current dview instance's memory
+
+SET C, [C]        ;get the pointer to the pointer to screen memory
+SET C, [C+0xffff] ;get the literal screen memory location
+                  ;(duplicate intentional)
+
+SHL B, 5 ;multiply by 32, the screen width
+
+ADD A, C ;add C to A to make A a location on the screen without line number
+SET C, POP ;release C
+
+IFG B, 0x11f  ;if B is past the end of the screen,
+  SET PC, exf ;exit false
+
+ADD A, B
 SET PC, POP
  ;
 
@@ -2998,18 +3033,15 @@ SET PC, package.memdump.skip
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
-JSR dview.newScreen
+SET A, 0x110
+JSR tusk.getMem
 
-SET [A], 0xf030
+SET B, C
+JSR typ.htoascii
 
-SET A, 0xffff
-:package.test.loop
-SUB A, 1
-IFN A, 0
-  SET PC, package.test.loop
+JSR tusk.dropMem
 
-JSR dview.close
-
+SET [A], 0
 SET PC, POP
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
@@ -3079,6 +3111,12 @@ DAT "tdview", 0
 JSR dview.newScreen
 
 SET [A], 0xf030
+
+SET A, 2
+SET B, 1
+JSR dview.getLoc
+
+SET [A], 0xf031
 
 SET A, 0xffff
 :package.tdview.loop
