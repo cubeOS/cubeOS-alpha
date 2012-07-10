@@ -39,7 +39,7 @@ SET [A], B ;make the first word in the memstack its stack pointer
 SET PUSH, A ;store memStack pointer
 
 SET A, [HW.LEM1802]
-JSR dview.init
+;JSR dview.init
 
 SET [v.tusk.memStack], POP
 
@@ -101,15 +101,18 @@ SET PUSH, B
 SET PUSH, C
 
 SET C, [v.tusk.memStack]
-SET C, [C] ;v.tusk.memStack pionts to a pointer
+SET C, [C] ;v.tusk.memStack points to a pointer
+           ;the pointer is the open space after the current memory, though
 
-SET A, [C]        ;retreive the location from the stack
-SET B, [C+0xffff] ;retreive the length from the stack
+SET A, [C+0xffff] ;retreive the location from the stack
+SET B, [C+0xfffe] ;retreive the length from the stack
 
 SET PUSH, B
+
 SUB C, 2 ;decrement the stack
 SET B, [v.tusk.memStack]
 SET [B], C
+
 SET B, POP
 
 JSR heap.free ;location, length
