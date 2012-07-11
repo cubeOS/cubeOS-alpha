@@ -123,8 +123,8 @@ ADD A, B
 SET PC, POP
  ;
 
-;:### dview.litWrite (x, y, pointer)
-;:Copies the null-terminated string from *pointer* to *x* and *y* onscreen.
+;:### dview.litWrite (x, y, inputPointer)
+;:Copies the null-terminated string from *inputPointer* to *x* and *y* onscreen.
 ;:
 ;:**returns** the screen location following the written text
 ;:
@@ -132,13 +132,20 @@ SET PC, POP
 JSR dview.getLoc
 
 SET B, A ;make B the output location
-SET A, C ;make A the input (pointer) locatin
+SET A, C ;make A the input (pointer) location
 SET PC, typ.cCopy ;c-style copy
 
-;:### dview.write (x, y, pointer)
-;:Writes ASCII to the current screen using special characters to act as directives. (This does not perform preprocessing such as translating normal ASCII into those special characters.) Special characters are as follows.
+;:### dview.write (outputPointer, inputPointer)
+;:Writes ASCII to the current screen using special characters to act as directives (see below.) (This does not perform preprocessing such as translating normal ASCII into those special characters.) Special characters are as follows.
 ;:**returns** the screen location following the written text
 ;:
+:dview.write.int
+SET A, PICK 4
+SET B, PICK 3
+JSR dview.write
+
+SET PC, pih.return
+
 :dview.write
 SET PUSH, X ;X will be the escape character flag
 SET PUSH, Y ;Y will be the effect carrier
@@ -147,11 +154,9 @@ SET PUSH, J ;J will be the output pointer
 
 SET X, 0
 SET Y, 0xf000 ;default to white on black
-SET I, C ;put the input location in I
 
-
-JSR dview.getLoc ;get output location
-SET J, A         ;put it in J
+SET J, A ;put the output location in J
+SET I, B ;put the input location in I
 
 :dview.write.loop
 SET A, 0x007F
@@ -178,7 +183,7 @@ AND X, 0xfff2 ;switch off the rightmost bit ("escaped")
 SET PC, dview.write.loop
 
 :dview.write.exit
-SET A, J ;return
+SET A, J ;return the screen location following the written text
 SET J, POP
 SET I, POP
 SET Y, POP
@@ -200,8 +205,8 @@ DAT dview.write.directive.none              ;0x05
 DAT dview.write.directive.none              ;0x06
 DAT dview.write.directive.none              ;0x07
 DAT dview.write.directive.none              ;0x08
-DAT dview.write.directive.none              ;0x09
-DAT dview.write.directive.none              ;0x0a
+DAT dview.write.directive.tab               ;0x09
+DAT dview.write.directive.newline           ;0x0a
 DAT dview.write.directive.none              ;0x0b
 DAT dview.write.directive.none              ;0x0c
 DAT dview.write.directive.none              ;0x0d
@@ -237,6 +242,47 @@ SET PC, dview.write.loop
 SET Y, 0xff80 ;take the first 9 bits
 AND Y, [I]    ;of the directive itself
 ADD I, 1      ;increase I
+SET PC, dview.write.loop
+
+;:#### Tab `0x09`
+;:**documentation pending** (defaults to tab 4)
+;:**syntax** `0x ll 09`` where `ll` is the number which the new screen location must be divisible by (for alignment)
+;:
+:dview.write.directive.tab
+SET A, 0
+SET B, 0
+JSR dview.getLoc ;get the screen start location
+
+SET B, 0xff00 ;get the first 8 bits
+AND B, [I]    ;of the directive
+SHR B, 8      ;and make them the first 8 bits of B
+
+IFE B, 0      ;if length was not given,
+  SET B, 4    ;default to length 4
+
+SUB J, A      ;make J a hypothetical screen index
+DIV J, B      ;divide by B, to make J the number of "B" amount passed
+ADD J, 1      ;add 1 to that number
+MUL J, B      ;multiply againt to get the hypothetical screen index
+ADD J, A      ;make J an index onscreen
+
+ADD I, 1 ;go past the directive
+SET PC, dview.write.loop
+
+;:#### New Line `0x0a`
+;:Jumps to the beginning of the next line, leaving NUL characters, and resumes writing.
+;:
+:dview.write.directive.newline
+SET A, 0
+SET B, 0
+JSR dview.getLoc ;get the screen start location
+
+SUB J, A      ;make J a hypothetical screen index
+AND J, 0xffe0 ;mod 32, to remove the X coord 
+ADD J, 32     ;add 32, to increase the Y coord
+ADD J, A      ;make J an index onscreen
+
+ADD I, 1 ;go past the directive
 SET PC, dview.write.loop
 
 ;:#### Display Hextet `0x1a`
@@ -279,3 +325,14 @@ BOR [A], Y ;otherwise, BOR in the effect in Y
 ADD A, 1   ;and increase A by 1
 SET PC, dview.write.directive.substitutehextet.color.loop
  ;
+
+;:### dview.prompt (screenOutputPointer, inputPointer, userTextOutput)
+;:Uses *dview.write* to write a prompt (from *inputPointer*) to *screenOutputPointer*, assuming the last non-null word pointed to by *inputPointer* is a cursor character, and will be moved accordingly as the user types.
+;:
+;:**under development**
+;:
+:dview.prompt
+SET PUSH, C
+JSR dview.write
+SET C, POP
+SET PC, POP
