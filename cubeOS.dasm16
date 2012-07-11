@@ -2673,6 +2673,163 @@ ADD A, B
 SET PC, POP
  ;
 
+;:### dview.litWrite (x, y, pointer)
+;:Copies the null-terminated string from *pointer* to *x* and *y* onscreen.
+;:
+;:**returns** the screen location following the written text
+;:
+:dview.litWrite
+JSR dview.getLoc
+
+SET B, A ;make B the output location
+SET A, C ;make A the input (pointer) locatin
+SET PC, typ.cCopy ;c-style copy
+
+;:### dview.write (x, y, pointer)
+;:Writes ASCII to the current screen using special characters to act as directives. (This does not perform preprocessing such as translating normal ASCII into those special characters.) Special characters are as follows.
+;:**returns** the screen location following the written text
+;:
+:dview.write
+SET PUSH, X ;X will be the escape character flag
+SET PUSH, Y ;Y will be the effect carrier
+SET PUSH, I ;I will be the input pointer
+SET PUSH, J ;J will be the output pointer
+
+SET X, 0
+SET Y, 0xf000 ;default to white on black
+SET I, C ;put the input location in I
+
+
+JSR dview.getLoc ;get output location
+SET J, A         ;put it in J
+
+:dview.write.loop
+SET A, 0x007F
+AND A, [I]    ;take the last 7 bits of the input word
+
+IFN X, 0
+  SET PC, dview.write.writechar
+
+IFE A, 0
+  SET PC, dview.write.exit
+
+IFE A, 0x5c ;if is "\"
+  SET PC, dview.write.escapechar
+
+IFL A, 0x20 ;if it is a directive character
+  SET PC, [A+dview.write.directive.table] ;jump to the relevant directive
+
+:dview.write.writechar
+BOR A, Y   ;BOR-in the effect
+STI [J], A ;write the character
+
+AND X, 0xfff2 ;switch off the rightmost bit ("escaped")
+
+SET PC, dview.write.loop
+
+:dview.write.exit
+SET A, J ;return
+SET J, POP
+SET I, POP
+SET Y, POP
+SET X, POP
+SET PC, POP
+
+:dview.write.escapechar
+SET X, 1 ;set the escape flag
+ADD I, 1 ;increase input location, but not output location
+SET PC, dview.write.loop
+
+:dview.write.directive.table
+DAT dview.write.directive.none              ;0x00
+DAT dview.write.directive.color             ;0x01
+DAT dview.write.directive.none              ;0x02
+DAT dview.write.directive.none              ;0x03
+DAT dview.write.directive.none              ;0x04
+DAT dview.write.directive.none              ;0x05
+DAT dview.write.directive.none              ;0x06
+DAT dview.write.directive.none              ;0x07
+DAT dview.write.directive.none              ;0x08
+DAT dview.write.directive.none              ;0x09
+DAT dview.write.directive.none              ;0x0a
+DAT dview.write.directive.none              ;0x0b
+DAT dview.write.directive.none              ;0x0c
+DAT dview.write.directive.none              ;0x0d
+DAT dview.write.directive.none              ;0x0e
+DAT dview.write.directive.none              ;0x0f
+DAT dview.write.directive.none              ;0x10
+DAT dview.write.directive.none              ;0x11
+DAT dview.write.directive.none              ;0x12
+DAT dview.write.directive.none              ;0x13
+DAT dview.write.directive.none              ;0x14
+DAT dview.write.directive.none              ;0x15
+DAT dview.write.directive.none              ;0x16
+DAT dview.write.directive.none              ;0x17
+DAT dview.write.directive.none              ;0x18
+DAT dview.write.directive.none              ;0x19
+DAT dview.write.directive.substitutehextet  ;0x1a
+DAT dview.write.directive.none              ;0x1b
+DAT dview.write.directive.none              ;0x1c
+DAT dview.write.directive.none              ;0x1d
+DAT dview.write.directive.none              ;0x1e
+DAT dview.write.directive.none              ;0x1f
+
+:dview.write.directive.none
+ADD I, 1 ;if not found, ignore the word
+SET PC, dview.write.loop
+
+;:#### Color `0x01`
+;:Substitutes the first nine bits of every word following this with the first nine bits of this word.
+;:**syntax** `0b ffff bbbb B000 0001`, where `ffff` is the foreground nibble, `bbbb` is the background nibble, and `B` is the flashing bit
+;:
+;:
+:dview.write.directive.color
+SET Y, 0xff80 ;take the first 9 bits
+AND Y, [I]    ;of the directive itself
+ADD I, 1      ;increase I
+SET PC, dview.write.loop
+
+;:#### Display Hextet `0x1a`
+;:Substitutes the literal hextet following the directive in ascii, obeying past color directives, according to the formatting implied by the leftmost 9 bits.
+;:**syntax** `0x ff 1a`, where `ff` are the formatting ASCII code
+;:
+;:##### Formatting ASCII codes
+;:
+;:**hexidecimal** `78` as referring to **x**
+;:
+:dview.write.directive.substitutehextet
+SET C, 0xff00 ;get the first 8 bits
+AND C, [I]    ;of the directive
+SHR C, 8      ;and make them the rightmost 8 bits of C
+
+SET A, [I+1] ;get the hextet to display
+SET B, J     ;get the output location
+
+SET PUSH, B
+SET PUSH, dview.write.directive.substitutehextet.color
+ ;when the formatting subroutine exits, go to this point
+
+IFE C, 0x78 ;hex style
+  SET PC, typ.htoascii
+
+SET PC, typ.htoascii ;default to hex
+
+:dview.write.directive.substitutehextet.color
+ADD I, 2 ;pass the directive and its following hextet
+SET J, A ;set J to the ending location of the hextet
+
+SET A, POP ;restore starting location to color in with Y
+           ;(J is already the starting location)
+
+:dview.write.directive.substitutehextet.color.loop
+IFE A, J ;if A is at the ending location,
+  SET PC, dview.write.loop ;exit the directive
+
+BOR [A], Y ;otherwise, BOR in the effect in Y
+ADD A, 1   ;and increase A by 1
+SET PC, dview.write.directive.substitutehextet.color.loop
+ ;
+
 ; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; PACKAGE ; Dash Package Handler ;
@@ -3112,11 +3269,10 @@ JSR dview.newScreen
 
 SET [A], 0xf030
 
-SET A, 2
+SET A, 1
 SET B, 1
-JSR dview.getLoc
-
-SET [A], 0xf031
+SET C, package.tdview.string
+JSR dview.write
 
 SET A, 0xffff
 :package.tdview.loop
@@ -3127,6 +3283,9 @@ IFN A, 0
 JSR dview.close
 
 SET PC, POP
+
+:package.tdview.string
+DAT "Displaying: ", 0x781a, 0xabcd, 0
 :package.showmaps
 DAT 0xffab, 0xcdff
 DAT "showmaps", 0
