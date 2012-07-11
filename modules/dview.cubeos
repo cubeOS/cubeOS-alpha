@@ -7,12 +7,13 @@
 ;:## Framework
 ;:
 
-;:### dview.init (LEM1802port)
+;:### dview.init (LEM1802port, GenericKeyboardPort)
 ;:Reserves 32 words of memory on the stack for containing screen object locations, the first of which is a pointer to the currently active screen. Screens are added and removed as a "stack."
 ;:
 ;:**returns** dview memory location
 ;:
 :dview.init
+SET PUSH, B
 SET PUSH, A
 
 SET A, 0x20
@@ -22,9 +23,10 @@ SET B, [v.tusk.memStack]
 SET [B+1], A ;register this instance of dview to the currently running process
 
 SET [A], A
-ADD [A], 2 ;make the pointer its location plus two
+ADD [A], 3 ;make the pointer its location plus three, for ports
 
 SET [A+1], POP ;make the second word in the memory the relevant LEM1802 port
+SET [A+2], POP ;make the third word in the memory the GenericKeyboard port
 
 SET PC, POP
  ;
@@ -222,7 +224,7 @@ DAT dview.write.directive.none              ;0x16
 DAT dview.write.directive.none              ;0x17
 DAT dview.write.directive.none              ;0x18
 DAT dview.write.directive.none              ;0x19
-DAT dview.write.directive.substitutehextet  ;0x1a
+DAT dview.write.directive.substitute        ;0x1a
 DAT dview.write.directive.none              ;0x1b
 DAT dview.write.directive.none              ;0x1c
 DAT dview.write.directive.none              ;0x1d
@@ -285,15 +287,17 @@ ADD J, A      ;make J an index onscreen
 ADD I, 1 ;go past the directive
 SET PC, dview.write.loop
 
-;:#### Display Hextet `0x1a`
-;:Substitutes the literal hextet following the directive in ascii, obeying past color directives, according to the formatting implied by the leftmost 9 bits.
+;:#### Substitute `0x1a`
+;:Substitutes the value following the directive as either a literal value, represented in ASCII, or a pointer to another ASCII string to be copied literally, obeying past color directives, according to the formatting implied by the leftmost 9 bits.
 ;:**syntax** `0x ff 1a`, where `ff` are the formatting ASCII code
 ;:
 ;:##### Formatting ASCII codes
 ;:
-;:**hexidecimal** `78` as referring to **x**
+;:**packed string** `70` as referring to **p**
+;:**string**        `73` as referring to **s**
+;:**hexidecimal**   `78` as referring to **x**
 ;:
-:dview.write.directive.substitutehextet
+:dview.write.directive.substitute
 SET C, 0xff00 ;get the first 8 bits
 AND C, [I]    ;of the directive
 SHR C, 8      ;and make them the rightmost 8 bits of C
@@ -302,28 +306,34 @@ SET A, [I+1] ;get the hextet to display
 SET B, J     ;get the output location
 
 SET PUSH, B
-SET PUSH, dview.write.directive.substitutehextet.color
+SET PUSH, dview.write.directive.substitute.color
  ;when the formatting subroutine exits, go to this point
 
-IFE C, 0x78 ;hex style
+IFE C, 0x70 ;packed string
+  SET PC, typ.cUnpack
+
+IFE C, 0x73 ;string
+  SET PC, typ.cCopy
+
+IFE C, 0x78 ;hexidecimal
   SET PC, typ.htoascii
 
-SET PC, typ.htoascii ;default to hex
+SET PC, typ.cCopy ;default to string
 
-:dview.write.directive.substitutehextet.color
-ADD I, 2 ;pass the directive and its following hextet
+:dview.write.directive.substitute.color
+ADD I, 2 ;pass the directive and the value following it
 SET J, A ;set J to the ending location of the hextet
 
 SET A, POP ;restore starting location to color in with Y
            ;(J is already the starting location)
 
-:dview.write.directive.substitutehextet.color.loop
+:dview.write.directive.substitute.color.loop
 IFE A, J ;if A is at the ending location,
   SET PC, dview.write.loop ;exit the directive
 
 BOR [A], Y ;otherwise, BOR in the effect in Y
 ADD A, 1   ;and increase A by 1
-SET PC, dview.write.directive.substitutehextet.color.loop
+SET PC, dview.write.directive.substitute.color.loop
  ;
 
 ;:### dview.prompt (screenOutputPointer, inputPointer, userTextOutput)
