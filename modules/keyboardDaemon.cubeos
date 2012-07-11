@@ -4,10 +4,10 @@
 ;:An instance of KeyboardDemon should be registered to any process that requires detection of keypresses. It requests an interrupt value from the operating system, and, when it detects that interrupt, writes the pressed key, if it is ASCII, to the location registered on its instantiation. (That location is, of course, incremented.)
 ;:
 
-
-:v.kd.writePointer DAT 0
+:v.kdmem
 
 ;:### kd.init (writePointer)
+;:
 ;:
 :kd.init
 
