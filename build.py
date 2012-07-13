@@ -6,7 +6,7 @@ kernel = ""
 location = os.path.dirname(os.path.abspath(sys.argv[0])) + os.sep
 
 modLoc = location + "modules" + os.sep
-moduleExtention = ".cubeos"
+moduleExtention = ".dasm16"
 modules = []
 
 packLoc = location + os.pardir + os.sep + "cubeOS-packages" + os.sep + "stdlib" + os.sep
