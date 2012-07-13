@@ -887,21 +887,25 @@ SET PC, POP
 :pih
 IAQ 1 ;trigger interrupt queueing
 
-IFG A, 128 ;If the message is too great
+SET PUSH, X
+SET A, PICK 2 ;get A before it was pushed to the stack
+
+IFG X, 128 ;If the message is too great
   RFI 1
 
-SET A, [A+pih.cmdtable]
+SET X, [X+pih.cmdtable]
 
-IFE A, 0xffff
+IFE X, 0xffff
   RFI 1
 
 SET PUSH, B
 SET PUSH, C
 
-JSR A
+JSR X
 
 SET C, POP
 SET B, POP
+SET X, POP
 RFI 1
 
 ;:### Messages
@@ -1600,13 +1604,83 @@ SET PC, POP
 ;;;;;;;;;;;;;;;;;;
 ;:An instance of KeyboardDemon should be registered to any process that requires detection of keypresses. It requests an interrupt value from the operating system, and, when it detects that interrupt, writes the pressed key, if it is ASCII, to the location registered on its instantiation. (That location is, of course, incremented.)
 ;:
-
-:v.kdmem
-
-;:### kd.init (writePointer)
+;:## The Handler
+;:All keyboards using KeyboardDaemon are given unique interrupt messages, all of which point *kd.keystroke*. 
 ;:
+:kd.keystroke
+
+;:## Data Structures
+;:
+;:### Daemon Instance List
+;:
+;:``` 
+;: +---------+
+;: |  Port0  | <- (in heap) location, stored in kd.daemonlist
+;: |  Msg 0  |
+;: | OptLoc0 |
+;: |  Port1  |
+;: |  Msg 1  |
+;: | OptLoc1 |
+;: |   ...   |
+;: +---------+
+;:```
+;:
+;:*Portx* refers to a Generic Keyboard port, and the *OptLocx* following directly after refers to the current "options" selection, which contains all of the information necessary to support a single keyboard (and integrates with dview.)
+;:
+;:### Option Block
+;:
+;:
+;:
+
+:kd.daemonlist
+DAT 0 ;memory location containing two memory locations per keyboard device
+
+:kd.length
+DAT 0 ;number of literal words in the daemon list
+
+;:### kd.init (slots)
+;:Initializes the keyboard handler with enough room for *slots* many Generic Keyboard devices.
 ;:
 :kd.init
+MUL A, 3 ;multiply by 3, because each keyboard has 3 words associated with it
+SET [kd.length], A
+JSR heap.alloc ;
+SET [kd.daemonlist], A
+SET PC, POP
+ ;
+
+;:### kd.newKeyboard (GenericKeyboard)
+;:Defines a new keyboard in the first open memory location carried by *kd.daemonlist*, as defined *kd.init*, or adds a new one if it doesn't exist.
+;:
+;:**returns** a pointer to the *GenericKeyboard*'s OptLoc word
+;:
+:kd.newKeyboard
+SET B, [kd.daemonlist]
+SET C, [kd.length]
+
+ADD C, B ;make C the ending location of the list
+
+:kd.newKeyboard.findexisting
+IFE [B], A ;if the port exists
+  SET PC, kd.newKeyboard.found
+
+ADD B, 2
+IFL B, C ;C will point to the very last OptLoc, so we use IFL to be safe
+  SET PC, kd.newKeyboard.findexisting
+
+SET PUSH, A ;save A
+SET A, [kd.daemonlist] ;make A the location to search
+JSR typ.ffz ;find the first zero
+
+;SHOULD IMPOSE CHECK
+
+SET [A], POP ;add the new port
+SET [A+1], 0 ;set the next word to 0, just in case
+;then continue as if we'd found the value
+
+:kd.newKeyboard.found
+ADD A, 1     ;add one to A, because we return the location of the OptLoc
+SET PC, POP
 
 
 
