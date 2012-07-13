@@ -53,7 +53,7 @@ SET A, 0
 SET B, 0
 HWI [HW.Speaker]
 
-JSR s.instance ;initialize DASH Shell
+JSR s.instance ;spawn an instance of the DASH Shell
 
 SET PC, halt
 

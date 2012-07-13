@@ -43,26 +43,31 @@ SET PC, POP
 :pih
 IAQ 1 ;trigger interrupt queueing
 
-IFG A, 128 ;If the message is too great
+SET PUSH, X
+SET A, PICK 2 ;get A before it was pushed to the stack
+
+IFG X, 128 ;If the message is too great
   RFI 1
 
-SET A, [A+pih.cmdtable]
+SET X, [X+pih.cmdtable]
 
-IFE A, 0xffff
+IFE X, 0xffff
   RFI 1
 
 SET PUSH, B
 SET PUSH, C
 
-JSR A
+JSR X
 
 SET C, POP
 SET B, POP
+SET X, POP
 RFI 1
 
 ;:### Messages
 ;:Messages 0-63 are reserved for calls reagarding the OS.
 ;:Messages 64-127 are reserved for programs.
+;:
 :pih.initMessages
 
 ;:#### 10: Reserve Heap Space
@@ -87,8 +92,22 @@ DAT 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xff
 :pihExit
 SET C, POP
 SET B, POP
-RFI 0
+
+RFI 1
  ;
+
+;:### pih.return ()
+;:Exits the interrupt handler, returning the value that is currently in A in the register A (avoiding clearing it during the return process.)
+;:
+;:**syntax** `SET PC, pih.returnVal` to exit
+;:
+:pih.return
+SET C, POP
+SET B, POP
+
+SET 0, POP ;discard the old A value
+SET PUSH, A ;replace it with the current A value
+RFI 1 ;POP A, POP PC, and disable interrupt queueing
 
 ;:### pih.chOSMsg (msg, location)
 ;:Redefines the OS (msg < 64) interrupt message to point at *location*.
