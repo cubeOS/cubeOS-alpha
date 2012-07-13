@@ -43,21 +43,25 @@ SET PC, POP
 :pih
 IAQ 1 ;trigger interrupt queueing
 
-IFG A, 128 ;If the message is too great
+SET PUSH, X
+SET A, PICK 2 ;get A before it was pushed to the stack
+
+IFG X, 128 ;If the message is too great
   RFI 1
 
-SET A, [A+pih.cmdtable]
+SET X, [X+pih.cmdtable]
 
-IFE A, 0xffff
+IFE X, 0xffff
   RFI 1
 
 SET PUSH, B
 SET PUSH, C
 
-JSR A
+JSR X
 
 SET C, POP
 SET B, POP
+SET X, POP
 RFI 1
 
 ;:### Messages
