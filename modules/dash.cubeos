@@ -14,35 +14,57 @@
 ;:## Subroutines
 
 :v.sPrompt DAT 0xF001, "$ ", 0
-:v.promptLoc DAT 0
 
-:v.stdin DAT 0
-:v.stdout DAT 0
+:dash.processMemory
 
-:v.argc DAT 0
+:v.promptLoc DAT v.promptLoc - dash.processMemory
+;offset to literal prompt location
+
+
+:v.args DAT v.args - dash.processMemory
+;offset of pointer  
+
+
+:v.argc DAT v.argc - dash.processMemory
+;offset to literal argc
+
+
+:v.stdin DAT v.stdin - dash.processMemory
+;offset to pointer to stdin
+
+
+:v.stdout DAT v.stdout - dash.processMemory
+;offset to pointer to stdout
+
+
+:s.stdin.quoteflag DAT s.stdin.quoteflag - dash.processMemory
+;offset to literal; is 1 if iterator is inside quotes
 
 ;:### s.instance
 ;:Prepares a new terminal session at the root directory.
 ;:
-;:1. SHOULD Set *v.cwds* to "/ " in packed form (`0x202F`)
-;:2. Clears the screen
-;:3. Calls *s.takeIn*
-;:4. Calls *s.parse*
-;:5. Calls *s.stdout* with the argument being the cursor location when the user pressed enter
-;:6. Loops nonendingly to 3
-;:
 :s.instance
+SET PUSH, Z ;for memory location storage
+
 JSR tusk.newProcess
+SET Z, A
+
+JSR dview.newScreen ;get screen location
+
+SET B, fontRAM ;get fontRAM location
+JSR sv.init
 
 SET A, 0x80
 JSR tusk.getMem
-SET [v.stdin], A ;v.stdin should not be static here
+SET [Z+v.stdin], A ;store the pointer in memory + v.stdin offset
 
 SET A, 0x80
 JSR tusk.getMem
-SET [v.stdout], A ;v.stdout should not be static here
+SET [Z+v.stdout], A ;store the pointer in memory + v.stdout offset
 
-;SHOULD ALSO REDEFINE THE SCREEN
+;SET A, 0x120 ;384 words, for the screen
+;JSR tusk.getMem
+;SET [Z+v.screenLoc], A
 
 JSR sv.clear ;clear the screen
 SET A, [v.scrnLoc]
@@ -151,10 +173,10 @@ SET PC, POP
 ;:This should also point the process to the starts of the remaining arguments.
 ;:
 :s.parse
-SET A, [v.stdout] ;prepare stdout by nullifying the first word
+SET A, [Z+v.stdout] ;prepare stdout by nullifying the first word
 SET [A], 0x0000   ;to overwrite old output if it exists
 
-SET A, [v.stdin] ;make both A and B the location of stdin
+SET A, [Z+v.stdin] ;make both A and B the location of stdin
 SET B, A         ;for length-finding later
 
 :s.parse.getFirstArg
@@ -179,8 +201,8 @@ SET PUSH, B ;push IA
 
 SET X, A ;jump to X
 SET A, [v.argc]   ;argc
-SET B, s.args     ;pointer to argv
-SET C, [v.stdout] ;output location
+SET B, v.args     ;pointer to argv
+SET C, [Z+v.stdout] ;output location
 
 JSR X ;calls the subroutine returned by *p.lookup*
 
@@ -221,21 +243,21 @@ SET PC, POP
 SET PUSH, I
 SET PUSH, J
 SET PUSH, X
-SET [v.argc], 1 ;set argc to 1 (including the zeroth argument)
+SET [Z+v.argc], 1 ;set argc to 1 (including the zeroth argument)
 SET I, A
 SET X, 1 ;the argument indexing index ($1, $2)
-SET B, [v.stdin]
+SET B, [Z+v.stdin]
 
-SET [s.args], B ;handle $0 separately
+SET [v.args], B ;handle $0 separately
 
 :s.stdin.loop
 STI [B], [I]
 AND [B], 0x007F
 
 IFE [B], 0x27 ;single quote
-  XOR [s.stdin.quoteflag], 1 ;flip state
+  XOR [Z+s.stdin.quoteflag], 1 ;flip state
   
-IFN [s.stdin.quoteflag], 1 ;unless they're quoted
+IFN [Z+s.stdin.quoteflag], 1 ;unless they're quoted
   IFE [B], 0x20 ;set spaces
     JSR s.stdin.newarg
 
@@ -246,24 +268,24 @@ IFN [I], 0
 
 SET [B], 0
 IFL X, 15
-  SET [s.args + J], 0 ;zero the pointer following the last argument
+  SET [v.args + J], 0 ;zero the pointer following the last argument
 SET X, POP
 SET J, POP
 SET I, POP
 SET PC, POP
 
 :s.stdin.newarg
-ADD [v.argc], 1
+ADD [Z+v.argc], 1
 SET [B], 0
 SET C, B
 ADD C, 1
 IFL X, 15
-  SET [s.args + X], C
+  SET [v.args + X], C
 ADD X, 1
 SET PC, POP
 
 
-:s.stdin.quoteflag DAT 0 ;is 1 if iterator is inside quotes
+
 ;:s.stdin.escflag DAT 0 ;is 1 if "\" was the most recent character
 
 ;:s.stdin.args ;for handling arguments
@@ -276,14 +298,13 @@ SET PC, POP
 JSR sv.getNewLine
 
 SET B, A ;output
-SET A, [v.stdout] ;input
+SET A, [Z+v.stdout] ;input
 SET PC, sv.write ;process to screen (null-terminated)
  ;
 ;;RESERVED SPACE
 
 ;for keeping track of where arguments are
-:s.args
-DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
 
 :v.cwd ;current working directory sector number
 DAT 0

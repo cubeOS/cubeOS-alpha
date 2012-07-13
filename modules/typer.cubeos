@@ -156,6 +156,8 @@ SET PC, POP
 ;:### typ.cUnpack (inputPointer, outputPointer)
 ;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) null-terminated at *inputPointer*(A) and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*(B).
 ;:
+;:**returns** the null location after the last unpacked character
+;:
 
 :typ.cUnpack
 SET PUSH, I
@@ -186,6 +188,7 @@ SET PC, typ.cUnpack.loop
 
 :typ.cUnpack.exit
 set [c], 0
+SET A, C
 SET I, POP
 SET PC, pop
 
