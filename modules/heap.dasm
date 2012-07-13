@@ -80,7 +80,6 @@ SET PC, POP
 ;:Reserves the first consecutive *length* of memory in the heap.
 ;:
 ;:**returns** the location of the reserved memory, <strike>or 1 if no such block of memory is available</strike>
-;:**UNDER DEVELOPMENT; DO NOT USE**
 ;:
 :heap.alloc
 SET PUSH, X

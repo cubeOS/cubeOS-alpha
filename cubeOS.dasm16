@@ -74,7 +74,7 @@ SET A, 0
 SET B, 0
 HWI [HW.Speaker]
 
-JSR s.instance ;initialize DASH Shell
+JSR s.instance ;spawn an instance of the DASH Shell
 
 SET PC, halt
 
@@ -887,26 +887,31 @@ SET PC, POP
 :pih
 IAQ 1 ;trigger interrupt queueing
 
-IFG A, 128 ;If the message is too great
+SET PUSH, X
+SET A, PICK 2 ;get A before it was pushed to the stack
+
+IFG X, 128 ;If the message is too great
   RFI 1
 
-SET A, [A+pih.cmdtable]
+SET X, [X+pih.cmdtable]
 
-IFE A, 0xffff
+IFE X, 0xffff
   RFI 1
 
 SET PUSH, B
 SET PUSH, C
 
-JSR A
+JSR X
 
 SET C, POP
 SET B, POP
+SET X, POP
 RFI 1
 
 ;:### Messages
 ;:Messages 0-63 are reserved for calls reagarding the OS.
 ;:Messages 64-127 are reserved for programs.
+;:
 :pih.initMessages
 
 ;:#### 10: Reserve Heap Space
@@ -931,8 +936,22 @@ DAT 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xff
 :pihExit
 SET C, POP
 SET B, POP
-RFI 0
+
+RFI 1
  ;
+
+;:### pih.return ()
+;:Exits the interrupt handler, returning the value that is currently in A in the register A (avoiding clearing it during the return process.)
+;:
+;:**syntax** `SET PC, pih.returnVal` to exit
+;:
+:pih.return
+SET C, POP
+SET B, POP
+
+SET 0, POP ;discard the old A value
+SET PUSH, A ;replace it with the current A value
+RFI 1 ;POP A, POP PC, and disable interrupt queueing
 
 ;:### pih.chOSMsg (msg, location)
 ;:Redefines the OS (msg < 64) interrupt message to point at *location*.
@@ -1198,63 +1217,115 @@ SET PC, POP
 ;:### tusk.newProcess
 ;:Registers a new process of unique ID. <strike>Adds the process id to the table at *v.tusk.PIDloc*.</strike>
 ;:
+;:**modifies** A
+;:**returns** a pointer to the first memory for the process's use
 ;:**under development**
 ;:
 :tusk.newProcess
-SET PUSH, A
 SET PUSH, B
 SET PUSH, C
 
 SET [v.tusk.runPID], [v.tusk.IDiterator] ;change to the new process
 ADD [v.tusk.IDiterator], 1 ;increase iterator by 1
 
-SET A, 0x40 ;reserve enough space for 31 memory slots (2 words per slot)
+SET A, 0x80 ;reserve 128 words, the first 64 for child memory
+            ;and the second for the process's actual use
 JSR heap.alloc
 
 SET B, A
-ADD B, 1 ;make B the index after A
+ADD B, 0x40 ;make B the first index of memory for the process's use
+SET PUSH, B
+
+SET B, A
+ADD B, 2 ;make B the index after the dview pointer
 
 SET [A], B ;make the first word in the memstack its stack pointer
 
-SET [v.tusk.memStack], A
-SET Y, [v.tusk.memStack] ;debug
+SET PUSH, A ;store memStack pointer
+
+SET [v.tusk.memStack], POP
+
+SET A, [HW.LEM1802]
+JSR dview.init
+
+SET A, POP ;make A the return value (pointer to memory)
+SET C, POP
+SET B, POP
+SET PC, POP
+
+;:### tusk.getMem (length)
+;:Reserves a *length* amount of memory from the heap using *heap.alloc*, and stores *length* and the location of the reserved memory on the "memory stack," which allows that memory to be freed either when the process calls *tusk.free* or when it terminates.
+;:
+;:**modifies** A
+;:**returns** the first location of the reserved memory
+;:
+:tusk.getMem.int
+SET A, PICK 4 ;restore from original interrupt push
+JSR tusk.getMem ;run the routine
+SET PC, pih.return ;return A
+ ;
+:tusk.getMem
+SET PUSH, B
+SET PUSH, C ;for the location the stack pointer is at
+
+SET C, [v.tusk.memStack]
+SET C, [C] ;v.tusk.memStack points to the pointer
+
+SET [C], A ;push length to the memstack
+ADD C, 1
+
+SET PUSH, C
+JSR heap.alloc
+SET C, POP
+
+SET [C], A ;push location to the memstack
+ADD C, 1
+
+SET B, [v.tusk.memStack]
+SET [B], C ;update the stack pointer carrier
+
+SET C, POP
+SET B, POP
+SET PC, POP
+
+
+
+;:### tusk.dropMem ()
+;:
+;:
+;:**does not modify registers**
+;:
+:tusk.dropMem.int
+SET A, PICK 4 ;restore from original interrupt push
+JSR tusk.getMem ;run the routine
+SET PC, pih.return ;return A
+ ;
+:tusk.dropMem
+SET PUSH, A
+SET PUSH, B
+SET PUSH, C
+
+SET C, [v.tusk.memStack]
+SET C, [C] ;v.tusk.memStack points to a pointer
+           ;the pointer is the open space after the current memory, though
+
+SET A, [C+0xffff] ;retreive the location from the stack
+SET B, [C+0xfffe] ;retreive the length from the stack
+
+SET PUSH, B
+
+SUB C, 2 ;decrement the stack
+SET B, [v.tusk.memStack]
+SET [B], C
+
+SET B, POP
+
+JSR heap.free ;location, length
 
 SET C, POP
 SET B, POP
 SET A, POP
 SET PC, POP
-
-;:### tusk.getMem (length)
-;:Reserves a *length* amount of memory from the heap using *heap.alloc*<strike>, such that the memory will be freed when the process terminates.</strike>
-;:
-;:**modifies** A
-;:**returns** the first location of the reserved memory
-;:
-:tusk.getMem
-SET PUSH, B
-SET PUSH, C
-;SET PUSH, Y ;for the stack pointer
-;SET PUSH, X ;for the location the stack pointer is at
-;SET Y, SP
-
-;SET X, [v.tusk.memStack]
-;SET SP, [X] ;recover from the stack pointer
-;SET Z, SP
-
-;SET PUSH, A ;push length to the memstack
-JSR heap.alloc
-;SET PUSH, A ;push location to the memstack
-
-;SET [X], SP ;update the stack pointer carrier
-
-;SET SP, Y
-;SET X, POP
-;SET Y, POP
-SET C, POP
-SET B, POP
-SET PC, POP
-
-;:### tusk.dropMem ()
 
 :tusk.PIDs ;64 open spaces
 DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -1417,6 +1488,8 @@ SET PC, POP
 ;:### typ.cUnpack (inputPointer, outputPointer)
 ;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) null-terminated at *inputPointer*(A) and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*(B).
 ;:
+;:**returns** the null location after the last unpacked character
+;:
 
 :typ.cUnpack
 SET PUSH, I
@@ -1447,6 +1520,7 @@ SET PC, typ.cUnpack.loop
 
 :typ.cUnpack.exit
 set [c], 0
+SET A, C
 SET I, POP
 SET PC, pop
 
@@ -1530,13 +1604,83 @@ SET PC, POP
 ;;;;;;;;;;;;;;;;;;
 ;:An instance of KeyboardDemon should be registered to any process that requires detection of keypresses. It requests an interrupt value from the operating system, and, when it detects that interrupt, writes the pressed key, if it is ASCII, to the location registered on its instantiation. (That location is, of course, incremented.)
 ;:
+;:## The Handler
+;:All keyboards using KeyboardDaemon are given unique interrupt messages, all of which point *kd.keystroke*. 
+;:
+:kd.keystroke
 
+;:## Data Structures
+;:
+;:### Daemon Instance List
+;:
+;:``` 
+;: +---------+
+;: |  Port0  | <- (in heap) location, stored in kd.daemonlist
+;: |  Msg 0  |
+;: | OptLoc0 |
+;: |  Port1  |
+;: |  Msg 1  |
+;: | OptLoc1 |
+;: |   ...   |
+;: +---------+
+;:```
+;:
+;:*Portx* refers to a Generic Keyboard port, and the *OptLocx* following directly after refers to the current "options" selection, which contains all of the information necessary to support a single keyboard (and integrates with dview.)
+;:
+;:### Option Block
+;:
+;:
+;:
 
-:v.kd.writePointer DAT 0
+:kd.daemonlist
+DAT 0 ;memory location containing two memory locations per keyboard device
 
-;:### kd.init (writePointer)
+:kd.length
+DAT 0 ;number of literal words in the daemon list
+
+;:### kd.init (slots)
+;:Initializes the keyboard handler with enough room for *slots* many Generic Keyboard devices.
 ;:
 :kd.init
+MUL A, 3 ;multiply by 3, because each keyboard has 3 words associated with it
+SET [kd.length], A
+JSR heap.alloc ;
+SET [kd.daemonlist], A
+SET PC, POP
+ ;
+
+;:### kd.newKeyboard (GenericKeyboard)
+;:Defines a new keyboard in the first open memory location carried by *kd.daemonlist*, as defined *kd.init*, or adds a new one if it doesn't exist.
+;:
+;:**returns** a pointer to the *GenericKeyboard*'s OptLoc word
+;:
+:kd.newKeyboard
+SET B, [kd.daemonlist]
+SET C, [kd.length]
+
+ADD C, B ;make C the ending location of the list
+
+:kd.newKeyboard.findexisting
+IFE [B], A ;if the port exists
+  SET PC, kd.newKeyboard.found
+
+ADD B, 2
+IFL B, C ;C will point to the very last OptLoc, so we use IFL to be safe
+  SET PC, kd.newKeyboard.findexisting
+
+SET PUSH, A ;save A
+SET A, [kd.daemonlist] ;make A the location to search
+JSR typ.ffz ;find the first zero
+
+;SHOULD IMPOSE CHECK
+
+SET [A], POP ;add the new port
+SET [A+1], 0 ;set the next word to 0, just in case
+;then continue as if we'd found the value
+
+:kd.newKeyboard.found
+ADD A, 1     ;add one to A, because we return the location of the OptLoc
+SET PC, POP
 
 
 
@@ -1941,35 +2085,57 @@ SET PC, POP
 ;:## Subroutines
 
 :v.sPrompt DAT 0xF001, "$ ", 0
-:v.promptLoc DAT 0
 
-:v.stdin DAT 0
-:v.stdout DAT 0
+:dash.processMemory
 
-:v.argc DAT 0
+:v.promptLoc DAT v.promptLoc - dash.processMemory
+;offset to literal prompt location
+
+
+:v.args DAT v.args - dash.processMemory
+;offset of pointer  
+
+
+:v.argc DAT v.argc - dash.processMemory
+;offset to literal argc
+
+
+:v.stdin DAT v.stdin - dash.processMemory
+;offset to pointer to stdin
+
+
+:v.stdout DAT v.stdout - dash.processMemory
+;offset to pointer to stdout
+
+
+:s.stdin.quoteflag DAT s.stdin.quoteflag - dash.processMemory
+;offset to literal; is 1 if iterator is inside quotes
 
 ;:### s.instance
 ;:Prepares a new terminal session at the root directory.
 ;:
-;:1. SHOULD Set *v.cwds* to "/ " in packed form (`0x202F`)
-;:2. Clears the screen
-;:3. Calls *s.takeIn*
-;:4. Calls *s.parse*
-;:5. Calls *s.stdout* with the argument being the cursor location when the user pressed enter
-;:6. Loops nonendingly to 3
-;:
 :s.instance
+SET PUSH, Z ;for memory location storage
+
 JSR tusk.newProcess
+SET Z, A
+
+JSR dview.newScreen ;get screen location
+
+SET B, fontRAM ;get fontRAM location
+JSR sv.init
 
 SET A, 0x80
 JSR tusk.getMem
-SET [v.stdin], A ;v.stdin should not be static here
+SET [Z+v.stdin], A ;store the pointer in memory + v.stdin offset
 
 SET A, 0x80
 JSR tusk.getMem
-SET [v.stdout], A ;v.stdout should not be static here
+SET [Z+v.stdout], A ;store the pointer in memory + v.stdout offset
 
-;SHOULD ALSO REDEFINE THE SCREEN
+;SET A, 0x120 ;384 words, for the screen
+;JSR tusk.getMem
+;SET [Z+v.screenLoc], A
 
 JSR sv.clear ;clear the screen
 SET A, [v.scrnLoc]
@@ -2078,10 +2244,10 @@ SET PC, POP
 ;:This should also point the process to the starts of the remaining arguments.
 ;:
 :s.parse
-SET A, [v.stdout] ;prepare stdout by nullifying the first word
+SET A, [Z+v.stdout] ;prepare stdout by nullifying the first word
 SET [A], 0x0000   ;to overwrite old output if it exists
 
-SET A, [v.stdin] ;make both A and B the location of stdin
+SET A, [Z+v.stdin] ;make both A and B the location of stdin
 SET B, A         ;for length-finding later
 
 :s.parse.getFirstArg
@@ -2106,8 +2272,8 @@ SET PUSH, B ;push IA
 
 SET X, A ;jump to X
 SET A, [v.argc]   ;argc
-SET B, s.args     ;pointer to argv
-SET C, [v.stdout] ;output location
+SET B, v.args     ;pointer to argv
+SET C, [Z+v.stdout] ;output location
 
 JSR X ;calls the subroutine returned by *p.lookup*
 
@@ -2148,21 +2314,21 @@ SET PC, POP
 SET PUSH, I
 SET PUSH, J
 SET PUSH, X
-SET [v.argc], 1 ;set argc to 1 (including the zeroth argument)
+SET [Z+v.argc], 1 ;set argc to 1 (including the zeroth argument)
 SET I, A
 SET X, 1 ;the argument indexing index ($1, $2)
-SET B, [v.stdin]
+SET B, [Z+v.stdin]
 
-SET [s.args], B ;handle $0 separately
+SET [v.args], B ;handle $0 separately
 
 :s.stdin.loop
 STI [B], [I]
 AND [B], 0x007F
 
 IFE [B], 0x27 ;single quote
-  XOR [s.stdin.quoteflag], 1 ;flip state
+  XOR [Z+s.stdin.quoteflag], 1 ;flip state
   
-IFN [s.stdin.quoteflag], 1 ;unless they're quoted
+IFN [Z+s.stdin.quoteflag], 1 ;unless they're quoted
   IFE [B], 0x20 ;set spaces
     JSR s.stdin.newarg
 
@@ -2173,24 +2339,24 @@ IFN [I], 0
 
 SET [B], 0
 IFL X, 15
-  SET [s.args + J], 0 ;zero the pointer following the last argument
+  SET [v.args + J], 0 ;zero the pointer following the last argument
 SET X, POP
 SET J, POP
 SET I, POP
 SET PC, POP
 
 :s.stdin.newarg
-ADD [v.argc], 1
+ADD [Z+v.argc], 1
 SET [B], 0
 SET C, B
 ADD C, 1
 IFL X, 15
-  SET [s.args + X], C
+  SET [v.args + X], C
 ADD X, 1
 SET PC, POP
 
 
-:s.stdin.quoteflag DAT 0 ;is 1 if iterator is inside quotes
+
 ;:s.stdin.escflag DAT 0 ;is 1 if "\" was the most recent character
 
 ;:s.stdin.args ;for handling arguments
@@ -2203,14 +2369,13 @@ SET PC, POP
 JSR sv.getNewLine
 
 SET B, A ;output
-SET A, [v.stdout] ;input
+SET A, [Z+v.stdout] ;input
 SET PC, sv.write ;process to screen (null-terminated)
  ;
 ;;RESERVED SPACE
 
 ;for keeping track of where arguments are
-:s.args
-DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
 
 :v.cwd ;current working directory sector number
 DAT 0
@@ -2301,7 +2466,6 @@ SET PC, POP
 ;:Reserves the first consecutive *length* of memory in the heap.
 ;:
 ;:**returns** the location of the reserved memory, <strike>or 1 if no such block of memory is available</strike>
-;:**UNDER DEVELOPMENT; DO NOT USE**
 ;:
 :heap.alloc
 SET PUSH, X
@@ -2461,6 +2625,356 @@ SET PC, POP
  ;;
 
 ; ; ; ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; DVIEW ; Windowing System ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;: **dview** is CubeOS's windowing system.
+;:
+
+;:## Framework
+;:
+
+;:### dview.init (LEM1802port, GenericKeyboardPort)
+;:Reserves 32 words of memory on the stack for containing screen object locations, the first of which is a pointer to the currently active screen. Screens are added and removed as a "stack."
+;:
+;:**returns** dview memory location
+;:
+:dview.init
+SET PUSH, B
+SET PUSH, A
+
+SET A, 0x20
+JSR heap.alloc
+
+SET B, [v.tusk.memStack]
+SET [B+1], A ;register this instance of dview to the currently running process
+
+SET [A], A
+ADD [A], 3 ;make the pointer its location plus three, for ports
+
+SET [A+1], POP ;make the second word in the memory the relevant LEM1802 port
+SET [A+2], POP ;make the third word in the memory the GenericKeyboard port
+
+SET PC, POP
+ ;
+
+;:### dview.newScreen ()
+;:Initializes a new screen mapping for the currently running process, adjusts the dview pointers to work with this new screen, and remaps the screen.
+;:
+;:**returns** the screen location
+;:
+:dview.newScreen
+SET B, [v.tusk.memStack] ;get the running process's memory
+SET B, [B+1] ;get the current dview instance's memory
+
+SET A, 0x180 ;enough memory for one full 12x32 screen
+
+SET PUSH, B
+JSR heap.alloc
+SET B, PEEK
+
+SET B, [B] ;the dview memstack pointer points to the first open index
+SET [B], A ;set the new value
+           ;will increase the memstack pointer after the hardware call
+
+SET B, PEEK
+
+SET C, [B+1] ;get the LEM1802 port
+
+SET A, 0 ;MEM_MAP_SCREEN
+           ;B points to the word pointing to the new screen location
+SET B, [B] ;so make B the pointer pointing to the new screen location
+SET B, [B] ;literally, then make B the new screen location
+HWI C ;the LEM1802 port
+
+SET A, B ;return the screen location
+
+SET B, POP
+ADD [B], 1 ;move the stack pointer up
+
+SET PC, POP
+ ;
+
+;:### dview.close ()
+;:Closes the latest window for the currently running process, remapping to the one opened before that.
+;:
+:dview.close
+SET B, [v.tusk.memStack] ;get the running process's memory
+SET B, [B+1] ;get the current dview instance's memory
+
+SUB [B], 1 ;move the memstack pointer down once
+SET C, [B+1] ;get the LEM1802 port
+
+SET PUSH, B ;store B while we remap the screen
+
+SET A, 0 ;MEM_MAP_SCREEN
+SET B, [B]        ;B is now the location of the pointer to the screen memory
+SET B, [B+0xffff] ;B is now the location of the pointer to the screen before
+                  ;the one we are unmapping
+HWI C
+
+SET B, POP ;restore B so that we can free the screen location we are dropping
+SET B, [B] ;make B the literal pointer to the screen memory we are dropping
+SET A, [B] ;make A the literal screen memory we are dropping
+SET B, 0x180 ;make B the length of a 12x32 screen
+JSR heap.free ;free the heap space
+
+SET PC, POP
+ ;
+
+;:## Screen Handling
+;:
+
+;:### dview.getLoc (xCoord, yCoord)
+;:Gets the memory location for the current screen at point (xCoord, yCoord).
+;:
+;:**modifies** A, B <br />
+;:**returns** literal memory location of that point on the current screen
+;:
+:dview.getLoc
+SET PUSH, C
+SET C, [v.tusk.memStack] ;get the running process's memory
+SET C, [C+1] ;get the current dview instance's memory
+
+SET C, [C]        ;get the pointer to the pointer to screen memory
+SET C, [C+0xffff] ;get the literal screen memory location
+                  ;(duplicate intentional)
+
+SHL B, 5 ;multiply by 32, the screen width
+
+ADD A, C ;add C to A to make A a location on the screen without line number
+SET C, POP ;release C
+
+IFG B, 0x11f  ;if B is past the end of the screen,
+  SET PC, exf ;exit false
+
+ADD A, B
+SET PC, POP
+ ;
+
+;:### dview.litWrite (x, y, inputPointer)
+;:Copies the null-terminated string from *inputPointer* to *x* and *y* onscreen.
+;:
+;:**returns** the screen location following the written text
+;:
+:dview.litWrite
+JSR dview.getLoc
+
+SET B, A ;make B the output location
+SET A, C ;make A the input (pointer) location
+SET PC, typ.cCopy ;c-style copy
+
+;:### dview.write (outputPointer, inputPointer)
+;:Writes ASCII to the current screen using special characters to act as directives (see below.) (This does not perform preprocessing such as translating normal ASCII into those special characters.) Special characters are as follows.
+;:**returns** the screen location following the written text
+;:
+:dview.write.int
+SET A, PICK 4
+SET B, PICK 3
+JSR dview.write
+
+SET PC, pih.return
+
+:dview.write
+SET PUSH, X ;X will be the escape character flag
+SET PUSH, Y ;Y will be the effect carrier
+SET PUSH, I ;I will be the input pointer
+SET PUSH, J ;J will be the output pointer
+
+SET X, 0
+SET Y, 0xf000 ;default to white on black
+
+SET J, A ;put the output location in J
+SET I, B ;put the input location in I
+
+:dview.write.loop
+SET A, 0x007F
+AND A, [I]    ;take the last 7 bits of the input word
+
+IFN X, 0
+  SET PC, dview.write.writechar
+
+IFE A, 0
+  SET PC, dview.write.exit
+
+IFE A, 0x5c ;if is "\"
+  SET PC, dview.write.escapechar
+
+IFL A, 0x20 ;if it is a directive character
+  SET PC, [A+dview.write.directive.table] ;jump to the relevant directive
+
+:dview.write.writechar
+BOR A, Y   ;BOR-in the effect
+STI [J], A ;write the character
+
+AND X, 0xfff2 ;switch off the rightmost bit ("escaped")
+
+SET PC, dview.write.loop
+
+:dview.write.exit
+SET A, J ;return the screen location following the written text
+SET J, POP
+SET I, POP
+SET Y, POP
+SET X, POP
+SET PC, POP
+
+:dview.write.escapechar
+SET X, 1 ;set the escape flag
+ADD I, 1 ;increase input location, but not output location
+SET PC, dview.write.loop
+
+:dview.write.directive.table
+DAT dview.write.directive.none              ;0x00
+DAT dview.write.directive.color             ;0x01
+DAT dview.write.directive.none              ;0x02
+DAT dview.write.directive.none              ;0x03
+DAT dview.write.directive.none              ;0x04
+DAT dview.write.directive.none              ;0x05
+DAT dview.write.directive.none              ;0x06
+DAT dview.write.directive.none              ;0x07
+DAT dview.write.directive.none              ;0x08
+DAT dview.write.directive.tab               ;0x09
+DAT dview.write.directive.newline           ;0x0a
+DAT dview.write.directive.none              ;0x0b
+DAT dview.write.directive.none              ;0x0c
+DAT dview.write.directive.none              ;0x0d
+DAT dview.write.directive.none              ;0x0e
+DAT dview.write.directive.none              ;0x0f
+DAT dview.write.directive.none              ;0x10
+DAT dview.write.directive.none              ;0x11
+DAT dview.write.directive.none              ;0x12
+DAT dview.write.directive.none              ;0x13
+DAT dview.write.directive.none              ;0x14
+DAT dview.write.directive.none              ;0x15
+DAT dview.write.directive.none              ;0x16
+DAT dview.write.directive.none              ;0x17
+DAT dview.write.directive.none              ;0x18
+DAT dview.write.directive.none              ;0x19
+DAT dview.write.directive.substitute        ;0x1a
+DAT dview.write.directive.none              ;0x1b
+DAT dview.write.directive.none              ;0x1c
+DAT dview.write.directive.none              ;0x1d
+DAT dview.write.directive.none              ;0x1e
+DAT dview.write.directive.none              ;0x1f
+
+:dview.write.directive.none
+ADD I, 1 ;if not found, ignore the word
+SET PC, dview.write.loop
+
+;:#### Color `0x01`
+;:Substitutes the first nine bits of every word following this with the first nine bits of this word.
+;:**syntax** `0b ffff bbbb B000 0001`, where `ffff` is the foreground nibble, `bbbb` is the background nibble, and `B` is the flashing bit
+;:
+;:
+:dview.write.directive.color
+SET Y, 0xff80 ;take the first 9 bits
+AND Y, [I]    ;of the directive itself
+ADD I, 1      ;increase I
+SET PC, dview.write.loop
+
+;:#### Tab `0x09`
+;:**documentation pending** (defaults to tab 4)
+;:**syntax** `0x ll 09`` where `ll` is the number which the new screen location must be divisible by (for alignment)
+;:
+:dview.write.directive.tab
+SET A, 0
+SET B, 0
+JSR dview.getLoc ;get the screen start location
+
+SET B, 0xff00 ;get the first 8 bits
+AND B, [I]    ;of the directive
+SHR B, 8      ;and make them the first 8 bits of B
+
+IFE B, 0      ;if length was not given,
+  SET B, 4    ;default to length 4
+
+SUB J, A      ;make J a hypothetical screen index
+DIV J, B      ;divide by B, to make J the number of "B" amount passed
+ADD J, 1      ;add 1 to that number
+MUL J, B      ;multiply againt to get the hypothetical screen index
+ADD J, A      ;make J an index onscreen
+
+ADD I, 1 ;go past the directive
+SET PC, dview.write.loop
+
+;:#### New Line `0x0a`
+;:Jumps to the beginning of the next line, leaving NUL characters, and resumes writing.
+;:
+:dview.write.directive.newline
+SET A, 0
+SET B, 0
+JSR dview.getLoc ;get the screen start location
+
+SUB J, A      ;make J a hypothetical screen index
+AND J, 0xffe0 ;mod 32, to remove the X coord 
+ADD J, 32     ;add 32, to increase the Y coord
+ADD J, A      ;make J an index onscreen
+
+ADD I, 1 ;go past the directive
+SET PC, dview.write.loop
+
+;:#### Substitute `0x1a`
+;:Substitutes the value following the directive as either a literal value, represented in ASCII, or a pointer to another ASCII string to be copied literally, obeying past color directives, according to the formatting implied by the leftmost 9 bits.
+;:**syntax** `0x ff 1a`, where `ff` are the formatting ASCII code
+;:
+;:##### Formatting ASCII codes
+;:
+;:**packed string** `70` as referring to **p**
+;:**string**        `73` as referring to **s**
+;:**hexidecimal**   `78` as referring to **x**
+;:
+:dview.write.directive.substitute
+SET C, 0xff00 ;get the first 8 bits
+AND C, [I]    ;of the directive
+SHR C, 8      ;and make them the rightmost 8 bits of C
+
+SET A, [I+1] ;get the hextet to display
+SET B, J     ;get the output location
+
+SET PUSH, B
+SET PUSH, dview.write.directive.substitute.color
+ ;when the formatting subroutine exits, go to this point
+
+IFE C, 0x70 ;packed string
+  SET PC, typ.cUnpack
+
+IFE C, 0x73 ;string
+  SET PC, typ.cCopy
+
+IFE C, 0x78 ;hexidecimal
+  SET PC, typ.htoascii
+
+SET PC, typ.cCopy ;default to string
+
+:dview.write.directive.substitute.color
+ADD I, 2 ;pass the directive and the value following it
+SET J, A ;set J to the ending location of the hextet
+
+SET A, POP ;restore starting location to color in with Y
+           ;(J is already the starting location)
+
+:dview.write.directive.substitute.color.loop
+IFE A, J ;if A is at the ending location,
+  SET PC, dview.write.loop ;exit the directive
+
+BOR [A], Y ;otherwise, BOR in the effect in Y
+ADD A, 1   ;and increase A by 1
+SET PC, dview.write.directive.substitute.color.loop
+ ;
+
+;:### dview.prompt (screenOutputPointer, inputPointer, userTextOutput)
+;:Uses *dview.write* to write a prompt (from *inputPointer*) to *screenOutputPointer*, assuming the last non-null word pointed to by *inputPointer* is a cursor character, and will be moved accordingly as the user types.
+;:
+;:**under development**
+;:
+:dview.prompt
+SET PUSH, C
+JSR dview.write
+SET C, POP
+SET PC, POP
+
+; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; PACKAGE ; Dash Package Handler ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2503,6 +3017,9 @@ SET A, package.touch
 JSR p.loadPackage
 
 SET A, package.pwd
+JSR p.loadPackage
+
+SET A, package.tdview
 JSR p.loadPackage
 
 SET A, package.showmaps
@@ -2817,23 +3334,15 @@ SET PC, package.memdump.skip
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
+SET A, 0x110
+JSR tusk.getMem
 
-SET A, [HW.LEM1802]
-JSR dview.init
+SET B, C
+JSR typ.htoascii
 
-JSR dview.newScreen
+JSR tusk.dropMem
 
-SET [A], 0xf030
-
-JSR dview.newScreen
-
-SET [A], 0xf031
-
-;SET A, 50000
-;JSR typ.wait
-
-JSR dview.close
-
+SET [A], 0
 SET PC, POP
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
@@ -2896,6 +3405,47 @@ ADD C, 1
 SET A, v.cwds
 SET B, C
 SET PC, typ.cUnpack
+:package.tdview
+DAT 0xffab, 0xcdff
+DAT "tdview", 0
+
+JSR dview.newScreen
+
+SET A, 0
+SET B, 0
+JSR dview.getLoc
+
+
+SET B, package.tdview.string0
+JSR dview.write
+
+SET B, package.tdview.prompt
+SET C, [Z+v.stdout]
+JSR dview.prompt
+
+SET A, 0xffff
+:package.tdview.loop
+SUB A, 1
+IFN A, 0
+  SET PC, package.tdview.loop
+
+JSR dview.close
+
+SET PC, POP
+
+:package.tdview.string0
+DAT "Literal (\\\\0x1): \\", 0x01, 0x0a
+DAT 0xc001, "R", 0xe001, "A", 0xa001, "I", 0x2001, "N", 0xb001, "B", 0x9001, "O", 0xd001, "W", 0x0a
+DAT 0xf001, "Displaying integer 0xabcd: ", 0x781a, 0xabcd, 0x0a
+DAT "tab 16", 0x1009, "tab 4", 0x0409, "!", 0x0a
+DAT "Substitution: ", 0x731a, package.tdview.string1, 0x0a
+DAT "again: ", 0x701a, package.tdview.pstring1, 0x0a, 0
+
+:package.tdview.string1 DAT "unpacked", 0
+:package.tdview.pstring1 DAT 0x6170, 0x6b63, 0x6465, 0
+
+:package.tdview.prompt
+DAT "Prompts!", 0x0a, 0x0f01, "Enter to exit:", 0xf001, " ", 0xf080, 0x1e, 0
 :package.showmaps
 DAT 0xffab, 0xcdff
 DAT "showmaps", 0
