@@ -92,9 +92,14 @@ SET B, 0 ;y 0
 JSR dview.getLoc ;get location 0
 
 ;CRASH REPORT PAGE HERE
+SET B, SYSTEM.CRASH.crashreport
+JSR dview.write
 
 SUB PC, 1
  ;
+:SYSTEM.CRASH.crashreport
+DAT "CubeOS has crashed.", 0
+
 
 ;:### ext
 ;:Exits a subroutine with A set to 0 (`TRUE`)
