@@ -7,6 +7,21 @@
 ;:All keyboards using KeyboardDaemon are given unique interrupt messages, all of which point *kd.keystroke*. 
 ;:
 :kd.keystroke
+SET B, A               ;word to find
+SET A, [kd.daemonlist] ;pointer
+JSR typ.ffw            ;find the word with this interrupt message,
+                       ;to identify the calling keyboard
+
+SUB A, 1     ;make A a pointer to the port number
+SET B, [A]   ;make B the port number
+SET A, [A+2] ;make A the configuration location
+
+;WRITING HERE
+IFN [A+2], 0
+  JSR [A+2] ;jump to "notify" location
+
+RFI 1 ;return from interrupt
+
 
 ;:## Data Structures
 ;:
@@ -28,11 +43,23 @@
 ;:
 ;:### Option Block
 ;:
-;:
+;:```
+;: +----------------+
+;: |  Direct Write  | <- the location at which to write the raw ascii
+;: |  Screen Write  | <- the location at which to write the colorized ascii
+;: | Notify On Exit | <- jumped to when "Exit Key" is pressed
+;: |    Exit Key    |
+;: |  Min-Position  | <- if 0, there is no minimum-position (onscreen)
+;: |  Max-Position  | <- if 0, there is no maximum-position (onscreen)
+;: |   Char Color   |
+;: |    Reserved    |
+;: |      ....      | <- Total length is 16 words
+;: +----------------+
+;:```
 ;:
 
 :kd.daemonlist
-DAT 0 ;memory location containing two memory locations per keyboard device
+DAT 0 ;memory location containing three memory locations per keyboard device
 
 :kd.length
 DAT 0 ;number of literal words in the daemon list
@@ -67,18 +94,38 @@ ADD B, 2
 IFL B, C ;C will point to the very last OptLoc, so we use IFL to be safe
   SET PC, kd.newKeyboard.findexisting
 
-SET PUSH, A ;save A
+SET PUSH, A ;save the port
 SET A, [kd.daemonlist] ;make A the location to search
 JSR typ.ffz ;find the first zero
+ADD A, [kd.daemonlist] ;typ.ffz adds the list
 
 ;SHOULD IMPOSE CHECK
 
-SET [A], POP ;add the new port
-SET [A+1], 0 ;set the next word to 0, just in case
+SET C, A ;need to use C instead, here, so A isn't lost
+
+SET [C], POP ;add the new port
+
+SET A, kd.keystroke ;make the location to jump to the keystroke handler
+JSR pih.newMsg ;make A a new interrupt message
+SET [C+1], A ;store the new message
+
+INT A
+
+SUB PC, 1
+
+SET B, A ;make B the new message
+SET A, 3 ;hardware call to enable interrupts with message in B
+HWI [C]  ;interrupt the GenericKeyboard port
+
+SUB PC, 1 ;debug
+
+SET [C+2], 0 ;set the next word to 0, just in case
+SET A, C ;set A to C, because we changed it earlier
 ;then continue as if we'd found the value
 
+
 :kd.newKeyboard.found
-ADD A, 1     ;add one to A, because we return the location of the OptLoc
+ADD A, 2     ;add two to A, because we return the location of the OptLoc
 SET PC, POP
 
 

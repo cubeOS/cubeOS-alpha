@@ -14,6 +14,8 @@
 ;:4. Invoke *s.instance* to intialize the DASH Shell
 ;:
 :__BOOT
+SET [0], 0x7f81 ;jump to SYSTEM.CRASH instruction if instruction 0 is ever reached
+
 JSR HWM
 
 SET A, videoRAM
@@ -79,6 +81,20 @@ SET SP, 0
 IAS 0
 SET PC, 0
 
+;:### SYSTEM.CRASH
+;:Is jumped to if the instruction at 0 is ever reached. Proceeds to print a crash report screen, and allow the user to restart.
+;:
+:SYSTEM.CRASH
+JSR dview.newScreen ;bind a new screen
+
+SET A, 0 ;x 0
+SET B, 0 ;y 0
+JSR dview.getLoc ;get location 0
+
+;CRASH REPORT PAGE HERE
+
+SUB PC, 1
+ ;
 
 ;:### ext
 ;:Exits a subroutine with A set to 0 (`TRUE`)
