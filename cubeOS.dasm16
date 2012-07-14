@@ -10,6 +10,7 @@
 ;
 ;
 SET PC, __BOOT
+DAT SYSTEM.CRASH
 ;;;;;;;
 ; ENV ;
 ;;;;;;;
@@ -35,6 +36,8 @@ SET PC, __BOOT
 ;:4. Invoke *s.instance* to intialize the DASH Shell
 ;:
 :__BOOT
+SET [0], 0x7f81 ;jump to SYSTEM.CRASH instruction if instruction 0 is ever reached
+
 JSR HWM
 
 SET A, videoRAM
@@ -100,6 +103,12 @@ SET SP, 0
 IAS 0
 SET PC, 0
 
+;:### SYSTEM.CRASH
+;:Is jumped to if the instruction at 0 is ever reached. Proceeds to print a crash report screen, and allow the user to restart.
+;:
+:SYSTEM.CRASH
+SUB PC, 1
+ ;
 
 ;:### ext
 ;:Exits a subroutine with A set to 0 (`TRUE`)
@@ -120,6 +129,225 @@ SET PC, POP
  ;
  ;;
  
+
+; ; ; ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SIMVID ; Video Manager ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+:v.scrnLoc DAT 0
+:v.scrnEnd DAT 0
+:v.scrnHeight DAT 12
+:v.scrnWidth DAT 32
+
+;:### sv.init (videoRAMPointer, fontRAMPointer)
+;:Maps the screen's font to *fontRAMPointer* and the screen's video ram to *videoRAMPointer* in that order.
+;:
+:sv.init
+
+SET PUSH, A
+SET A, 1
+HWI [HW.LEM1802] ;MEM_MAP_FONT
+
+SET B, POP
+SET A, 0
+HWI [HW.LEM1802] ;MEM_MAP_SCREEN
+
+SET [v.scrnLoc], B
+ADD B, 0x180
+SET [v.scrnEnd], B
+SET PC, POP
+ ;
+
+;:### sv.newWindow
+;:Reserves screen space in the heap, maps the screen to it.
+;:
+;:**returns** the first index in the new screen location
+;:
+:sv.newWindow
+SET A, 0x120
+JSR tusk.getMem ;reserve 384 words
+
+SET B, A
+SET A, 0
+HWI [HW.LEM1802] ;remap the screen to this heap location
+
+SET A, B ;return the location of the screen
+SET PC, POP
+
+;:### sv.write (inputPointer, outputPointer)
+;:Writes ASCII to the screen using special characters to act as directives. (This does not perform preprocessing such as translating normal ASCII into those special characters.) Special characters are as follows.
+;:**returns** the location of the null following the written text
+;:
+;:#### Color `0x01`
+;:Substitutes the first nine bits of every word following this with the first nine bits of this word.
+;:
+;:
+;:
+:sv.write
+IFC [A], 0x007F ;if the last 7 bits are 0b0000 000
+  SET PC, sv.write.exitEarly ;exit early
+
+SET PUSH, I
+SET PUSH, J
+
+SET I, A
+SET J, B
+SET [sv.write.v.color], 0xF000 ;default to white on black
+
+:sv.write.loop
+SET A, [I]
+AND A, 0x007F
+
+IFE A, 0x01
+  SET PC, sv.write.s.color
+
+BOR A, [sv.write.v.color]
+
+STI [J], A ;set the destination to the processed source and increment destination pointer and source pointer
+
+IFN [I], 0
+  SET PC, sv.write.loop
+  
+SET [J], [I] ;write the terminating null
+
+SET A, J
+SET J, POP
+SET I, POP
+SET PC, POP
+
+:sv.write.exitEarly
+SET [B], 0x0000 ;make the first word in the output null
+SET A, B ;return the index that sv.write would have written to
+         ;if there had been content
+SET PC, POP
+
+:sv.write.s.color
+SET [sv.write.v.color], [I]
+AND [sv.write.v.color], 0xFF80 ;first 9 bits
+ADD I, 1 ;increment the source, but not the destination
+SET PC, sv.write.loop
+
+:sv.write.v.color DAT 0
+ ;
+ 
+:sv.clear
+SET PUSH, I
+SET PUSH, J
+
+SET I, [v.scrnLoc]
+
+:sv.clear.loop
+STI [I], 0
+
+IFL I, [v.scrnEnd]
+  SET PC, sv.clear.loop
+
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
+
+:sv.getLoc ; (xOffset, yOffset)
+IFL A, [v.scrnWidth]
+  IFL B, [v.scrnHeight]
+    SET PC, sv.getLoc.loc ;if onscreen, continue
+SET PC, exf
+
+:sv.getLoc.loc
+MUL B, [v.scrnWidth] ;make yOffset a line index
+ADD A, B              ;combine them
+ADD A, [v.scrnLoc]    ;make the index an index onscreen
+SET PC, POP           ;return in A
+ ;
+
+:sv.autoScroll ; () does not modify registers
+SET PUSH, X
+
+SET X, [v.scrnEnd]
+SUB X, [v.scrnWidth]
+
+IFE [X], 0
+  SET PC, sv.autoScroll.ex
+
+SET PUSH, I
+SET PUSH, J
+SET I, [v.scrnLoc]
+SET J, I
+ADD J, [v.scrnWidth]
+
+:sv.autoScroll.loop
+STI [I], [J]
+IFN J, X
+  SET PC, sv.autoScroll.loop
+
+SET X, J
+:sv.autoScroll.looplast
+STI [I], [X]
+SET [X], 0
+ADD X, 1
+IFG X, [v.scrnEnd]
+  SET PC, sv.autoScroll.subex
+SET PC, sv.autoScroll.looplast
+
+:sv.autoScroll.subex
+SET J, POP
+SET I, POP
+
+:sv.autoScroll.ex
+SET X, POP
+SET PC, POP
+ ;
+
+:sv.scrollUp
+SET PUSH, I
+SET PUSH, J
+
+SET I, [v.scrnLoc]
+SET J, I
+ADD J, [v.scrnWidth]
+
+:sv.scrollUp.loop
+STI [I], [J]
+IFL J, [v.scrnEnd]
+  SET PC, sv.scrollUp.loop
+
+:sv.scrollUp.clearLast
+SET I, [v.scrnEnd]
+SUB I, [v.scrnWidth]
+
+:sv.scrollUp.clearLast.loop
+STI [I], 0
+IFL I, [v.scrnEnd]
+  SET PC, sv.scrollUp.clearLast.loop
+
+SET J, POP
+SET I, POP
+SUB I, [v.scrnWidth] ;adjust I for caller, hopefully
+SET PC, POP
+ ;
+ 
+:sv.getNewLine ; (currentLoc)
+SET PUSH, I
+SET I, [v.scrnLoc]
+JSR sv.autoScroll
+SET PC, sv.getNewLine.loop.sub
+
+:sv.getNewLine.loop
+ADD I, [v.scrnWidth]
+
+:sv.getNewLine.loop.sub
+IFG A, I ;exit successful if line scrnindex >= currentindex
+  SET PC, sv.getNewLine.loop
+
+IFE I, [v.scrnEnd]
+  SUB I, [v.scrnWidth]
+
+SET A, I
+SET I, POP
+SET PC, POP
+ ;
+ ;;
 
 ; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -155,6 +383,722 @@ DAT 0,0,0xF01F,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01C,  0xF01C,0xF01C,0xF01C,0xF01
 DAT 0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0,  0,0,0,0
  ;
  ;;
+
+; ; ; ;
+;RETURNS INCORRECT VALUE IF DOING HASHGET ON AN UNPRESENT VALUE
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; DATALIB ; Data Managing Library ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;:DataLib is a library for managing arbitrary amounts of data with relative speed and efficiency.
+;:
+
+;:## Hash Table
+;:Subroutines for creating and searching hash tables, which are sorted tables that store values under names
+;:
+
+;:### dl.makeHashTable (headerPointer, indicies, startingLength)
+;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. *length* is not the total length of the table, but rather the number of occupied indicies.
+;:**returns** *headerPointer*
+;:
+:dl.makeHashTable
+SET [A], 0x5468 ;"hT" magic number
+SET [A+1], B ;indicies
+SET [A+2], C ;length
+SET [A+3], 0 ;reserved
+SET PC, POP
+ ;
+
+;:### dl.hashGet (searchTerm, hashTablePointer)
+;:Searches the hash table at *hashTablePointer* for *searchTerm* in the lookup portion of it. It returns the value in the value portion associated with the searchTerm.
+;:
+;:**returns** value associated by the hash table with *searchTerm*, or 1 if it could not be found
+;:**development version** 
+;:
+:dl.hashGet
+SET PUSH, [B+1] ;store the number of indicies
+
+SET C, [B+2] ;length
+ADD B, 4 ;location
+JSR dl.searchValTable
+
+IFE A, 1
+  SET PC, dl.hashGet.exf
+
+ADD A, POP ;make A an index in the value table
+SET A, [A] ;return the value, rather than the index
+SET PC, POP
+
+:dl.hashGet.exf
+;A is 1
+SET B, POP
+SET PC, POP
+ ;
+
+;:### dl.hashInsert (lookupValue, insertValue, hashTablePointer)
+;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table. This is designed to work very well with the 16-bit hashing algorithm crp.dsHash.
+;:
+;:**under development**
+;:
+:dl.hashInsert
+SET PUSH, B ;store *insertValue*
+SET PUSH, [C+1] ;store *indicies* from header
+SET PUSH, C ;store pointer to header
+
+SET B, C
+ADD B, 4 ;start of sortedTable (for lookups)
+SET C, [C+2] ;length of sortedTable
+
+JSR dl.sortedInsert
+
+SET C, POP
+ADD [C+2], 1 ;add one to the length
+
+ADD A, POP ;retrieve *indicies* from stack
+
+SET B, A
+SET A, POP ;retrieve *insertValue* from stack
+
+SET PC, dl.unsortedInsert
+ ;
+
+;:## Sorted Table
+;:Subroutines for creating and searching sorted tables
+;:
+
+;:### dl.sortedInsert (insertValue, tableLocation, tableLength)
+;:Inserts *insertValue* into the sorted table at *tableLocation* of *tableLength*, maintaining the sortedness of the table.
+;:
+;:**returns** location of insert<strike>, or 1 if the value is already present in the table</strike>
+;:
+:dl.sortedInsert
+SET PUSH, A
+JSR dl.findInsertIndex
+
+;NEED TO HANDLE DUPLICATE ENTRY
+
+SET B, A
+SET A, POP
+SET PC, dl.unsortedInsert ;exit when this subroutine exits
+ ;
+
+;:### dl.searchValTable (searchTerm, tableLocation, tableLength)
+;:Performs a binary search on the table at *tableLocation* (with length *tableLength*) for *searchTerm* and returns the memory location
+;:
+:dl.searchValTable
+IFE C, 0 ;if *tableLength* is zero, return the tableLocation
+  SET PC, dl.searchValTable.noLength
+
+IFE C, 1
+  SET PC, dl.searchValTable.lengthOne
+
+SET PUSH, I
+
+:dl.searchValTable.recheck
+SET I, C
+SHR I, 1 ;divide by 2
+ADD I, B
+
+IFE [I], A
+SET PC, dl.searchValTable.found
+
+IFE C, 1
+  SET PC, dl.searchValTable.exf
+
+IFG A, [I]
+  SET PC, dl.searchValTable.toolow
+
+IFL A, [I]
+  SET PC, dl.searchValTable.toohigh
+
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.toohigh
+SET C, I
+SUB C, B
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.toolow
+ADD C, B
+SUB C, I
+SET B, I
+SET PC, dl.searchValTable.recheck
+
+:dl.searchValTable.found
+SET A, I
+SET I, POP
+SET PC, POP
+
+:dl.searchValTable.noLength
+SET A, B
+SET PC, POP
+
+:dl.searchValTable.lengthOne
+IFG A, [B] ;if *insertValue* is greater than the existing value
+  ADD B, 1 ;look at the second value
+
+SET A, B ;return B
+SET PC, POP
+
+:dl.searchValTable.exf
+SET A, 1
+SET I, POP
+SET PC, POP
+ ;
+
+;:### dl.findInsertIndex (searchTerm, tableLocation, tableLength)
+;:Returns the index at which *searchTerm* should be inserted to keep the table at *tableLocation* with length *tableLength* sorted.
+;:
+:dl.findInsertIndex
+JSR dl.searchValTable
+
+IFE A, 1 ;if the value isn't there
+  ADD A, B ;add B to make it the index to insert at
+
+;DO SOMETHING IF A != 1 AND LENGTH ISN'T LOW
+  
+SET PC, POP
+ ;
+ 
+;:### dl.unsortedInsert (insertValue, insertLocation)
+;:Inserts *insertValue* at *insertLocation* and pushes the value it would replace upward in memory recursively until only a null is overwritten.
+;:**returns** *insertLocation*
+;:
+:dl.unsortedInsert
+SET PUSH, I
+SET PUSH, J
+SET PUSH, X ;SHOULD JUST USE A
+SET PUSH, Y ;SHOULD JUST USE B
+
+SET PUSH, B
+SET I, B
+SET X, A
+
+:dl.unsortedInsert.loop
+IFE X, 0
+  SET PC, dl.unsortedInsert.exit
+SET Y, [I]
+STI [I], X
+SET X, Y
+
+SET PC, dl.unsortedInsert.loop
+
+:dl.unsortedInsert.exit
+SET A, POP
+SET Y, POP
+SET X, POP
+SET I, POP
+SET J, POP
+SET PC, POP
+ ;
+ ;;
+ 
+
+:screendata
+:ht dat 0,0,0,0
+
+; ; ; ;
+;;;;;;;;;;;;;;;;;;
+; KeyboardDaemon ;
+;;;;;;;;;;;;;;;;;;
+;:An instance of KeyboardDemon should be registered to any process that requires detection of keypresses. It requests an interrupt value from the operating system, and, when it detects that interrupt, writes the pressed key, if it is ASCII, to the location registered on its instantiation. (That location is, of course, incremented.)
+;:
+;:## The Handler
+;:All keyboards using KeyboardDaemon are given unique interrupt messages, all of which point *kd.keystroke*. 
+;:
+:kd.keystroke
+SET B, A               ;word to find
+SET A, [kd.daemonlist] ;pointer
+JSR typ.ffw            ;find the word with this interrupt message,
+                       ;to identify the calling keyboard
+
+SUB A, 1     ;make A a pointer to the port number
+SET B, [A]   ;make B the port number
+SET A, [A+2] ;make A the configuration location
+
+;WRITING HERE
+IFN [A+2], 0
+  JSR [A+2] ;jump to "notify" location
+
+RFI 1 ;return from interrupt
+
+
+;:## Data Structures
+;:
+;:### Daemon Instance List
+;:
+;:``` 
+;: +---------+
+;: |  Port0  | <- (in heap) location, stored in kd.daemonlist
+;: |  Msg 0  |
+;: | OptLoc0 |
+;: |  Port1  |
+;: |  Msg 1  |
+;: | OptLoc1 |
+;: |   ...   |
+;: +---------+
+;:```
+;:
+;:*Portx* refers to a Generic Keyboard port, and the *OptLocx* following directly after refers to the current "options" selection, which contains all of the information necessary to support a single keyboard (and integrates with dview.)
+;:
+;:### Option Block
+;:
+;:```
+;: +----------------+
+;: |  Direct Write  | <- the location at which to write the raw ascii
+;: |  Screen Write  | <- the location at which to write the colorized ascii
+;: | Notify On Exit | <- jumped to when "Exit Key" is pressed
+;: |    Exit Key    |
+;: |  Min-Position  | <- if 0, there is no minimum-position (onscreen)
+;: |  Max-Position  | <- if 0, there is no maximum-position (onscreen)
+;: |   Char Color   |
+;: |    Reserved    |
+;: |      ....      | <- Total length is 16 words
+;: +----------------+
+;:```
+;:
+
+:kd.daemonlist
+DAT 0 ;memory location containing three memory locations per keyboard device
+
+:kd.length
+DAT 0 ;number of literal words in the daemon list
+
+;:### kd.init (slots)
+;:Initializes the keyboard handler with enough room for *slots* many Generic Keyboard devices.
+;:
+:kd.init
+MUL A, 3 ;multiply by 3, because each keyboard has 3 words associated with it
+SET [kd.length], A
+JSR heap.alloc ;
+SET [kd.daemonlist], A
+SET PC, POP
+ ;
+
+;:### kd.newKeyboard (GenericKeyboard)
+;:Defines a new keyboard in the first open memory location carried by *kd.daemonlist*, as defined *kd.init*, or adds a new one if it doesn't exist.
+;:
+;:**returns** a pointer to the *GenericKeyboard*'s OptLoc word
+;:
+:kd.newKeyboard
+SET B, [kd.daemonlist]
+SET C, [kd.length]
+
+ADD C, B ;make C the ending location of the list
+
+:kd.newKeyboard.findexisting
+IFE [B], A ;if the port exists
+  SET PC, kd.newKeyboard.found
+
+ADD B, 2
+IFL B, C ;C will point to the very last OptLoc, so we use IFL to be safe
+  SET PC, kd.newKeyboard.findexisting
+
+SET PUSH, A ;save the port
+SET A, [kd.daemonlist] ;make A the location to search
+JSR typ.ffz ;find the first zero
+ADD A, [kd.daemonlist] ;typ.ffz adds the list
+
+;SHOULD IMPOSE CHECK
+
+SET C, A ;need to use C instead, here, so A isn't lost
+
+SET [C], POP ;add the new port
+
+SET A, kd.keystroke ;make the location to jump to the keystroke handler
+JSR pih.newMsg ;make A a new interrupt message
+SET [C+1], A ;store the new message
+
+INT A
+
+SUB PC, 1
+
+SET B, A ;make B the new message
+SET A, 3 ;hardware call to enable interrupts with message in B
+HWI [C]  ;interrupt the GenericKeyboard port
+
+SUB PC, 1 ;debug
+
+SET [C+2], 0 ;set the next word to 0, just in case
+SET A, C ;set A to C, because we changed it earlier
+;then continue as if we'd found the value
+
+
+:kd.newKeyboard.found
+ADD A, 2     ;add two to A, because we return the location of the OptLoc
+SET PC, POP
+
+
+
+; ; ; ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; TYPER ; Data and String Handler ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:### typ.ffw (pointer, word)
+;:**F**inds the **f**irst **w**ord matching *word* after *pointer*, and returns the number of words between *pointer* and that *word*.
+;:
+;:**modifies** A
+;:
+:typ.ffw
+SET PUSH, A
+
+:typ.ffw.loop
+IFE [A], B
+  SET PC, typ.ffw.exit
+
+ADD A, 1
+SET PC, typ.ffw.loop
+
+:typ.ffw.exit
+SUB A, POP
+SET PC, POP
+ ;
+
+;:### typ.ffz (pointer)
+;:**F**inds the **f**irst **z**ero after *pointer*, and returns the number of words between *pointer* and that zero.
+;:
+;:**modifies** A
+;:
+:typ.ffz
+SET PUSH, B
+SET B, 0
+JSR typ.ffw ;find first word matching 0
+SET B, POP
+SET PC, POP
+
+;:### typ.htoascii (hextet, outputPointer)
+;:Converts *hextet* (a 16-bit unsigned integer) to ASCII, and writes that ASCII to *outputPointer*. Always produces four ASCII characters.
+;:
+;:**returns** the location following the last character of the ASCII writing.
+;:
+:typ.htoascii
+SET PUSH, I
+SET I, 4 ;counter for how many times to shift the hextet
+
+:typ.htoascii.lookup
+SET C, 0xf000
+AND C, A
+SHR C, 12
+SET [B], [typ.htoascii.table + C]
+
+SHL A, 4
+SUB I, 1
+ADD B, 1
+
+IFN I, 0
+  SET PC, typ.htoascii.lookup
+
+SET I, POP
+SET A, B
+SET PC, POP
+
+:typ.htoascii.table
+DAT 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39 ; "0" - "9"
+DAT 0x61, 0x62, 0x63, 0x64, 0x65, 0x66 ; "a" - "f"
+ ;
+
+;:### typ.asciitoh (inputPointer)
+;:Scans a 4-character string in hex form and produces a single word output containing the value that string represents.
+;:
+;:**returns** the value represented by the hex string
+;:
+;:**author** lukevers
+;:
+:typ.asciitoh
+SET PUSH, I
+SET PUSH, X
+
+SET I, 12
+SET X, 0
+
+SET C, A
+
+:typ.asciitoh.loop
+SET A, typ.htoascii.table
+SET B, [C]
+BOR B, 0x0020
+JSR typ.ffw
+
+SHL A, I
+BOR X, A
+
+ADD C, 1
+SUB I, 4
+
+IFA I, 0xffff ;if I is greater than than -1, signed (so that the last bit is examined)
+  SET PC, typ.asciitoh.loop
+
+SET A, X
+SET X, POP
+SET I, POP
+SET PC, POP
+
+;:### typ.cCopy (inputPointer, outputPointer)
+;:Copies the null-terminated string at *inputPointer* to *outputPointer*.
+;:**returns** the location following the last character of the copy at the *outputPointer* location
+;:
+
+:typ.cCopy
+SET PUSH, I
+SET PUSH, J
+SET I, A
+SET J, B
+
+:typ.cCopy.loop
+IFE [I], 0
+  SET PC, typ.cCopy.exit
+
+STI [J], [I]
+SET PC, typ.cCopy.loop
+
+:typ.cCopy.exit
+SET [J], 0
+SET A, J
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
+
+;:### typ.pCopy (inputPointer, outputPointer, length)
+;:Copies data of *length* from *inputPointer* to *outputPointer*.
+;:**returns** a pointer to the word following the last output word
+;:
+:typ.pCopy
+SET PUSH, I
+SET PUSH, J
+
+SET I, A
+SET J, B
+ADD C, A
+
+:typ.pCopy.loop
+IFE I, C
+  SET PC, typ.pCopy.exit
+
+STI [J], [I]
+SET PC, typ.pCopy.loop
+
+:typ.pCopy.exit
+SET A, J
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
+
+;:### typ.cUnpack (inputPointer, outputPointer)
+;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) null-terminated at *inputPointer*(A) and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*(B).
+;:
+;:**returns** the null location after the last unpacked character
+;:
+
+:typ.cUnpack
+SET PUSH, I
+SET I, A
+SET C, B
+
+:typ.cUnpack.loop
+IFE [I], 0
+  SET PC, typ.cUnpack.exit
+ 
+set push, [I]
+and [I], 0x007F
+IFE [I], 0
+  SET PC, typ.cUnpack.exit
+set [C], [I]
+set [I], pop
+add c, 1
+set push, [I]
+shr [I], 8
+and [I], 0x007F
+IFE [I], 0
+  SET PC, typ.cUnpack.exit
+set [C], [I]
+set [I], pop
+ADD I, 1
+add C, 1
+SET PC, typ.cUnpack.loop
+
+:typ.cUnpack.exit
+set [c], 0
+SET A, C
+SET I, POP
+SET PC, pop
+
+;:### typ.pPack (inputLocation, inputLength, outputLocation)
+;:Reads an unpacked (`0b0000 0000 0XXX XXXX`) string from *inputLocation* of *inputLength* and outputs a packed (`0b0YYY YYYY 0XXX XXXX`) little-endian style string at *outputLocation*.
+;:
+
+:typ.pPack
+SET PUSH, I
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+
+SET Z, 0x007F
+SET I, A
+ADD B, A
+
+
+:typ.pPack.loop
+STI X, [I]
+AND X, Z
+SET [C], X
+STI X, [I]
+AND X, Z
+SHL X, 8
+XOR [C], X
+
+ADD C, 1
+IFL I, B
+  SET PC, typ.pPack.loop
+
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET I, POP
+SET PC, POP
+ ;
+
+;:### typ.pUnpack (inputPointer, inputLength, outputPoiner)
+;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) in little-endian at *inputPointer* of *inputLength* and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*.
+;:
+
+:typ.pUnpack
+SET PUSH, I
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+
+SET I, C
+ADD B, A
+SET Z, 0x007F
+SET Y, 0x7F00
+
+:typ.pUnpack.loop
+SET X, [A]
+AND X, Z
+STI [I], X
+
+SET X, [A]
+AND X, Y
+SHR X, 8
+STI [I], X
+
+ADD A, 1
+IFL A, B
+  SET PC, typ.pUnpack.loop
+
+SET A, I ;return in A
+
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET I, POP
+SET PC, POP
+ ;
+ ;;
+
+; ; ; ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; HWMAN ; Hardware Manager ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:The Hardware Manager is designed to be run to place a layer of abstraction between the software and connected hardware. HWM detects known hardware and maps their port numbers to memory locations, which are accessible through labels.
+;:For example, to send a hardware interrupt to a connected LEM1802, one might normally use the command `HWI 0`, or `HWI 1`. This might change between emulators and ingame, however. HWM allows such syntax as `HWI [LEM1802]`.
+;:
+;:## Supported Hardware
+;:*Items marked with an asterisk do not have intialization routines called automatically.
+;:- *[Generic Clock](http://0x10c.com/highnerd/rc_1/clock.txt)
+:HW.GenericClock DAT 0xffff
+;:- *[LEM1802](http://0x10c.com/highnerd/rc_1/lem1802.txt)
+:HW.LEM1802 DAT 0xffff
+;:- *[Generic Keyboard](http://0x10c.com/highnerd/rc_1/keyboard.txt)
+:HW.GenericKeyboard DAT 0xffff
+;:- *[Speaker](http://bitbucket.org/benedek/dcpu-16/src/477043e85337/doc/speaker.txt)
+:HW.Speaker DAT 0xffff
+;:- *[HMD2043](https://gist.github.com/2516406)
+:HW.HMD2043
+;:
+;:## Subroutines
+;:
+
+;:### HWM
+;:Maps the ports of all recognized hardware to specific points in memory, which are accessible through labels. Upon recognizing a piece of hardware, it will map it to a memory location and do an automatic `JSR` to a label of the form `HWinit.x`, where *x* is the name of the hardware recognized in either full form (`HWinit.LEM1802`) or definition camel case (`HWinit.GenericClock`) if the name of the hardware cannot be represented by labels in its full form.
+;:
+:HWM
+JSR pushReg
+
+HWN I ;I is the number of attached devices
+SET J, 0 ;J will be the iterator
+
+:HWM.loop
+HWQ J
+
+IFE A, 0xf615
+  IFE B, 0x7349
+    SET [HW.LEM1802], J
+
+IFE A, 0xb402
+  IFE B, 0x12d0
+    SET [HW.GenericClock], J
+    
+IFE A, 0x7406
+  IFE B, 0x30cf
+    SET [HW.GenericKeyboard], J
+
+IFE A, 0x0001
+  IFE B, 0x0206
+    SET [HW.Speaker], J
+
+IFE A, 0x4cae
+  IFE B, 0x74fa
+    SET [HW.HMD2043], J
+
+ADD J, 1
+
+IFN I, J
+  SET PC, HWM.loop
+  
+SET PC, popReg
+ ;
+ 
+;:### HWF.LEM1802
+;:Finds the LEM1802 in as few cycles as possible and sets the memory location at the label *LEM1802* to its port number without mapping other hardware. This is intended to be run at boottime in order to quickly start the monitor and display a boot screen.
+;:**Under development**
+;:
+
+;:### pushReg
+;:Pushes all registers to the stack.
+;:
+:pushReg
+SET [pushReg.ReturnLocation], POP
+SET PUSH, A
+SET PUSH, B
+SET PUSH, C
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+SET PUSH, I
+SET PUSH, J
+SET PC, [pushReg.ReturnLocation]
+:pushReg.ReturnLocation DAT 0 ;needed in order to return after pushing values
+ ;
+
+;:### popReg
+;:Pops all registers from the stack, then pops PC from the stack. **This must be called by `SET PC, popReg`.** Otherwise, the registers will be popped incorrectly.
+;:
+:popReg
+SET J, POP
+SET I, POP
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET C, POP
+SET B, POP
+SET A, POP
+SET PC, POP
+ ;
 
 ; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -842,365 +1786,327 @@ SET A, [A+1] ;parent sector
 SET PC, POP
 
 ; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; PINKIEPIE ; Interrupt Handler ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;: **PinkiePie Interrupt Handler** is cubeOS's integrated software interrupt handler.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; HEAPMAN ; Heap Manager   ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;:# Heap Manager
 ;:
 
-
-;:## Software Interrupts
-;:A software interrupt is called in assembly by `INT a`, where `a` is a "message." Upon executing an interrupt, `PC` and `A` are pushed to the stack and replaced by the value in the register `IA` and the message, respectively. This forces the DCPU to begin executing code at whatever address `IA` was set to beforehand. That code can then exit by doing, after restoring other registers, `RFI 0`, which disables interrupt queueing, pops `A` from the stack, then pops `PC` from the stack. That will allow the DCPU to resume the code it was executing before the interrupt was called.
-;:In large operating environments, it makes sense to set `IA` to a constant value at the start of operation, before any interrupts are called. This allows for *interrupt handlers*, which are usually provided by operating systems. The start address of the interrupt handler is placed in `IA`, so it is invoked whenever an interrupt is called. This allows it to handle interrupts consistently, as based on the message.
-;:It also allows software not included in the kernal (and therefore not privvy to labels,) to make function calls defined by the interrupt handler. Furthermore, advanced enough interrupt handlers can allow an operating system to support multitasking.
+;:### heap.init
+;:(location, length, blocksize)
+;:heap.init reserves a 4 word header followed by a bit map of all blocks. The size of the bit map is (*maxlength*/*blocksize*)/16. *length* is actually the length of the heap, excluding the header and bit map.
+;:
+;:The header consists of a magic word, **0x9ea9**, the location of the first block in memory, the size of each block, and the maximum length of the heap.
+;:
+;:**This subroutine clears all of the space given to it.**
+;:
+;:**returns** location of header
 ;:
 
-;:## Initialization
-;:To initialize PinkiePie, use `pih.init`. Changes to IA can be reset by performing this call again.
-;:
-;:### pih.init
-;:Does `IAS pih` to direct any interrupts to the interrupt handler.
-;:
-:pih.init
-IAS pih
-
-JSR pih.initMessages
-
-SET PC, POP
- ;
- 
-;:## Interrupt Handler
-;:The interrupt handler is located at the label `pih`. The subroutine `pih.init` makes this the active interrupt handler.
-;:PinkiePie's interrupt handling process is as follows.
-;:
-;:1. Trigger interrupt queueing with `IAQ 1`
-;:2. Drops the interrupt and returns with `RFI` if the message is greater than 128.
-;:3. Looks up the message in `pih.cmdtable`.
-;:4. If the value is `0xFFFF`, then return with `RFI`.
-;:5. Push `B` and `C` to the stack, so they will be preserved.
-;:6. `JSR` to the value returned by the table.
-;:7. Pop `C` and `B` from the stack, and do `RFI`.
-;:
-;:If the interrupt is actually an API call, (i.e. A call made to the OS with arguments.) then the receiving subroutine must pop arguments from the stack in order to retrieve them. This is necessary, but **be careful**.
-;:
-
-:pih
-IAQ 1 ;trigger interrupt queueing
-
-SET PUSH, X
-SET A, PICK 2 ;get A before it was pushed to the stack
-
-IFG X, 128 ;If the message is too great
-  RFI 1
-
-SET X, [X+pih.cmdtable]
-
-IFE X, 0xffff
-  RFI 1
-
-SET PUSH, B
-SET PUSH, C
-
-JSR X
-
-SET C, POP
-SET B, POP
-SET X, POP
-RFI 1
-
-;:### Messages
-;:Messages 0-63 are reserved for calls reagarding the OS.
-;:Messages 64-127 are reserved for programs.
-;:
-:pih.initMessages
-
-;:#### 10: Reserve Heap Space
-;:Reserves the amount of words in A on the heap, and returns the location of the reserved memory in A.
-;:
-
-SET A, 10
-SET B, tusk.getMem.int
-JSR pih.chOSMsg
-
-;:#### 11
-SET A, 11
-SET B, tusk.dropMem.int
-JSR pih.chOSMsg
-
-SET PC, POP
-
-
-:pih.cmdtable
-DAT 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff
-
-:pihExit
-SET C, POP
-SET B, POP
-
-RFI 1
- ;
-
-;:### pih.return ()
-;:Exits the interrupt handler, returning the value that is currently in A in the register A (avoiding clearing it during the return process.)
-;:
-;:**syntax** `SET PC, pih.returnVal` to exit
-;:
-:pih.return
-SET C, POP
-SET B, POP
-
-SET 0, POP ;discard the old A value
-SET PUSH, A ;replace it with the current A value
-RFI 1 ;POP A, POP PC, and disable interrupt queueing
-
-;:### pih.chOSMsg (msg, location)
-;:Redefines the OS (msg < 64) interrupt message to point at *location*.
-;:
-;:**modifies** A
-;:
-;:**returns** *msg*
-;:
-:pih.chOSMsg
-SET [pih.cmdtable + A], B
-SET PC, POP
-
-;:### pih.newMsg (location)
-;:Finds the first unused message greater than or equal to 64, but less than or equal to 127. It then makes *location* the location to jump to when that interrupt is triggered.
-;:
-;:**returns** the first open message
-;:
-:pih.newMsg
-SET B, 64
-
-:pih.newMsg.findOpen
-IFE [pih.cmdtable + B], 0xffff
-  SET PC, pih.newMsg.found
-ADD B, 1
-SET PC, pih.newMsg.findOpen
-
-:pih.newMsg.found
-SET [pih.cmdtable + B], A
-SET A, B
-SET PC, POP
-
-; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;
-; SIMVID ; Video Manager ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-:v.scrnLoc DAT 0
-:v.scrnEnd DAT 0
-:v.scrnHeight DAT 12
-:v.scrnWidth DAT 32
-
-;:### sv.init (videoRAMPointer, fontRAMPointer)
-;:Maps the screen's font to *fontRAMPointer* and the screen's video ram to *videoRAMPointer* in that order.
-;:
-:sv.init
-
-SET PUSH, A
-SET A, 1
-HWI [HW.LEM1802] ;MEM_MAP_FONT
-
-SET B, POP
-SET A, 0
-HWI [HW.LEM1802] ;MEM_MAP_SCREEN
-
-SET [v.scrnLoc], B
-ADD B, 0x180
-SET [v.scrnEnd], B
-SET PC, POP
- ;
-
-;:### sv.newWindow
-;:Reserves screen space in the heap, maps the screen to it.
-;:
-;:**returns** the first index in the new screen location
-;:
-:sv.newWindow
-SET A, 0x120
-JSR tusk.getMem ;reserve 384 words
-
-SET B, A
-SET A, 0
-HWI [HW.LEM1802] ;remap the screen to this heap location
-
-SET A, B ;return the location of the screen
-SET PC, POP
-
-;:### sv.write (inputPointer, outputPointer)
-;:Writes ASCII to the screen using special characters to act as directives. (This does not perform preprocessing such as translating normal ASCII into those special characters.) Special characters are as follows.
-;:**returns** the location of the null following the written text
-;:
-;:#### Color `0x01`
-;:Substitutes the first nine bits of every word following this with the first nine bits of this word.
-;:
-;:
-;:
-:sv.write
-IFC [A], 0x007F ;if the last 7 bits are 0b0000 000
-  SET PC, sv.write.exitEarly ;exit early
-
+:heap.init
 SET PUSH, I
 SET PUSH, J
+
+SET [env.heap], A
 
 SET I, A
-SET J, B
-SET [sv.write.v.color], 0xF000 ;default to white on black
+SET PUSH, A ;store the location for returning
+SET A, B
 
-:sv.write.loop
-SET A, [I]
-AND A, 0x007F
+DIV A, C ;find the number of necessary blocks
+IFN EX, 0
+  ADD A, 1 ;round up
 
-IFE A, 0x01
-  SET PC, sv.write.s.color
+         ;make A the number of words needed for the bitmap:
+SHR A, 4 ;divide by 16
+IFE EX, 0
+  SET PC, heap.init.evenbitmap ;if that goes evenly, skip the next step
 
-BOR A, [sv.write.v.color]
+ADD A, 1 ;round up
+SET PUSH, A ;for restoring at the end of this part
+SET PUSH, B ;for use in this part
 
-STI [J], A ;set the destination to the processed source and increment destination pointer and source pointer
+ADD A, I ;add the heap offset
+ADD A, 4 ;add the size of the header
+         ;to make A the location of the last word in the bitmap
 
-IFN [I], 0
-  SET PC, sv.write.loop
-  
-SET [J], [I] ;write the terminating null
+SET [A], 0xffff ;set it to be filled
+SET B, PICK 2   ;set B to the number of blocks
+AND B, 0x000f   ;make B the number of blocks left in the last word of memory
+SHR [A], B      ;set B number of blocks to 0 in the bitmap
 
-SET A, J
+SET B, POP ;restore B
+SET A, POP ;restore the number of words needed for the bitmap
+
+:heap.init.evenbitmap
+
+;A is already the number of words needed for the bitmap
+ADD A, I ;add the header offset
+ADD A, 4 ;make A the location of the start of the first block
+
+STI [I], 0x9EA9
+STI [I], A
+STI [I], C
+STI [I], B
+
+SET I, A   ;since A is already the starting location, 
+ADD I, POP ;create ending location
+
+:heap.init.loop ;clear backwards
+IFE I, A
+  SET PC, heap.init.exit
+STD [I], 0
+SET PC, heap.init.loop
+
+:heap.init.exit
 SET J, POP
 SET I, POP
 SET PC, POP
-
-:sv.write.exitEarly
-SET [B], 0x0000 ;make the first word in the output null
-SET A, B ;return the index that sv.write would have written to
-         ;if there had been content
-SET PC, POP
-
-:sv.write.s.color
-SET [sv.write.v.color], [I]
-AND [sv.write.v.color], 0xFF80 ;first 9 bits
-ADD I, 1 ;increment the source, but not the destination
-SET PC, sv.write.loop
-
-:sv.write.v.color DAT 0
- ;
- 
-:sv.clear
-SET PUSH, I
-SET PUSH, J
-
-SET I, [v.scrnLoc]
-
-:sv.clear.loop
-STI [I], 0
-
-IFL I, [v.scrnEnd]
-  SET PC, sv.clear.loop
-
-SET J, POP
-SET I, POP
-SET PC, POP
  ;
 
-:sv.getLoc ; (xOffset, yOffset)
-IFL A, [v.scrnWidth]
-  IFL B, [v.scrnHeight]
-    SET PC, sv.getLoc.loc ;if onscreen, continue
-SET PC, exf
-
-:sv.getLoc.loc
-MUL B, [v.scrnWidth] ;make yOffset a line index
-ADD A, B              ;combine them
-ADD A, [v.scrnLoc]    ;make the index an index onscreen
-SET PC, POP           ;return in A
- ;
-
-:sv.autoScroll ; () does not modify registers
+;:### heap.alloc (length)
+;:Reserves the first consecutive *length* of memory in the heap.
+;:
+;:**returns** the location of the reserved memory, <strike>or 1 if no such block of memory is available</strike>
+;:
+:heap.alloc
 SET PUSH, X
-
-SET X, [v.scrnEnd]
-SUB X, [v.scrnWidth]
-
-IFE [X], 0
-  SET PC, sv.autoScroll.ex
-
 SET PUSH, I
 SET PUSH, J
-SET I, [v.scrnLoc]
-SET J, I
-ADD J, [v.scrnWidth]
 
-:sv.autoScroll.loop
-STI [I], [J]
-IFN J, X
-  SET PC, sv.autoScroll.loop
+SET X, [env.heap] ;make X the heap location
 
-SET X, J
-:sv.autoScroll.looplast
-STI [I], [X]
-SET [X], 0
-ADD X, 1
-IFG X, [v.scrnEnd]
-  SET PC, sv.autoScroll.subex
-SET PC, sv.autoScroll.looplast
+SET B, [X+2] ;make B the block length
+DIV A, B ;make A the number of blocks needed
+IFN EX, 0
+  ADD A, 1 ;round up
+SET I, A ;make I the iterator for number of blocks needed
 
-:sv.autoScroll.subex
+SET B, X ;make B the location of the header
+ADD B, 4 ;add the length of the header to make B the location of the bitmap
+
+SET A, [B] ;make A the first word of the usagemap
+
+SET PUSH, I ;store iterator for easy access
+SET J, 0 ;make J the iterator to keep track of the bit number
+
+:heap.alloc.checkbits
+
+IFE J, 16 ;if the last bit in the word has been scanned
+  SET PC, heap.alloc.newword
+
+IFC A, 0x8000 ;if the leftmost bit of A is 0,
+  SET PC, heap.alloc.openbit
+
+;if it's 1, note the closed bit
+SET I, PEEK ;reset the iterator
+SHL A, 1
+ADD J, 1 ;increase bit iterator
+SET PC, heap.alloc.checkbits
+
+:heap.alloc.newword ;go to the next word
+ADD B, 1 ;increase the pointer by 1
+
+;SHOULD DETECT THE END OF THE BLOCK MAP
+
+SET A, [B]
+SET J, 0
+SET PC, heap.alloc.checkbits
+
+:heap.alloc.openbit
+SUB I, 1
+SHL A, 1
+ADD J, 1 ;increase bit iterator
+
+IFN I, 0 ;if the iterator has not reached zero, continue
+  SET PC, heap.alloc.checkbits
+
+SET C, X ;set C to the location of the header
+ADD C, 4 ;set C to the location of the bitmap
+
+SUB B, C ;set B to the number of full words passed
+SHL B, 4 ;set B to the number of bits passed (MUL 16)
+
+SUB J, PEEK ;subtract the number of needed blocks from the
+            ;bit iterator to get the first index of the open area
+            ;but keep the number of blocks needed for later
+
+ADD B, J ;add the index of the first block in the open area
+         ;in order to get the actual first block index
+
+SET A, B   ;set A to the block index
+SET B, POP ;set B to the number of blocks needed
+SET C, 1   ;set C to "mark the blocks used"
+JSR heap.mark
+
+MUL A, [X+2] ;multiply by the length of each block
+ADD A, [X+1] ;add the location of the first block in memory
+             ;to produce the location of the first word of the first
+             ;reserved block
+
 SET J, POP
 SET I, POP
-
-:sv.autoScroll.ex
 SET X, POP
 SET PC, POP
  ;
 
-:sv.scrollUp
-SET PUSH, I
-SET PUSH, J
+;:### heap.free (location, length)
+;:Marks the blocks specified by *location* and *length* as free, and clears them.
+;:
+;:**returns** *location*
+;:
+:heap.free
+SET PUSH, B
+SET PUSH, A
 
-SET I, [v.scrnLoc]
-SET J, I
-ADD J, [v.scrnWidth]
+SET C, [env.heap]
 
-:sv.scrollUp.loop
-STI [I], [J]
-IFL J, [v.scrnEnd]
-  SET PC, sv.scrollUp.loop
+SUB A, [C+1] ;subtract the first block's location from A
+DIV A, [C+2] ;divide by the size of a block, to get the
+             ;block index, rounding down
 
-:sv.scrollUp.clearLast
-SET I, [v.scrnEnd]
-SUB I, [v.scrnWidth]
+;DIV A, [C+2] not coming out evenly (EX != 0) implies corruption
+;of some sort. Impose a check here?
 
-:sv.scrollUp.clearLast.loop
-STI [I], 0
-IFL I, [v.scrnEnd]
-  SET PC, sv.scrollUp.clearLast.loop
+DIV B, [C+2] ;make B the number of blocks implied by *length*
+IFN EX, 0    ;rounding up, as the allocation subroutine does
+  ADD B, 1
 
-SET J, POP
-SET I, POP
-SUB I, [v.scrnWidth] ;adjust I for caller, hopefully
+SET C, 0 ;"unused"
+JSR heap.mark
+
+SET A, POP
+SET B, POP
+ADD B, A
+ADD B, 1
+SET C, A
+
+:heap.free.clear
+SET [A], 0
+ADD A, 1
+IFN A, B
+SET PC, heap.free.clear
+
 SET PC, POP
  ;
- 
-:sv.getNewLine ; (currentLoc)
-SET PUSH, I
-SET I, [v.scrnLoc]
-JSR sv.autoScroll
-SET PC, sv.getNewLine.loop.sub
 
-:sv.getNewLine.loop
-ADD I, [v.scrnWidth]
+;:### heap.mark (block, number, used/unused)
+;:Marks *number* of blocks used or unused, starting from the index *block*. `1` in *used/unused* denotes `used`, and `0` denotes `unused`.
+;:
+;:**return** *block*
+;:
+:heap.mark
+SET PUSH, A
+SET PUSH, X
+SET X, [env.heap]
+ADD X, 4 ;make X a pointer to the first word in the bitmap
 
-:sv.getNewLine.loop.sub
-IFG A, I ;exit successful if line scrnindex >= currentindex
-  SET PC, sv.getNewLine.loop
+SUB B, 1 ;for use later
+SET PUSH, C ;store used/unused type
+SET PUSH, B ;store B
+SET PUSH, A ;store A
 
-IFE I, [v.scrnEnd]
-  SUB I, [v.scrnWidth]
+SHR A, 4 ;divide by 16, to get the word index
+ADD A, X ;make A a pointer to the relevant word
 
-SET A, I
-SET I, POP
+SET B, POP ;restore the block index
+AND B, 0x000f ;get the bit index
+
+SET C, 0x8000 ;set the leftmost bit
+ASR C, POP    ;make the leftmost *number* bits 1
+
+SHR C, B ;make C apply to all of the blocks to be reserved
+
+SET B, POP ;restore used/unused
+IFE B, 1
+  SET PC, heap.mark.used
+
+:heap.mark.unused
+XOR C, 0xffff ;flip the bits to reflect what needs to be changed
+AND [A], C    ;set the bits that need to be changed to 0
+
+SET X, POP
+SET A, POP
+SET PC, POP
+
+:heap.mark.used
+BOR [A], C ;set the bits that need to be changed to 1
+
+SET X, POP
+SET A, POP ;return *blocks*
 SET PC, POP
  ;
  ;;
+
+; ; ; ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; CRYPT ; Cryptography Lib ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;:# Crypt
+;:Cryptography Library
+;:
+
+;:### crp.sum (inputPointer, inputLength)
+;:Performs a BSD-checksum operation.
+;:**returns** the 16-bit hash
+;:
+:crp.sum
+IFE [A], 0
+  SET PC, ext ;set A to zero and exit
+
+ADD B, A
+SET C, 0
+
+:crp.sum.loop
+SHR C, 1
+BOR C, EX ;checksum = (checksum >> 1) + ((checksum & 1) << 15)
+
+ADD C, [A] ;checksum += ch
+
+ADD A, 1
+
+IFN A, B
+  SET PC, crp.sum.loop
+
+SET A, C
+SET PC, POP
+
+;:### <strike>crp.dsHash (inputPointer, inputLength)</strike>
+;:***depricated***
+;:Reads data of *inputLength* from *inputPointer* and performs a hash function on it.
+;:**returns** the 16-bit hash
+;:
+;:For every value, shift the word *i* left and BOR with EX. XOR all of the resulting values together to produce the hash.
+;:```python
+;:for i in inputLength:
+;:	output ^ (inputPointer[i] << i)
+;:```
+;:
+
+:crp.dsHash
+SET PUSH, I
+SET PUSH, J
+SET I, A
+SET J, 0
+
+SET A, 0
+ADD B, I ;B becomes the exit location
+
+:crp.dsHash.loop
+SET C, [I]
+SHL C, J
+BOR C, EX
+XOR A, C
+
+STI C, 0 ;efficient I and J increment
+IFL I, B
+  SET PC, crp.dsHash.loop
+
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
 
 ; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1329,744 +2235,6 @@ SET PC, POP
 
 :tusk.PIDs ;64 open spaces
 DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-
-; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; TYPER ; Data and String Handler ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;:### typ.ffw (pointer, word)
-;:**F**inds the **f**irst **w**ord matching *word* after *pointer*, and returns the number of words between *pointer* and that *word*.
-;:
-;:**modifies** A
-;:
-:typ.ffw
-SET PUSH, A
-
-:typ.ffw.loop
-IFE [A], B
-  SET PC, typ.ffw.exit
-
-ADD A, 1
-SET PC, typ.ffw.loop
-
-:typ.ffw.exit
-SUB A, POP
-SET PC, POP
- ;
-
-;:### typ.ffz (pointer)
-;:**F**inds the **f**irst **z**ero after *pointer*, and returns the number of words between *pointer* and that zero.
-;:
-;:**modifies** A
-;:
-:typ.ffz
-SET PUSH, B
-SET B, 0
-JSR typ.ffw ;find first word matching 0
-SET B, POP
-SET PC, POP
-
-;:### typ.htoascii (hextet, outputPointer)
-;:Converts *hextet* (a 16-bit unsigned integer) to ASCII, and writes that ASCII to *outputPointer*. Always produces four ASCII characters.
-;:
-;:**returns** the location following the last character of the ASCII writing.
-;:
-:typ.htoascii
-SET PUSH, I
-SET I, 4 ;counter for how many times to shift the hextet
-
-:typ.htoascii.lookup
-SET C, 0xf000
-AND C, A
-SHR C, 12
-SET [B], [typ.htoascii.table + C]
-
-SHL A, 4
-SUB I, 1
-ADD B, 1
-
-IFN I, 0
-  SET PC, typ.htoascii.lookup
-
-SET I, POP
-SET A, B
-SET PC, POP
-
-:typ.htoascii.table
-DAT 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39 ; "0" - "9"
-DAT 0x61, 0x62, 0x63, 0x64, 0x65, 0x66 ; "a" - "f"
- ;
-
-;:### typ.asciitoh (inputPointer)
-;:Scans a 4-character string in hex form and produces a single word output containing the value that string represents.
-;:
-;:**returns** the value represented by the hex string
-;:
-;:**author** lukevers
-;:
-:typ.asciitoh
-SET PUSH, I
-SET PUSH, X
-
-SET I, 12
-SET X, 0
-
-SET C, A
-
-:typ.asciitoh.loop
-SET A, typ.htoascii.table
-SET B, [C]
-JSR typ.ffw
-
-SHL A, I
-BOR X, A
-
-ADD C, 1
-SUB I, 4
-
-IFA I, 0xffff ;if I is greater than than -1, signed (so that the last bit is examined)
-  SET PC, typ.asciitoh.loop
-
-SET A, X
-SET X, POP
-SET I, POP
-SET PC, POP
-
-;:### typ.cCopy (inputPointer, outputPointer)
-;:Copies the null-terminated string at *inputPointer* to *outputPointer*.
-;:**returns** the location following the last character of the copy at the *outputPointer* location
-;:
-
-:typ.cCopy
-SET PUSH, I
-SET PUSH, J
-SET I, A
-SET J, B
-
-:typ.cCopy.loop
-IFE [I], 0
-  SET PC, typ.cCopy.exit
-
-STI [J], [I]
-SET PC, typ.cCopy.loop
-
-:typ.cCopy.exit
-SET [J], 0
-SET A, J
-SET J, POP
-SET I, POP
-SET PC, POP
- ;
-
-;:### typ.pCopy (inputPointer, outputPointer, length)
-;:Copies data of *length* from *inputPointer* to *outputPointer*.
-;:**returns** a pointer to the word following the last output word
-;:
-:typ.pCopy
-SET PUSH, I
-SET PUSH, J
-
-SET I, A
-SET J, B
-ADD C, A
-
-:typ.pCopy.loop
-IFE I, C
-  SET PC, typ.pCopy.exit
-
-STI [J], [I]
-SET PC, typ.pCopy.loop
-
-:typ.pCopy.exit
-SET A, J
-SET J, POP
-SET I, POP
-SET PC, POP
- ;
-
-;:### typ.cUnpack (inputPointer, outputPointer)
-;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) null-terminated at *inputPointer*(A) and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*(B).
-;:
-;:**returns** the null location after the last unpacked character
-;:
-
-:typ.cUnpack
-SET PUSH, I
-SET I, A
-SET C, B
-
-:typ.cUnpack.loop
-IFE [I], 0
-  SET PC, typ.cUnpack.exit
- 
-set push, [I]
-and [I], 0x007F
-IFE [I], 0
-  SET PC, typ.cUnpack.exit
-set [C], [I]
-set [I], pop
-add c, 1
-set push, [I]
-shr [I], 8
-and [I], 0x007F
-IFE [I], 0
-  SET PC, typ.cUnpack.exit
-set [C], [I]
-set [I], pop
-ADD I, 1
-add C, 1
-SET PC, typ.cUnpack.loop
-
-:typ.cUnpack.exit
-set [c], 0
-SET A, C
-SET I, POP
-SET PC, pop
-
-;:### typ.pPack (inputLocation, inputLength, outputLocation)
-;:Reads an unpacked (`0b0000 0000 0XXX XXXX`) string from *inputLocation* of *inputLength* and outputs a packed (`0b0YYY YYYY 0XXX XXXX`) little-endian style string at *outputLocation*.
-;:
-
-:typ.pPack
-SET PUSH, I
-SET PUSH, X
-SET PUSH, Y
-SET PUSH, Z
-
-SET Z, 0x007F
-SET I, A
-ADD B, A
-
-
-:typ.pPack.loop
-STI X, [I]
-AND X, Z
-SET [C], X
-STI X, [I]
-AND X, Z
-SHL X, 8
-XOR [C], X
-
-ADD C, 1
-IFL I, B
-  SET PC, typ.pPack.loop
-
-SET Z, POP
-SET Y, POP
-SET X, POP
-SET I, POP
-SET PC, POP
- ;
-
-;:### typ.pUnpack (inputPointer, inputLength, outputPoiner)
-;:Reads a packed (`0b0YYY YYYY 0XXX XXXX`) in little-endian at *inputPointer* of *inputLength* and outputs an unpacked (`0b0000 0000 0XXX XXXX`) string at *outputPointer*.
-;:
-
-:typ.pUnpack
-SET PUSH, I
-SET PUSH, X
-SET PUSH, Y
-SET PUSH, Z
-
-SET I, C
-ADD B, A
-SET Z, 0x007F
-SET Y, 0x7F00
-
-:typ.pUnpack.loop
-SET X, [A]
-AND X, Z
-STI [I], X
-
-SET X, [A]
-AND X, Y
-SHR X, 8
-STI [I], X
-
-ADD A, 1
-IFL A, B
-  SET PC, typ.pUnpack.loop
-
-SET A, I ;return in A
-
-SET Z, POP
-SET Y, POP
-SET X, POP
-SET I, POP
-SET PC, POP
- ;
- ;;
-
-; ; ; ;
-;;;;;;;;;;;;;;;;;;
-; KeyboardDaemon ;
-;;;;;;;;;;;;;;;;;;
-;:An instance of KeyboardDemon should be registered to any process that requires detection of keypresses. It requests an interrupt value from the operating system, and, when it detects that interrupt, writes the pressed key, if it is ASCII, to the location registered on its instantiation. (That location is, of course, incremented.)
-;:
-;:## The Handler
-;:All keyboards using KeyboardDaemon are given unique interrupt messages, all of which point *kd.keystroke*. 
-;:
-:kd.keystroke
-
-;:## Data Structures
-;:
-;:### Daemon Instance List
-;:
-;:``` 
-;: +---------+
-;: |  Port0  | <- (in heap) location, stored in kd.daemonlist
-;: |  Msg 0  |
-;: | OptLoc0 |
-;: |  Port1  |
-;: |  Msg 1  |
-;: | OptLoc1 |
-;: |   ...   |
-;: +---------+
-;:```
-;:
-;:*Portx* refers to a Generic Keyboard port, and the *OptLocx* following directly after refers to the current "options" selection, which contains all of the information necessary to support a single keyboard (and integrates with dview.)
-;:
-;:### Option Block
-;:
-;:
-;:
-
-:kd.daemonlist
-DAT 0 ;memory location containing two memory locations per keyboard device
-
-:kd.length
-DAT 0 ;number of literal words in the daemon list
-
-;:### kd.init (slots)
-;:Initializes the keyboard handler with enough room for *slots* many Generic Keyboard devices.
-;:
-:kd.init
-MUL A, 3 ;multiply by 3, because each keyboard has 3 words associated with it
-SET [kd.length], A
-JSR heap.alloc ;
-SET [kd.daemonlist], A
-SET PC, POP
- ;
-
-;:### kd.newKeyboard (GenericKeyboard)
-;:Defines a new keyboard in the first open memory location carried by *kd.daemonlist*, as defined *kd.init*, or adds a new one if it doesn't exist.
-;:
-;:**returns** a pointer to the *GenericKeyboard*'s OptLoc word
-;:
-:kd.newKeyboard
-SET B, [kd.daemonlist]
-SET C, [kd.length]
-
-ADD C, B ;make C the ending location of the list
-
-:kd.newKeyboard.findexisting
-IFE [B], A ;if the port exists
-  SET PC, kd.newKeyboard.found
-
-ADD B, 2
-IFL B, C ;C will point to the very last OptLoc, so we use IFL to be safe
-  SET PC, kd.newKeyboard.findexisting
-
-SET PUSH, A ;save A
-SET A, [kd.daemonlist] ;make A the location to search
-JSR typ.ffz ;find the first zero
-
-;SHOULD IMPOSE CHECK
-
-SET [A], POP ;add the new port
-SET [A+1], 0 ;set the next word to 0, just in case
-;then continue as if we'd found the value
-
-:kd.newKeyboard.found
-ADD A, 1     ;add one to A, because we return the location of the OptLoc
-SET PC, POP
-
-
-
-; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; HWMAN ; Hardware Manager ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;:The Hardware Manager is designed to be run to place a layer of abstraction between the software and connected hardware. HWM detects known hardware and maps their port numbers to memory locations, which are accessible through labels.
-;:For example, to send a hardware interrupt to a connected LEM1802, one might normally use the command `HWI 0`, or `HWI 1`. This might change between emulators and ingame, however. HWM allows such syntax as `HWI [LEM1802]`.
-;:
-;:## Supported Hardware
-;:*Items marked with an asterisk do not have intialization routines called automatically.
-;:- *[Generic Clock](http://0x10c.com/highnerd/rc_1/clock.txt)
-:HW.GenericClock DAT 0xffff
-;:- *[LEM1802](http://0x10c.com/highnerd/rc_1/lem1802.txt)
-:HW.LEM1802 DAT 0xffff
-;:- *[Generic Keyboard](http://0x10c.com/highnerd/rc_1/keyboard.txt)
-:HW.GenericKeyboard DAT 0xffff
-;:- *[Speaker](http://bitbucket.org/benedek/dcpu-16/src/477043e85337/doc/speaker.txt)
-:HW.Speaker DAT 0xffff
-;:- *[HMD2043](https://gist.github.com/2516406)
-:HW.HMD2043
-;:
-;:## Subroutines
-;:
-
-;:### HWM
-;:Maps the ports of all recognized hardware to specific points in memory, which are accessible through labels. Upon recognizing a piece of hardware, it will map it to a memory location and do an automatic `JSR` to a label of the form `HWinit.x`, where *x* is the name of the hardware recognized in either full form (`HWinit.LEM1802`) or definition camel case (`HWinit.GenericClock`) if the name of the hardware cannot be represented by labels in its full form.
-;:
-:HWM
-JSR pushReg
-
-HWN I ;I is the number of attached devices
-SET J, 0 ;J will be the iterator
-
-:HWM.loop
-HWQ J
-
-IFE A, 0xf615
-  IFE B, 0x7349
-    SET [HW.LEM1802], J
-
-IFE A, 0xb402
-  IFE B, 0x12d0
-    SET [HW.GenericClock], J
-    
-IFE A, 0x7406
-  IFE B, 0x30cf
-    SET [HW.GenericKeyboard], J
-
-IFE A, 0x0001
-  IFE B, 0x0206
-    SET [HW.Speaker], J
-
-IFE A, 0x4cae
-  IFE B, 0x74fa
-    SET [HW.HMD2043], J
-
-ADD J, 1
-
-IFN I, J
-  SET PC, HWM.loop
-  
-SET PC, popReg
- ;
- 
-;:### HWF.LEM1802
-;:Finds the LEM1802 in as few cycles as possible and sets the memory location at the label *LEM1802* to its port number without mapping other hardware. This is intended to be run at boottime in order to quickly start the monitor and display a boot screen.
-;:**Under development**
-;:
-
-;:### pushReg
-;:Pushes all registers to the stack.
-;:
-:pushReg
-SET [pushReg.ReturnLocation], POP
-SET PUSH, A
-SET PUSH, B
-SET PUSH, C
-SET PUSH, X
-SET PUSH, Y
-SET PUSH, Z
-SET PUSH, I
-SET PUSH, J
-SET PC, [pushReg.ReturnLocation]
-:pushReg.ReturnLocation DAT 0 ;needed in order to return after pushing values
- ;
-
-;:### popReg
-;:Pops all registers from the stack, then pops PC from the stack. **This must be called by `SET PC, popReg`.** Otherwise, the registers will be popped incorrectly.
-;:
-:popReg
-SET J, POP
-SET I, POP
-SET Z, POP
-SET Y, POP
-SET X, POP
-SET C, POP
-SET B, POP
-SET A, POP
-SET PC, POP
- ;
-
-; ; ; ;
-;RETURNS INCORRECT VALUE IF DOING HASHGET ON AN UNPRESENT VALUE
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; DATALIB ; Data Managing Library ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;:DataLib is a library for managing arbitrary amounts of data with relative speed and efficiency.
-;:
-
-;:## Hash Table
-;:Subroutines for creating and searching hash tables, which are sorted tables that store values under names
-;:
-
-;:### dl.makeHashTable (headerPointer, indicies, startingLength)
-;:Creates the header for a hashTable at *headerPointer* with *indicies* as the target number of indicies for the hashTable. The total length of the hashTable is `2 * indicies + 4`, which includes the header, the lookup portion of the table, and the value portion of the table. *length* is not the total length of the table, but rather the number of occupied indicies.
-;:**returns** *headerPointer*
-;:
-:dl.makeHashTable
-SET [A], 0x5468 ;"hT" magic number
-SET [A+1], B ;indicies
-SET [A+2], C ;length
-SET [A+3], 0 ;reserved
-SET PC, POP
- ;
-
-;:### dl.hashGet (searchTerm, hashTablePointer)
-;:Searches the hash table at *hashTablePointer* for *searchTerm* in the lookup portion of it. It returns the value in the value portion associated with the searchTerm.
-;:
-;:**returns** value associated by the hash table with *searchTerm*, or 1 if it could not be found
-;:**development version** 
-;:
-:dl.hashGet
-SET PUSH, [B+1] ;store the number of indicies
-
-SET C, [B+2] ;length
-ADD B, 4 ;location
-JSR dl.searchValTable
-
-IFE A, 1
-  SET PC, dl.hashGet.exf
-
-ADD A, POP ;make A an index in the value table
-SET A, [A] ;return the value, rather than the index
-SET PC, POP
-
-:dl.hashGet.exf
-;A is 1
-SET B, POP
-SET PC, POP
- ;
-
-;:### dl.hashInsert (lookupValue, insertValue, hashTablePointer)
-;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table. This is designed to work very well with the 16-bit hashing algorithm crp.dsHash.
-;:
-;:**under development**
-;:
-:dl.hashInsert
-SET PUSH, B ;store *insertValue*
-SET PUSH, [C+1] ;store *indicies* from header
-SET PUSH, C ;store pointer to header
-
-SET B, C
-ADD B, 4 ;start of sortedTable (for lookups)
-SET C, [C+2] ;length of sortedTable
-
-JSR dl.sortedInsert
-
-SET C, POP
-ADD [C+2], 1 ;add one to the length
-
-ADD A, POP ;retrieve *indicies* from stack
-
-SET B, A
-SET A, POP ;retrieve *insertValue* from stack
-
-SET PC, dl.unsortedInsert
- ;
-
-;:## Sorted Table
-;:Subroutines for creating and searching sorted tables
-;:
-
-;:### dl.sortedInsert (insertValue, tableLocation, tableLength)
-;:Inserts *insertValue* into the sorted table at *tableLocation* of *tableLength*, maintaining the sortedness of the table.
-;:
-;:**returns** location of insert<strike>, or 1 if the value is already present in the table</strike>
-;:
-:dl.sortedInsert
-SET PUSH, A
-JSR dl.findInsertIndex
-
-;NEED TO HANDLE DUPLICATE ENTRY
-
-SET B, A
-SET A, POP
-SET PC, dl.unsortedInsert ;exit when this subroutine exits
- ;
-
-;:### dl.searchValTable (searchTerm, tableLocation, tableLength)
-;:Performs a binary search on the table at *tableLocation* (with length *tableLength*) for *searchTerm* and returns the memory location
-;:
-:dl.searchValTable
-IFE C, 0 ;if *tableLength* is zero, return the tableLocation
-  SET PC, dl.searchValTable.noLength
-
-IFE C, 1
-  SET PC, dl.searchValTable.lengthOne
-
-SET PUSH, I
-
-:dl.searchValTable.recheck
-SET I, C
-SHR I, 1 ;divide by 2
-ADD I, B
-
-IFE [I], A
-SET PC, dl.searchValTable.found
-
-IFE C, 1
-  SET PC, dl.searchValTable.exf
-
-IFG A, [I]
-  SET PC, dl.searchValTable.toolow
-
-IFL A, [I]
-  SET PC, dl.searchValTable.toohigh
-
-SET PC, dl.searchValTable.recheck
-
-:dl.searchValTable.toohigh
-SET C, I
-SUB C, B
-SET PC, dl.searchValTable.recheck
-
-:dl.searchValTable.toolow
-ADD C, B
-SUB C, I
-SET B, I
-SET PC, dl.searchValTable.recheck
-
-:dl.searchValTable.found
-SET A, I
-SET I, POP
-SET PC, POP
-
-:dl.searchValTable.noLength
-SET A, B
-SET PC, POP
-
-:dl.searchValTable.lengthOne
-IFG A, [B] ;if *insertValue* is greater than the existing value
-  ADD B, 1 ;look at the second value
-
-SET A, B ;return B
-SET PC, POP
-
-:dl.searchValTable.exf
-SET A, 1
-SET I, POP
-SET PC, POP
- ;
-
-;:### dl.findInsertIndex (searchTerm, tableLocation, tableLength)
-;:Returns the index at which *searchTerm* should be inserted to keep the table at *tableLocation* with length *tableLength* sorted.
-;:
-:dl.findInsertIndex
-JSR dl.searchValTable
-
-IFE A, 1 ;if the value isn't there
-  ADD A, B ;add B to make it the index to insert at
-
-;DO SOMETHING IF A != 1 AND LENGTH ISN'T LOW
-  
-SET PC, POP
- ;
- 
-;:### dl.unsortedInsert (insertValue, insertLocation)
-;:Inserts *insertValue* at *insertLocation* and pushes the value it would replace upward in memory recursively until only a null is overwritten.
-;:**returns** *insertLocation*
-;:
-:dl.unsortedInsert
-SET PUSH, I
-SET PUSH, J
-SET PUSH, X ;SHOULD JUST USE A
-SET PUSH, Y ;SHOULD JUST USE B
-
-SET PUSH, B
-SET I, B
-SET X, A
-
-:dl.unsortedInsert.loop
-IFE X, 0
-  SET PC, dl.unsortedInsert.exit
-SET Y, [I]
-STI [I], X
-SET X, Y
-
-SET PC, dl.unsortedInsert.loop
-
-:dl.unsortedInsert.exit
-SET A, POP
-SET Y, POP
-SET X, POP
-SET I, POP
-SET J, POP
-SET PC, POP
- ;
- ;;
- 
-
-:screendata
-:ht dat 0,0,0,0
-
-; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; CRYPT ; Cryptography Lib ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;:# Crypt
-;:Cryptography Library
-;:
-
-;:### crp.sum (inputPointer, inputLength)
-;:Performs a BSD-checksum operation.
-;:**returns** the 16-bit hash
-;:
-:crp.sum
-IFE [A], 0
-  SET PC, ext ;set A to zero and exit
-
-ADD B, A
-SET C, 0
-
-:crp.sum.loop
-SHR C, 1
-BOR C, EX ;checksum = (checksum >> 1) + ((checksum & 1) << 15)
-
-ADD C, [A] ;checksum += ch
-
-ADD A, 1
-
-IFN A, B
-  SET PC, crp.sum.loop
-
-SET A, C
-SET PC, POP
-
-;:### <strike>crp.dsHash (inputPointer, inputLength)</strike>
-;:***depricated***
-;:Reads data of *inputLength* from *inputPointer* and performs a hash function on it.
-;:**returns** the 16-bit hash
-;:
-;:For every value, shift the word *i* left and BOR with EX. XOR all of the resulting values together to produce the hash.
-;:```python
-;:for i in inputLength:
-;:	output ^ (inputPointer[i] << i)
-;:```
-;:
-
-:crp.dsHash
-SET PUSH, I
-SET PUSH, J
-SET I, A
-SET J, 0
-
-SET A, 0
-ADD B, I ;B becomes the exit location
-
-:crp.dsHash.loop
-SET C, [I]
-SHL C, J
-BOR C, EX
-XOR A, C
-
-STI C, 0 ;efficient I and J increment
-IFL I, B
-  SET PC, crp.dsHash.loop
-
-SET J, POP
-SET I, POP
-SET PC, POP
- ;
 
 ; ; ; ;
 ;;;;;;;;;;;;;;;;
@@ -2384,245 +2552,146 @@ DAT 0x202f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
  ;;
 
 ; ; ; ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; HEAPMAN ; Heap Manager   ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;:# Heap Manager
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; PINKIEPIE ; Interrupt Handler ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;: **PinkiePie Interrupt Handler** is cubeOS's integrated software interrupt handler.
 ;:
 
-;:### heap.init
-;:(location, length, blocksize)
-;:heap.init reserves a 4 word header followed by a bit map of all blocks. The size of the bit map is (*maxlength*/*blocksize*)/16. *length* is actually the length of the heap, excluding the header and bit map.
-;:
-;:The header consists of a magic word, **0x9ea9**, the location of the first block in memory, the size of each block, and the maximum length of the heap.
-;:
-;:**This subroutine clears all of the space given to it.**
-;:
-;:**returns** location of header
+
+;:## Software Interrupts
+;:A software interrupt is called in assembly by `INT a`, where `a` is a "message." Upon executing an interrupt, `PC` and `A` are pushed to the stack and replaced by the value in the register `IA` and the message, respectively. This forces the DCPU to begin executing code at whatever address `IA` was set to beforehand. That code can then exit by doing, after restoring other registers, `RFI 0`, which disables interrupt queueing, pops `A` from the stack, then pops `PC` from the stack. That will allow the DCPU to resume the code it was executing before the interrupt was called.
+;:In large operating environments, it makes sense to set `IA` to a constant value at the start of operation, before any interrupts are called. This allows for *interrupt handlers*, which are usually provided by operating systems. The start address of the interrupt handler is placed in `IA`, so it is invoked whenever an interrupt is called. This allows it to handle interrupts consistently, as based on the message.
+;:It also allows software not included in the kernal (and therefore not privvy to labels,) to make function calls defined by the interrupt handler. Furthermore, advanced enough interrupt handlers can allow an operating system to support multitasking.
 ;:
 
-:heap.init
-SET PUSH, I
-SET PUSH, J
+;:## Initialization
+;:To initialize PinkiePie, use `pih.init`. Changes to IA can be reset by performing this call again.
+;:
+;:### pih.init
+;:Does `IAS pih` to direct any interrupts to the interrupt handler.
+;:
+:pih.init
+IAS pih
 
-SET [env.heap], A
+JSR pih.initMessages
 
-SET I, A
-SET PUSH, A ;store the location for returning
+SET PC, POP
+ ;
+ 
+;:## Interrupt Handler
+;:The interrupt handler is located at the label `pih`. The subroutine `pih.init` makes this the active interrupt handler.
+;:PinkiePie's interrupt handling process is as follows.
+;:
+;:1. Trigger interrupt queueing with `IAQ 1`
+;:2. Drops the interrupt and returns with `RFI` if the message is greater than 128.
+;:3. Looks up the message in `pih.cmdtable`.
+;:4. If the value is `0xFFFF`, then return with `RFI`.
+;:5. Push `B` and `C` to the stack, so they will be preserved.
+;:6. `JSR` to the value returned by the table.
+;:7. Pop `C` and `B` from the stack, and do `RFI`.
+;:
+;:If the interrupt is actually an API call, (i.e. A call made to the OS with arguments.) then the receiving subroutine must pop arguments from the stack in order to retrieve them. This is necessary, but **be careful**.
+;:
+
+:pih
+IAQ 1 ;trigger interrupt queueing
+
+SET PUSH, X
+SET A, PICK 2 ;get A before it was pushed to the stack
+
+IFG X, 128 ;If the message is too great
+  RFI 1
+
+SET X, [X+pih.cmdtable]
+
+IFE X, 0xffff
+  RFI 1
+
+SET PUSH, B
+SET PUSH, C
+
+JSR X
+
+SET C, POP
+SET B, POP
+SET X, POP
+RFI 1
+
+;:### Messages
+;:Messages 0-63 are reserved for calls reagarding the OS.
+;:Messages 64-127 are reserved for programs.
+;:
+:pih.initMessages
+
+;:#### 10: Reserve Heap Space
+;:Reserves the amount of words in A on the heap, and returns the location of the reserved memory in A.
+;:
+
+SET A, 10
+SET B, tusk.getMem.int
+JSR pih.chOSMsg
+
+;:#### 11
+SET A, 11
+SET B, tusk.dropMem.int
+JSR pih.chOSMsg
+
+SET PC, POP
+
+
+:pih.cmdtable
+DAT 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff
+
+:pihExit
+SET C, POP
+SET B, POP
+
+RFI 1
+ ;
+
+;:### pih.return ()
+;:Exits the interrupt handler, returning the value that is currently in A in the register A (avoiding clearing it during the return process.)
+;:
+;:**syntax** `SET PC, pih.returnVal` to exit
+;:
+:pih.return
+SET C, POP
+SET B, POP
+
+SET 0, POP ;discard the old A value
+SET PUSH, A ;replace it with the current A value
+RFI 1 ;POP A, POP PC, and disable interrupt queueing
+
+;:### pih.chOSMsg (msg, location)
+;:Redefines the OS (msg < 64) interrupt message to point at *location*.
+;:
+;:**modifies** A
+;:
+;:**returns** *msg*
+;:
+:pih.chOSMsg
+SET [pih.cmdtable + A], B
+SET PC, POP
+
+;:### pih.newMsg (location)
+;:Finds the first unused message greater than or equal to 64, but less than or equal to 127. It then makes *location* the location to jump to when that interrupt is triggered.
+;:
+;:**returns** the first open message
+;:
+:pih.newMsg
+SET B, 64
+
+:pih.newMsg.findOpen
+IFE [pih.cmdtable + B], 0xffff
+  SET PC, pih.newMsg.found
+ADD B, 1
+SET PC, pih.newMsg.findOpen
+
+:pih.newMsg.found
+SET [pih.cmdtable + B], A
 SET A, B
-
-DIV A, C ;find the number of necessary blocks
-IFN EX, 0
-  ADD A, 1 ;round up
-
-         ;make A the number of words needed for the bitmap:
-SHR A, 4 ;divide by 16
-IFE EX, 0
-  SET PC, heap.init.evenbitmap ;if that goes evenly, skip the next step
-
-ADD A, 1 ;round up
-SET PUSH, A ;for restoring at the end of this part
-SET PUSH, B ;for use in this part
-
-ADD A, I ;add the heap offset
-ADD A, 4 ;add the size of the header
-         ;to make A the location of the last word in the bitmap
-
-SET [A], 0xffff ;set it to be filled
-SET B, PICK 2   ;set B to the number of blocks
-AND B, 0x000f   ;make B the number of blocks left in the last word of memory
-SHR [A], B      ;set B number of blocks to 0 in the bitmap
-
-SET B, POP ;restore B
-SET A, POP ;restore the number of words needed for the bitmap
-
-:heap.init.evenbitmap
-
-;A is already the number of words needed for the bitmap
-ADD A, I ;add the header offset
-ADD A, 4 ;make A the location of the start of the first block
-
-STI [I], 0x9EA9
-STI [I], A
-STI [I], C
-STI [I], B
-
-SET I, A   ;since A is already the starting location, 
-ADD I, POP ;create ending location
-
-:heap.init.loop ;clear backwards
-IFE I, A
-  SET PC, heap.init.exit
-STD [I], 0
-SET PC, heap.init.loop
-
-:heap.init.exit
-SET J, POP
-SET I, POP
 SET PC, POP
- ;
-
-;:### heap.alloc (length)
-;:Reserves the first consecutive *length* of memory in the heap.
-;:
-;:**returns** the location of the reserved memory, <strike>or 1 if no such block of memory is available</strike>
-;:
-:heap.alloc
-SET PUSH, X
-SET PUSH, I
-SET PUSH, J
-
-SET X, [env.heap] ;make X the heap location
-
-SET B, [X+2] ;make B the block length
-DIV A, B ;make A the number of blocks needed
-IFN EX, 0
-  ADD A, 1 ;round up
-SET I, A ;make I the iterator for number of blocks needed
-
-SET B, X ;make B the location of the header
-ADD B, 4 ;add the length of the header to make B the location of the bitmap
-
-SET A, [B] ;make A the first word of the usagemap
-
-SET PUSH, I ;store iterator for easy access
-SET J, 0 ;make J the iterator to keep track of the bit number
-
-:heap.alloc.checkbits
-
-IFE J, 16 ;if the last bit in the word has been scanned
-  SET PC, heap.alloc.newword
-
-IFC A, 0x8000 ;if the leftmost bit of A is 0,
-  SET PC, heap.alloc.openbit
-
-;if it's 1, note the closed bit
-SET I, PEEK ;reset the iterator
-SHL A, 1
-ADD J, 1 ;increase bit iterator
-SET PC, heap.alloc.checkbits
-
-:heap.alloc.newword ;go to the next word
-ADD B, 1 ;increase the pointer by 1
-
-;SHOULD DETECT THE END OF THE BLOCK MAP
-
-SET A, [B]
-SET J, 0
-SET PC, heap.alloc.checkbits
-
-:heap.alloc.openbit
-SUB I, 1
-SHL A, 1
-ADD J, 1 ;increase bit iterator
-
-IFN I, 0 ;if the iterator has not reached zero, continue
-  SET PC, heap.alloc.checkbits
-
-SET C, X ;set C to the location of the header
-ADD C, 4 ;set C to the location of the bitmap
-
-SUB B, C ;set B to the number of full words passed
-SHL B, 4 ;set B to the number of bits passed (MUL 16)
-
-SUB J, PEEK ;subtract the number of needed blocks from the
-            ;bit iterator to get the first index of the open area
-            ;but keep the number of blocks needed for later
-
-ADD B, J ;add the index of the first block in the open area
-         ;in order to get the actual first block index
-
-SET A, B   ;set A to the block index
-SET B, POP ;set B to the number of blocks needed
-SET C, 1   ;set C to "mark the blocks used"
-JSR heap.mark
-
-MUL A, [X+2] ;multiply by the length of each block
-ADD A, [X+1] ;add the location of the first block in memory
-             ;to produce the location of the first word of the first
-             ;reserved block
-
-SET J, POP
-SET I, POP
-SET X, POP
-SET PC, POP
- ;
-
-;:### heap.free (location, length)
-;:Marks the blocks specified by *location* and *length* as free, and clears them.
-;:
-;:**returns** *location*
-;:
-:heap.free
-SET PUSH, A
-
-SET C, [env.heap]
-
-SUB A, [C+1] ;subtract the first block's location from A
-DIV A, [C+2] ;divide by the size of a block, to get the
-             ;block index, rounding down
-
-;DIV A, [C+2] not coming out evenly (EX != 0) implies corruption
-;of some sort. Impose a check here?
-
-DIV B, [C+2] ;make B the number of blocks implied by *length*
-IFN EX, 0    ;rounding up, as the allocation subroutine does
-  ADD B, 1
-
-SET C, 0 ;"unused"
-JSR heap.mark
-
-SET A, POP
-SET PC, POP
- ;
-
-;:### heap.mark (block, number, used/unused)
-;:Marks *number* of blocks used or unused, starting from the index *block*. `1` in *used/unused* denotes `used`, and `0` denotes `unused`.
-;:
-;:**return** *block*
-;:
-:heap.mark
-SET PUSH, A
-SET PUSH, X
-SET X, [env.heap]
-ADD X, 4 ;make X a pointer to the first word in the bitmap
-
-SUB B, 1 ;for use later
-SET PUSH, C ;store used/unused type
-SET PUSH, B ;store B
-SET PUSH, A ;store A
-
-SHR A, 4 ;divide by 16, to get the word index
-ADD A, X ;make A a pointer to the relevant word
-
-SET B, POP ;restore the block index
-AND B, 0x000f ;get the bit index
-
-SET C, 0x8000 ;set the leftmost bit
-ASR C, POP    ;make the leftmost *number* bits 1
-
-SHR C, B ;make C apply to all of the blocks to be reserved
-
-SET B, POP ;restore used/unused
-IFE B, 1
-  SET PC, heap.mark.used
-
-:heap.mark.unused
-XOR C, 0xffff ;flip the bits to reflect what needs to be changed
-AND [A], C    ;set the bits that need to be changed to 0
-
-SET X, POP
-SET A, POP
-SET PC, POP
-
-:heap.mark.used
-BOR [A], C ;set the bits that need to be changed to 1
-
-SET X, POP
-SET A, POP ;return *blocks*
-SET PC, POP
- ;
- ;;
 
 ; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2970,9 +3039,37 @@ SET PC, dview.write.directive.substitute.color.loop
 ;:
 :dview.prompt
 SET PUSH, C
+
 JSR dview.write
-SET C, POP
+SET PUSH, A ;store the location to write to onscreen
+
+SET A, 1
+JSR kd.init
+
+SET A, [HW.GenericKeyboard]
+JSR kd.newKeyboard ;binds the keyboard
+
+SET [A+1], POP             ;the output location (after the prompt
+SET [A], POP               ;*userTextOutput*
+SET [A+2], dview.endPrompt ;end the prompt waitloop
+;OTHER PARAMETERS NEED TO BE SET
+
+;SET A, 1
+;JSR tusk.getMem ;get 1 word of memory (at minimum)
+;SET [A], 0
+SET [dview.temp.promptflag], 1
+
+:dview.prompt.loop
+IFN [dview.temp.promptflag], 0
+  SET PC, dview.prompt.loop
+
 SET PC, POP
+
+:dview.endPrompt
+SET [dview.temp.promptflag], 0
+SET PC, POP
+
+:dview.temp.promptflag DAT 0
 
 ; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -3334,16 +3431,7 @@ SET PC, package.memdump.skip
 DAT 0xffab, 0xcdff
 DAT "test", 0
 
-SET A, 0x110
-JSR tusk.getMem
-
-SET B, C
-JSR typ.htoascii
-
-JSR tusk.dropMem
-
-SET [A], 0
-SET PC, POP
+SET PC, 0 ;crash
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
 ;:

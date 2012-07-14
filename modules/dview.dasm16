@@ -343,6 +343,34 @@ SET PC, dview.write.directive.substitute.color.loop
 ;:
 :dview.prompt
 SET PUSH, C
+
 JSR dview.write
-SET C, POP
+SET PUSH, A ;store the location to write to onscreen
+
+SET A, 1
+JSR kd.init
+
+SET A, [HW.GenericKeyboard]
+JSR kd.newKeyboard ;binds the keyboard
+
+SET [A+1], POP             ;the output location (after the prompt
+SET [A], POP               ;*userTextOutput*
+SET [A+2], dview.endPrompt ;end the prompt waitloop
+;OTHER PARAMETERS NEED TO BE SET
+
+;SET A, 1
+;JSR tusk.getMem ;get 1 word of memory (at minimum)
+;SET [A], 0
+SET [dview.temp.promptflag], 1
+
+:dview.prompt.loop
+IFN [dview.temp.promptflag], 0
+  SET PC, dview.prompt.loop
+
 SET PC, POP
+
+:dview.endPrompt
+SET [dview.temp.promptflag], 0
+SET PC, POP
+
+:dview.temp.promptflag DAT 0
