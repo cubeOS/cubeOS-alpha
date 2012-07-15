@@ -13,15 +13,25 @@ SET A, [kd.daemonlist] ;pointer
 JSR typ.ffw            ;find the word with this interrupt message,
                        ;to identify the calling keyboard
 
+ADD A, [kd.daemonlist] ;make A a memory location rather than a length
+
 SUB A, 1     ;make A a pointer to the port number
 SET B, [A]   ;make B the port number
 SET A, [A+2] ;make A the configuration location
 
-JSR dview.endPrompt
+SET PUSH, A
+SET A, 2 ;get ASCII key in C
+HWI B ;interrupt the port that triggered the interrupt
+
+;C BECOMES 0 HERE, NO MATTER WHAT KEY IS PRESSED, AND I DON'T KNOW WHY
+
+SET A, POP
 
 ;WRITING HERE
-;IFN [A+2], 0
-;  JSR [A+2] ;jump to "notify" location
+
+IFE C, [A+3] ;if C is the exit character
+  IFN [A+2], 0 ;if the notify location is not empty
+    JSR [A+2] ;jump to "notify" location
 
 SET PC, POP
  ;return from the interrupt
