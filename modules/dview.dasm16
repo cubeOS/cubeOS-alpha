@@ -353,6 +353,13 @@ JSR kd.init
 SET A, [HW.GenericKeyboard]
 JSR kd.newKeyboard ;binds the keyboard
 
+SET B, A
+
+SET A, 0x20
+JSR tusk.getMem
+
+SET [B], A
+
 SET [A+1], POP             ;the output location (after the prompt
 SET [A], POP               ;*userTextOutput*
 SET [A+2], dview.endPrompt ;end the prompt waitloop
