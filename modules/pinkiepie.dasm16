@@ -37,30 +37,37 @@ SET PC, POP
 ;:6. `JSR` to the value returned by the table.
 ;:7. Pop `C` and `B` from the stack, and do `RFI`.
 ;:
-;:If the interrupt is actually an API call, (i.e. A call made to the OS with arguments.) then the receiving subroutine must pop arguments from the stack in order to retrieve them. This is necessary, but **be careful**.
+;:If the interrupt is actually an API call, (i.e. A call made to the OS with arguments,) then the receiving subroutine should note that the arguments `A`, `B`, and `C` will enter the subroutine unchanged. In order to return a value in A, however, the subroutine must exit with *pih.return*. `X` is the location of the subroutine when it enters.
 ;:
 
 :pih
 IAQ 1 ;trigger interrupt queueing
 
 SET PUSH, X
-SET A, PICK 2 ;get A before it was pushed to the stack
+
+SET X, A
 
 IFG X, 128 ;If the message is too great
-  RFI 1
+  SET PC, pih.exitearly
 
 SET X, [X+pih.cmdtable]
 
 IFE X, 0xffff
-  RFI 1
+  SET PC, pih.exitearly
+
+SET PUSH, X ;push X so it can be jumped to
+SET X, A
+SET A, PICK 2 ;get A before it was pushed to the stack for the interrupt
 
 SET PUSH, B
 SET PUSH, C
 
-JSR X
+JSR PICK 2 ;jump to what X was
 
 SET C, POP
 SET B, POP
+SET 0, POP ;drop the value that needed to be pushed for the jump
+:pih.exitearly
 SET X, POP
 RFI 1
 
@@ -92,7 +99,7 @@ DAT 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xff
 :pihExit
 SET C, POP
 SET B, POP
-
+SET X, POP
 RFI 1
  ;
 

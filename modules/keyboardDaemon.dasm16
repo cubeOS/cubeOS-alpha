@@ -6,8 +6,9 @@
 ;:## The Handler
 ;:All keyboards using KeyboardDaemon are given unique interrupt messages, all of which point *kd.keystroke*. 
 ;:
-:kd.keystroke
-SET B, A               ;word to find
+:kd.keystroke.int
+                       ;when a .int enters, X is the interrupt message
+SET B, X               ;word to find
 SET A, [kd.daemonlist] ;pointer
 JSR typ.ffw            ;find the word with this interrupt message,
                        ;to identify the calling keyboard
@@ -16,11 +17,14 @@ SUB A, 1     ;make A a pointer to the port number
 SET B, [A]   ;make B the port number
 SET A, [A+2] ;make A the configuration location
 
-;WRITING HERE
-IFN [A+2], 0
-  JSR [A+2] ;jump to "notify" location
+JSR dview.endPrompt
 
-RFI 1 ;return from interrupt
+;WRITING HERE
+;IFN [A+2], 0
+;  JSR [A+2] ;jump to "notify" location
+
+SET PC, POP
+ ;return from the interrupt
 
 
 ;:## Data Structures
@@ -104,25 +108,22 @@ ADD A, [kd.daemonlist] ;typ.ffz adds the list
 SET C, A ;need to use C instead, here, so A isn't lost
 
 SET [C], POP ;add the new port
+SET PUSH, C
 
-SET A, kd.keystroke ;make the location to jump to the keystroke handler
+SET A, kd.keystroke.int ;make the location to jump to the keystroke handler
 JSR pih.newMsg ;make A a new interrupt message
+SET C, POP
+
 SET [C+1], A ;store the new message
+SET [C+2], 0 ;set the next word to 0, just in case
 
-INT A
+SET B, A ;put the message in B for the hardware call
 
-SUB PC, 1
-
-SET B, A ;make B the new message
-SET A, 3 ;hardware call to enable interrupts with message in B
+SET A, 3    ;hardware call to enable interrupts with message in B
 HWI [C]  ;interrupt the GenericKeyboard port
 
-SUB PC, 1 ;debug
-
-SET [C+2], 0 ;set the next word to 0, just in case
 SET A, C ;set A to C, because we changed it earlier
 ;then continue as if we'd found the value
-
 
 :kd.newKeyboard.found
 ADD A, 2     ;add two to A, because we return the location of the OptLoc
