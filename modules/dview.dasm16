@@ -363,6 +363,7 @@ SET [B], A
 SET [A+1], POP             ;the output location (after the prompt
 SET [A], POP               ;*userTextOutput*
 SET [A+2], dview.endPrompt ;end the prompt waitloop
+SET [A+3], 0x11            ;set the exit key to "return"
 ;OTHER PARAMETERS NEED TO BE SET
 
 ;SET A, 1
