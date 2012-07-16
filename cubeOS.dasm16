@@ -645,6 +645,9 @@ IFE C, [A+3] ;if C is the exit character
 IFG C, 0x1f ;if the key is an ASCII key
   SET PC, kd.keystroke.writeChar
 
+IFE C, 0x10 ;backspace
+  JSR kd.keystroke.backspace
+
 SET PC, POP
  ;return from the interrupt
 
@@ -654,11 +657,11 @@ IFE B, 0 ;if there is no max position specified
   SET B, 0xffff ;make B the highest possible value (no pointer)
 
 IFL [A+1], B ;if the screen location is less than the maximum
-  SET PC, kd.keystroke.continue ;then continue
+  SET PC, kd.keystroke.writeChar.continue ;then continue
 
 SET PC, POP ;otherwise, return
 
-:kd.keystroke.continue
+:kd.keystroke.writeChar.continue
 SET PUSH, Y ;we're going to use Y to colorize 
 
 SET B, [A] ;set B to the direct write location
@@ -676,7 +679,23 @@ ADD [A+1], 1 ;increase the onscreen write pointer
 
 SET Y, POP
 SET PC, POP
- ;
+
+:kd.keystroke.backspace
+IFG [A+1], [A+4] ;if the current screenpointer is at the minimum location
+  SET PC, kd.keystroke.backspace.continue ;then continue
+
+SET PC, POP ;otherwise, return
+
+:kd.keystroke.backspace.continue
+SUB [A], 1 ;decrement the direct write location
+SET B, [A] ;make B the direct write location
+SET [B], 0 ;erase the previous character
+
+SUB [A+1], 1 ;decrement the screen write location
+SET B, [A+1] ;make B the screen write location
+SET [B], 0   ;erase the previous character
+
+SET PC, POP
 
 ;:## Data Structures
 ;:
@@ -2897,11 +2916,8 @@ SET PC, typ.cCopy ;c-style copy
 ;:**returns** the screen location following the written text
 ;:
 :dview.write.int
-SET A, PICK 4
-SET B, PICK 3
-JSR dview.write
-
-SET PC, pih.return
+SET PUSH, pih.return ;push the return location to the stack
+;and continue to dview.write
 
 :dview.write
 SET PUSH, X ;X will be the escape character flag
@@ -3048,9 +3064,9 @@ SET PC, dview.write.loop
 ;:
 ;:##### Formatting ASCII codes
 ;:
-;:**packed string** `70` as referring to **p**
-;:**string**        `73` as referring to **s**
-;:**hexidecimal**   `78` as referring to **x**
+;:**packed string** `70` as referring to **p** <br />
+;:**string**        `73` as referring to **s** <br />
+;:**hexidecimal**   `78` as referring to **x** <br />
 ;:
 :dview.write.directive.substitute
 SET C, 0xff00 ;get the first 8 bits
@@ -3120,7 +3136,17 @@ SET [A], POP               ;*userTextOutput*
 SET [A+2], dview.endPrompt ;end the prompt waitloop
 SET [A+3], 0x11            ;set the exit key to "return"
 
-SET [A+5], 0 ;disable maximum-location
+SET [A+4], [A+1] ;minimum-location is the starting location (as normal)
+
+;SET PUSH, A ;store A
+
+;SET A, 15
+;SET B, 5        ;we can discard B
+;JSR dview.getLoc ;get the last index
+;SET B, A
+;SET A, POP
+
+SET [A+5], 0x2450 ;make the max-location the last screen index
 ;OTHER PARAMETERS NEED TO BE SET
 
 ;SET A, 1
