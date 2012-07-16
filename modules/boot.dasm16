@@ -18,10 +18,6 @@ SET [0], 0x7f81 ;jump to SYSTEM.CRASH instruction if instruction 0 is ever reach
 
 JSR HWM
 
-SET A, videoRAM
-SET B, fontRAM
-JSR sv.init ;set up boot screen and screen
-
 SET A, 0x2000 ;heap location
 SET B, 0x5000 ;length
 SET C, 0x0040 ;block size (64)

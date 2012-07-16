@@ -13,7 +13,7 @@
 ;:
 ;:## Subroutines
 
-:v.sPrompt DAT 0xF001, "$ ", 0
+:v.sPrompt DAT 0xa001, "$", 0xf001, " ", 0
 
 :dash.processMemory
 
@@ -50,9 +50,7 @@ JSR tusk.newProcess
 SET Z, A
 
 JSR dview.newScreen ;get screen location
-
-SET B, fontRAM ;get fontRAM location
-JSR sv.init
+SET PUSH, A         ;store it
 
 SET A, 0x80
 JSR tusk.getMem
@@ -60,15 +58,9 @@ SET [Z+v.stdin], A ;store the pointer in memory + v.stdin offset
 
 SET A, 0x80
 JSR tusk.getMem
-SET [Z+v.stdout], A ;store the pointer in memory + v.stdout offset
+SET [Z+v.stdout], A ;store the poitner in memory + v.stdout offset
 
-;SET A, 0x120 ;384 words, for the screen
-;JSR tusk.getMem
-;SET [Z+v.screenLoc], A
-
-JSR sv.clear ;clear the screen
-SET A, [v.scrnLoc]
-
+SET A, POP ;restore screen location
 :s.instance.promptLoop
 JSR s.takeIn
 SET PUSH, A ;keep track of cursor location
@@ -89,92 +81,20 @@ SET PC, POP
 ;:**returns** the cursor location on exit
 ;:
 :s.takeIn
-SET PUSH, I
-SET PUSH, J
-SET I, 0
+                   ;A is the screen output pointer
+SET B, v.sPrompt   ;make B the location of the prompt
+SET C, [Z+v.stdin] ;make C the raw output location
+JSR dview.prompt   ;write a prompt to the screen, put the output in stdout
 
-JSR sv.getNewLine ;get the next blank line after *cursorPointer*
-JSR s.drawPrompt ;draw the prompt using s.drawPrompt
-
-SET A, 1 ;HWI parameter
-
-:s.takeIn.loop
-IFL I, [v.promptLoc]
-  SET I, [v.promptLoc]
-SET [I], 0xf09e ;cursor character
-
-:s.takeIn.wait
-HWI [HW.GenericKeyboard]
-
-IFG C, 0x1f
-  IFL C, 0x80
-    SET PC, s.takeIn.write
-
-IFE C, 0x10
-  SET PC, s.takeIn.backspace
-
-IFE C, 0x11
-  SET PC, s.takeIn.enter
-  
-;INSERT (0x12)
-  
-IFE C, 0x13
-  SET PC, s.takeIn.delete
-  
-SET PC, s.takeIn.wait
-
-
-:s.takeIn.write
-XOR C, 0xF000
-STI [I], C
-
-IFN I, [v.scrnEnd] ;write normally
-  SET PC, s.takeIn.loop
-
-:s.takeIn.write.scroll
-SUB [v.promptLoc], [v.scrnWidth] ;make prompt scroll, too
-JSR sv.scrollUp ;scroll everything up
-SET PC, s.takeIn.loop
-
-
-:s.takeIn.backspace
-STD [I], 0
-SET [I], 0
-SET PC, s.takeIn.loop
- ;
-
-:s.takeIn.delete
-SET A, 2 ;changes interrupt action, so must be reset afterward
-SET B, 0x91 ;sets B to the *Control* key
-HWI [HW.GenericKeyboard] ;C becomes 1 if *Control* is pressed
-
-IFE C, 1 ;exit if 
-  SET PC, s.instance
-
-SET A, 1 ;reset interrupt action
-SET PC, s.takeIn.loop
- ;
-
-:s.takeIn.enter
-SET [I], 0
-SET A, [v.promptLoc]
-SET B, I ;UNNECESSARY ASSIGNMENT OF CURSOR POSITION
-JSR s.stdin
-
-SET A, I;return location in A
-SET I, POP
-SET J, POP
 SET PC, POP
  ;
 
 ;:### s.parse
-;:This subroutine isolates the first argument in *v.stdin* by scanning through, then stopping on null or 0x20. Then, it gets the *crp.sum* of the string. Then, it calls *p.lookup*, sets `B` to the location of stdin and `C` to the location of stdout, and invokes the subroutine returned by *p.lookup*.
-;:
-;:This should also point the process to the starts of the remaining arguments.
+;:This subroutine isolates the first argument in *v.stdin* by scanning through, then stopping on null or 0x20. Then, it gets the *crp.sum* of the string. Then, it calls *p.lookup*, sets `B` to the location of stdin, and invokes the subroutine returned by *p.lookup*.
 ;:
 :s.parse
-SET A, [Z+v.stdout] ;prepare stdout by nullifying the first word
-SET [A], 0x0000   ;to overwrite old output if it exists
+SET A, [Z+v.stdout] ;prepare stdout
+SET [A], 0          ;by nullifying the first word
 
 SET A, [Z+v.stdin] ;make both A and B the location of stdin
 SET B, A         ;for length-finding later
@@ -216,22 +136,6 @@ SET I, POP
 ;SET A, 0
 ;SET B, [v.scrnLoc]
 ;HWI [HW.LEM1802]
-
-SET PC, POP
- ;
-
-;:### s.drawPrompt (pointer)
-;:Draws a prompt using *env.cwds* and *v.sPrompt* at *pointer* and sets *v.promptLoc* to the location following the prompt.
-;:
-;:**returns** the location following the prompt
-;:
-:s.drawPrompt
-
-SET B, A
-SET A, v.sPrompt
-JSR sv.write
-
-SET [v.promptLoc], A
 
 SET PC, POP
  ;
@@ -295,11 +199,12 @@ SET PC, POP
 ;:### s.stdout (outputPointer)
 ;:Does a C-style copy from *v.stdout* to *outputPointer*.
 :s.stdout
-JSR sv.getNewLine
+;change A to the next new line
 
-SET B, A ;output
-SET A, [Z+v.stdout] ;input
-SET PC, sv.write ;process to screen (null-terminated)
+
+                    ;A is the output pointer
+SET B, [Z+v.stdout] ;input
+SET PC, dview.write ;process to screen (null-terminated)
  ;
 ;;RESERVED SPACE
 
