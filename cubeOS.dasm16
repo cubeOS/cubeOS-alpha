@@ -638,15 +638,45 @@ HWI B ;interrupt the port that triggered the interrupt
 
 SET A, POP
 
-;WRITING HERE
-
 IFE C, [A+3] ;if C is the exit character
   IFN [A+2], 0 ;if the notify location is not empty
     JSR [A+2] ;jump to "notify" location
 
+IFG C, 0x1f ;if the key is an ASCII key
+  SET PC, kd.keystroke.writeChar
+
 SET PC, POP
  ;return from the interrupt
 
+:kd.keystroke.writeChar
+SET B, [A+5] ;max onscreen position
+IFE B, 0 ;if there is no max position specified
+  SET B, 0xffff ;make B the highest possible value (no pointer)
+
+IFL [A+1], B ;if the screen location is less than the maximum
+  SET PC, kd.keystroke.continue ;then continue
+
+SET PC, POP ;otherwise, return
+
+:kd.keystroke.continue
+SET PUSH, Y ;we're going to use Y to colorize 
+
+SET B, [A] ;set B to the direct write location
+SET [B], C ;write the ASCII key
+ADD [A], 1 ;increase the pointer
+
+SET B, [A+1]      ;set B to the screen write location
+SET Y, [B+0xffff] ;set Y to the character before the screen write location
+AND Y, 0xff80     ;make Y consist of only the effect characters
+
+SET [B], C ;write C onscreen
+BOR [B], Y ;colorize the onscreen character
+
+ADD [A+1], 1 ;increase the onscreen write pointer
+
+SET Y, POP
+SET PC, POP
+ ;
 
 ;:## Data Structures
 ;:
@@ -3089,6 +3119,8 @@ SET [A+1], POP             ;the output location (after the prompt
 SET [A], POP               ;*userTextOutput*
 SET [A+2], dview.endPrompt ;end the prompt waitloop
 SET [A+3], 0x11            ;set the exit key to "return"
+
+SET [A+5], 0 ;disable maximum-location
 ;OTHER PARAMETERS NEED TO BE SET
 
 ;SET A, 1
