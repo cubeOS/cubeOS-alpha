@@ -20,10 +20,8 @@ SET B, [A]   ;make B the port number
 SET A, [A+2] ;make A the configuration location
 
 SET PUSH, A
-SET A, 2 ;get ASCII key in C
+SET A, 1 ;get ASCII key in C
 HWI B ;interrupt the port that triggered the interrupt
-
-;C BECOMES 0 HERE, NO MATTER WHAT KEY IS PRESSED, AND I DON'T KNOW WHY
 
 SET A, POP
 
