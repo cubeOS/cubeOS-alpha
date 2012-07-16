@@ -44,11 +44,11 @@ IFE B, 0 ;if there is no max position specified
   SET B, 0xffff ;make B the highest possible value (no pointer)
 
 IFL [A+1], B ;if the screen location is less than the maximum
-  SET PC, kd.keystroke.continue ;then continue
+  SET PC, kd.keystroke.writeChar.continue ;then continue
 
 SET PC, POP ;otherwise, return
 
-:kd.keystroke.continue
+:kd.keystroke.writeChar.continue
 SET PUSH, Y ;we're going to use Y to colorize 
 
 SET B, [A] ;set B to the direct write location
@@ -66,7 +66,23 @@ ADD [A+1], 1 ;increase the onscreen write pointer
 
 SET Y, POP
 SET PC, POP
- ;
+
+:kd.keystroke.backspace
+IFG [A+1], [A+4] ;if the current screenpointer is at the minimum location
+  SET PC, kd.keystroke.backspace.continue ;then continue
+
+SET PC, POP ;otherwise, return
+
+:kd.keystroke.backspace.continue
+SUB [A], 1 ;decrement the direct write location
+SET B, [A] ;make B the direct write location
+SET [B], 0 ;erase the previous character
+
+SUB [A+1], 1 ;decrement the screen write location
+SET B, [A+1] ;make B the screen write location
+SET [B], 0   ;erase the previous character
+
+SET PC, POP
 
 ;:## Data Structures
 ;:
