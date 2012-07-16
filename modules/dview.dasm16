@@ -334,9 +334,8 @@ SET PC, dview.write.directive.substitute.color.loop
  ;
 
 ;:### dview.prompt (screenOutputPointer, inputPointer, userTextOutput)
-;:Uses *dview.write* to write a prompt (from *inputPointer*) to *screenOutputPointer*, assuming the last non-null word pointed to by *inputPointer* is a cursor character, and will be moved accordingly as the user types.
+;:Uses *dview.write* to write a prompt (from *inputPointer*) to *screenOutputPointer*.
 ;:
-;:**under development**
 ;:
 :dview.prompt
 SET PUSH, C
@@ -357,13 +356,15 @@ JSR tusk.getMem
 
 SET [B], A
 
-SET [A+1], POP             ;the output location (after the prompt
+SET [A+1], POP             ;the output location (after the prompt)
 SET [A], POP               ;*userTextOutput*
 SET [A+2], dview.endPrompt ;end the prompt waitloop
 SET [A+3], 0x11            ;set the exit key to "return"
 
 SET [A+4], [A+1] ;minimum-location is the starting location (as normal)
 SET [A+5],0      ;disable the max-location
+
+SET PUSH, A ;store A for screen pointer retreival
 
 ;SET A, 1
 ;JSR tusk.getMem ;get 1 word of memory (at minimum)
@@ -373,6 +374,11 @@ SET [dview.temp.promptflag], 1
 :dview.prompt.loop
 IFN [dview.temp.promptflag], 0
   SET PC, dview.prompt.loop
+
+SET A, POP ;restore memory location
+SET A, [A+1] ;make A the last screen index
+
+JSR tusk.dropMem
 
 SET PC, POP
 
