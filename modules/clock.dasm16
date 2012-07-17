@@ -1,5 +1,6 @@
 :clock.heapSpace DAT 0
 :clock.count DAT 0
+:clock.heapEnd DAT 0
 
 ;:### clock.init 
 ;:
@@ -7,7 +8,17 @@
 SET A, 32
 JSR tusk.getMem
 SET [clock.heapSpace], A
+ADD A, 32
+SET [clock.heapEnd], A
 SET [clock.count], 0
+SET A, 0
+SET B, 1
+HWI [HW.GenericClock]
+SET A, clock.tick
+JSR pih.newMsg
+SET B, A
+SET A, 2
+HWI [HW.GenericClock]
 SET PC, POP
 
 ;:### clock.newCall (notifyLocation, frequency)
@@ -19,8 +30,34 @@ SET C, [clock.heapSpace]
 IFE [C], 0
   SET PC, clock.newCall.addCall
 ADD C, 2
-SET PC, clock.newCall.findSpace
+IFN C, [clock.heapEnd]
+  SET PC, clock.newCall.findSpace
 
 :clock.newCall.addCall
 SET [C], A
 SET [C+1], B
+
+;:### clock.tick
+;:
+:clock.tick
+SET A, [clock.heapSpace]
+SET B, [clock.count]
+
+:clock.tick.alert
+SET C, 60
+MOD C, [A+1]
+IFE C, 0
+  JSR clock.tick.jump
+ADD A, 2
+IFN A, [clock.heapEnd]
+  SET PC, clock.tick.alert
+
+:clock.tick.jump
+SET PUSH, A
+SET PUSH, B
+SET PUSH, C
+JSR [A]
+SET C, POP
+SET B, POP
+SET A, POP
+SET PC, POP
