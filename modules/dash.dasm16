@@ -86,6 +86,17 @@ SET B, v.sPrompt   ;make B the location of the prompt
 SET C, [Z+v.stdin] ;make C the raw output location
 JSR dview.prompt   ;write a prompt to the screen, put the output in stdout
 
+SET C, A ;make C the location after the user prompt
+
+SET A, 0
+SET B, 0
+JSR dview.getLoc ;get the screen location of the current screen
+
+SUB C, A      ;make C a hypothetical screen index
+AND C, 0xffe0 ;make the X coordinate 0
+ADD C, 32     ;increase the Y coordinate by 1
+ADD A, C      ;make A the actual screen index
+
 SET PC, POP
  ;
 
@@ -188,23 +199,15 @@ IFL X, 15
 ADD X, 1
 SET PC, POP
 
-
-
-;:s.stdin.escflag DAT 0 ;is 1 if "\" was the most recent character
-
-;:s.stdin.args ;for handling arguments
-;DAT 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
- ;
-
 ;:### s.stdout (outputPointer)
 ;:Does a C-style copy from *v.stdout* to *outputPointer*.
 :s.stdout
 ;change A to the next new line
 
-
                     ;A is the output pointer
 SET B, [Z+v.stdout] ;input
 SET PC, dview.write ;process to screen (null-terminated)
+SUB PC, 1 ;debug
  ;
 ;;RESERVED SPACE
 
