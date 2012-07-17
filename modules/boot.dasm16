@@ -18,8 +18,6 @@ SET [0], 0x7f81 ;jump to SYSTEM.CRASH instruction if instruction 0 is ever reach
 
 JSR HWM
 
-JSR clock.init
-
 SET A, videoRAM
 SET B, fontRAM
 JSR sv.init ;set up boot screen and screen
