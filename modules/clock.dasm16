@@ -44,6 +44,9 @@ SET A, [clock.heapSpace]
 SET B, [clock.count]
 
 :clock.tick.alert
+ADD B, 1
+IFE B, 60
+  SET B, 0
 SET C, 60
 MOD C, [A+1]
 IFE C, 0
