@@ -13,7 +13,7 @@
 ;:
 ;:## Subroutines
 
-:v.sPrompt DAT 0xa001, "$", 0xf001, " ", 0
+:v.sPrompt DAT 0x2001, "$ ", 0
 
 :dash.processMemory
 
