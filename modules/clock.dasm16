@@ -1,6 +1,8 @@
 :clock.heapSpace DAT 0
 :clock.count DAT 0
 
+;:### clock.init 
+;:
 :clock.init
 SET A, 32
 JSR tusk.getMem
@@ -9,6 +11,7 @@ SET [clock.count], 0
 SET PC, POP
 
 ;:### clock.newCall (notifyLocation, frequency)
+;:
 :clock.newCall
 SET C, [clock.heapSpace]
 
