@@ -55,6 +55,8 @@ SET A, 0x8000
 SET B, 0x810
 SET C, 128
 
+JSR clock.init ;initialize the clock
+
 JSR cat.mountSystem ;initialize FS
 
 JSR p.init ;initialize DPH
@@ -361,6 +363,87 @@ SET I, POP
 SET PC, POP
  ;
  ;;
+
+; ; ; ;
+:clock.heapSpace DAT 0
+:clock.count DAT 0
+:clock.heapEnd DAT 0
+
+;:### clock.init 
+;:
+:clock.init
+SET A, 32
+JSR tusk.getMem
+SET [clock.heapSpace], A
+
+ADD A, 16
+SET [clock.heapEnd], A
+SET [clock.count], 0
+
+SET A, clock.tick
+JSR pih.newMsg
+
+SET B, A
+SET A, 2
+HWI [HW.GenericClock]
+
+SET A, 0
+SET B, 1
+HWI [HW.GenericClock]
+SET PC, POP
+
+;:### clock.newCall (notifyLocation, frequency)
+;:
+:clock.newCall
+SET C, [clock.heapSpace]
+
+:clock.newCall.findSpace
+IFE [C], 0
+  SET PC, clock.newCall.addCall
+ADD C, 2
+IFN C, [clock.heapEnd]
+  SET PC, clock.newCall.findSpace
+
+:clock.newCall.addCall
+SET [C], A
+SET [C+1], B
+
+;:### clock.tick
+;:
+:clock.tick
+SET A, [clock.heapSpace]
+SET B, [clock.count]
+
+:clock.tick.alert
+ADD B, 1
+IFE B, 60
+  SET B, 0
+SET C, 60
+SET Z, [A+1]
+IFE [A+1], 0
+  SET PC, clock.tick.alert.continueloop
+MOD C, [A+1]
+IFE C, 0
+  SET PC, clock.tick.jump
+
+:clock.tick.alert.continueloop
+ADD A, 2
+IFL A, [clock.heapEnd]
+  SET PC, clock.tick.alert
+
+SUB PC, 1 ;debug
+SET PC, POP
+
+:clock.tick.jump
+SUB PC, 1 ;debug
+SET PUSH, A
+SET PUSH, B
+SET PUSH, C
+JSR [A]
+SET C, POP
+SET B, POP
+SET A, POP
+SET PC, clock.tick.alert.continueloop
 
 ; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -3137,17 +3220,7 @@ SET [A+2], dview.endPrompt ;end the prompt waitloop
 SET [A+3], 0x11            ;set the exit key to "return"
 
 SET [A+4], [A+1] ;minimum-location is the starting location (as normal)
-
-;SET PUSH, A ;store A
-
-;SET A, 15
-;SET B, 5        ;we can discard B
-;JSR dview.getLoc ;get the last index
-;SET B, A
-;SET A, POP
-
-SET [A+5], 0x2450 ;make the max-location the last screen index
-;OTHER PARAMETERS NEED TO BE SET
+SET [A+5],0      ;disable the max-location
 
 ;SET A, 1
 ;JSR tusk.getMem ;get 1 word of memory (at minimum)
@@ -3218,6 +3291,9 @@ SET A, package.showmaps
 JSR p.loadPackage
 
 SET A, package.inferno
+JSR p.loadPackage
+
+SET A, package.ctest
 JSR p.loadPackage
 
 SET A, package.mkdir
@@ -3647,6 +3723,21 @@ SET PC, typ.cCopy
 
 :pack.inferno.text DAT 0xF001, "Lasciate ogne speranza, voi ch'intrate.", 0
  ;
+:package.ctest
+DAT 0xffab, 0xcdff
+DAT "ctest", 0
+
+SET A, package.ctest.notify
+SET B, 6
+JSR clock.newCall
+
+SET PC, POP
+
+:package.ctest.notify
+ADD [package.ctest.count], 1
+SET PC, POP
+
+:package.ctest.count DAT 0
 :package.mkdir
 DAT 0xffab, 0xcdff
 DAT "mkdir", 0

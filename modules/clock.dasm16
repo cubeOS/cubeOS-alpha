@@ -8,16 +8,20 @@
 SET A, 32
 JSR tusk.getMem
 SET [clock.heapSpace], A
-ADD A, 32
+
+ADD A, 16
 SET [clock.heapEnd], A
 SET [clock.count], 0
-SET A, 0
-SET B, 1
-HWI [HW.GenericClock]
+
 SET A, clock.tick
 JSR pih.newMsg
+
 SET B, A
 SET A, 2
+HWI [HW.GenericClock]
+
+SET A, 0
+SET B, 1
 HWI [HW.GenericClock]
 SET PC, POP
 
@@ -48,14 +52,23 @@ ADD B, 1
 IFE B, 60
   SET B, 0
 SET C, 60
+SET Z, [A+1]
+IFE [A+1], 0
+  SET PC, clock.tick.alert.continueloop
 MOD C, [A+1]
 IFE C, 0
-  JSR clock.tick.jump
+  SET PC, clock.tick.jump
+
+:clock.tick.alert.continueloop
 ADD A, 2
-IFN A, [clock.heapEnd]
+IFL A, [clock.heapEnd]
   SET PC, clock.tick.alert
 
+SUB PC, 1 ;debug
+SET PC, POP
+
 :clock.tick.jump
+SUB PC, 1 ;debug
 SET PUSH, A
 SET PUSH, B
 SET PUSH, C
@@ -63,4 +76,4 @@ JSR [A]
 SET C, POP
 SET B, POP
 SET A, POP
-SET PC, POP
+SET PC, clock.tick.alert.continueloop
