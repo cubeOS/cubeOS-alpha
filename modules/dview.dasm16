@@ -336,6 +336,7 @@ SET PC, dview.write.directive.substitute.color.loop
 ;:### dview.prompt (screenOutputPointer, inputPointer, userTextOutput)
 ;:Uses *dview.write* to write a prompt (from *inputPointer*) to *screenOutputPointer*.
 ;:
+;:**returns** the screen location following the last user-entered key
 ;:
 :dview.prompt
 SET PUSH, C
@@ -362,7 +363,7 @@ SET [A+2], dview.endPrompt ;end the prompt waitloop
 SET [A+3], 0x11            ;set the exit key to "return"
 
 SET [A+4], [A+1] ;minimum-location is the starting location (as normal)
-SET [A+5],0      ;disable the max-location
+SET [A+5], 0     ;disable the max-location
 
 SET PUSH, A ;store A for screen pointer retreival
 
