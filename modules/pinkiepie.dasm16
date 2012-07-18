@@ -62,8 +62,11 @@ SET A, PICK 2 ;get A before it was pushed to the stack for the interrupt
 SET PUSH, B
 SET PUSH, C
 
-JSR PICK 2 ;jump to what X was
+SET PUSH, pih.exitfrominterrupt ;do the equivalent of JSR, exiting to
+                                ;pih.exitfrominterrupt
+SET PC, PICK 3                  ;jump to what X was
 
+:pih.exitfrominterrupt
 SET C, POP
 SET B, POP
 SET 0, POP ;drop the value that needed to be pushed for the jump

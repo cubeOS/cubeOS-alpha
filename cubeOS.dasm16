@@ -51,33 +51,14 @@ JSR heap.init
 
 JSR pih.init
 
+JSR clock.init ;initialize the clock
+
 SET A, 0x8000
 SET B, 0x810
 SET C, 128
-
-JSR clock.init ;initialize the clock
-
 JSR cat.mountSystem ;initialize FS
 
 JSR p.init ;initialize DPH
-
-SET A, 0
-SET B, 6
-HWI [HW.GenericClock]
-
-SET A, 0
-SET B, 0x0FFF
-HWI [HW.Speaker]
-
-SET A, 1
-:__BOOT.wait
-HWI [HW.GenericClock]
-IFL C, 15
-  SET PC, __BOOT.wait
-
-SET A, 0
-SET B, 0
-HWI [HW.Speaker]
 
 JSR s.instance ;spawn an instance of the DASH Shell
 
@@ -376,7 +357,7 @@ SET A, 32
 JSR tusk.getMem
 SET [clock.heapSpace], A
 
-ADD A, 16
+ADD A, 32
 SET [clock.heapEnd], A
 SET [clock.count], 0
 
@@ -411,31 +392,31 @@ SET [C+1], B
 ;:### clock.tick
 ;:
 :clock.tick
-SET A, [clock.heapSpace]
-SET B, [clock.count]
+SET A, [clock.heapSpace] ;make A the location of the schedule
+SET B, [clock.count]     ;make B the number of ticks (mod 60) so far
+ADD B, 1                 ;add one to that number of ticks
+IFE B, 60                ;if the value has topped out,
+  SET B, 0               ;set it to zero
+
+SET [clock.count], B     ;then update clock.count
 
 :clock.tick.alert
-ADD B, 1
-IFE B, 60
-  SET B, 0
+IFE [A+1], 0                            ;if there is no frequency registered,
+  SET PC, clock.tick.alert.continueloop ;then just move along.
 SET C, 60
-SET Z, [A+1]
-IFE [A+1], 0
-  SET PC, clock.tick.alert.continueloop
 MOD C, [A+1]
 IFE C, 0
   SET PC, clock.tick.jump
 
 :clock.tick.alert.continueloop
 ADD A, 2
+
 IFL A, [clock.heapEnd]
   SET PC, clock.tick.alert
 
-SUB PC, 1 ;debug
 SET PC, POP
 
 :clock.tick.jump
-SUB PC, 1 ;debug
 SET PUSH, A
 SET PUSH, B
 SET PUSH, C
@@ -2770,8 +2751,11 @@ SET A, PICK 2 ;get A before it was pushed to the stack for the interrupt
 SET PUSH, B
 SET PUSH, C
 
-JSR PICK 2 ;jump to what X was
+SET PUSH, pih.exitfrominterrupt ;do the equivalent of JSR, exiting to
+                                ;pih.exitfrominterrupt
+SET PC, PICK 3                  ;jump to what X was
 
+:pih.exitfrominterrupt
 SET C, POP
 SET B, POP
 SET 0, POP ;drop the value that needed to be pushed for the jump
@@ -3260,16 +3244,13 @@ JSR dl.makeHashTable
 SET A, package.calc
 JSR p.loadPackage
 
+SET A, package.break
+JSR p.loadPackage
+
 SET A, package.ls
 JSR p.loadPackage
 
-SET A, package.testbin
-JSR p.loadPackage
-
 SET A, package.memdump
-JSR p.loadPackage
-
-SET A, package.test
 JSR p.loadPackage
 
 SET A, package.rainbow
@@ -3293,10 +3274,10 @@ JSR p.loadPackage
 SET A, package.inferno
 JSR p.loadPackage
 
-SET A, package.ctest
+SET A, package.mkdir
 JSR p.loadPackage
 
-SET A, package.mkdir
+SET A, package.stopwatch
 JSR p.loadPackage
 
 SET A, package.benchmark
@@ -3476,6 +3457,22 @@ SET PC, package.calc.mathloop
 SET A, POP
 SET B, POP
 SET PC, typ.htoascii
+:package.break ;Header
+DAT 0xffab, 0xcdff
+DAT "break", 0
+
+set a, break.Out
+set b, break.In
+jsr typ.cUnpack
+ife [break.Out +1], 0
+	jsr ext
+jsr exf
+
+:break.Out
+DAT "HI"
+
+:break.In
+DAT 0x0025
 ;:### package.ls
 ;:Writes the names all of the links (files and directories) in the current working directory to stdout.
 ;:
@@ -3535,32 +3532,6 @@ SET [B+0xffff], 0 ;set the last newline to 0, so it prints cleanly
 SET I, POP
 SET PC, POP
  ;
-:package.testbin
-DAT 0xffab, 0xcdff
-DAT "testbin", 0
-
-SET A, 0
-SET B, [B+1]
-SET C, 2
-JSR cat.newFile
-
-SET PUSH, A
-SET B, 0xa000
-JSR cat.open
-
-SET A, package.testbin.binary
-SET B, 0xa004
-JSR typ.cCopy
-
-SET [0xa003], 5 ;the length of the binary is 5 words
-
-SET A, 0xa004
-SET B, POP
-JSR cat.write
-
-:package.testbin.binary
-DAT 0x7d41, 0x0030, 0x8842, 0x8541, 0x6381, 0 ;simple binary executable
-
 :package.memdump
 DAT 0xffab, 0xcdff
 DAT "memdump", 0
@@ -3598,11 +3569,6 @@ SET Y, X
 ;discard the pushed $2 because we don't want it and it technically doesn't exist
 SET 0, POP
 SET PC, package.memdump.skip
-:package.test
-DAT 0xffab, 0xcdff
-DAT "test", 0
-
-SET PC, 0 ;crash
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
 ;:
@@ -3682,6 +3648,12 @@ SET B, package.tdview.prompt
 SET C, [Z+v.stdout]
 JSR dview.prompt
 
+SET A, 0xffff
+:package.tdview.loop
+SUB A, 1
+IFN A, 0
+  SET PC, package.tdview.loop
+
 JSR dview.close
 
 SET PC, POP
@@ -3723,21 +3695,6 @@ SET PC, typ.cCopy
 
 :pack.inferno.text DAT 0xF001, "Lasciate ogne speranza, voi ch'intrate.", 0
  ;
-:package.ctest
-DAT 0xffab, 0xcdff
-DAT "ctest", 0
-
-SET A, package.ctest.notify
-SET B, 6
-JSR clock.newCall
-
-SET PC, POP
-
-:package.ctest.notify
-ADD [package.ctest.count], 1
-SET PC, POP
-
-:package.ctest.count DAT 0
 :package.mkdir
 DAT 0xffab, 0xcdff
 DAT "mkdir", 0
@@ -3746,6 +3703,29 @@ SET A, [v.cwd]
 SET B, [B+1]
 SET C, 1 ;directory
 SET PC, cat.newFile
+:package.stopwatch
+DAT 0xffab, 0xcdff
+DAT "watch", 0
+
+JSR dview.newScreen ;register a new screen
+                    ;this makes A the screen's location
+
+SET B, package.stopwatch.showtext
+JSR dview.write
+
+SET PUSH, A ;push the output location
+
+:package.stopwatch.displayloop
+SET A, PEEK
+SET B, package.stopwatch.counter
+JSR dview.write                  ;write the tick count onscreen, replacing the old one
+SET PC, package.stopwatch.displayloop
+
+:package.stopwatch.showtext
+DAT "Clock ticks: ", 0
+:package.stopwatch.counter
+DAT 0x781a, clock.count, 0  ;substitute the hexidecimal value [clock.count]
+ ;
 :package.benchmark
 DAT 0xffab, 0xcdff
 DAT "benchmark", 0
