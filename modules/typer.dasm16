@@ -187,6 +187,7 @@ add C, 1
 SET PC, typ.cUnpack.loop
 
 :typ.cUnpack.exit
+add c, 1
 set [c], 0
 SET A, C
 SET I, POP
