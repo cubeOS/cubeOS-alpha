@@ -29,33 +29,14 @@ JSR heap.init
 
 JSR pih.init
 
+JSR clock.init ;initialize the clock
+
 SET A, 0x8000
 SET B, 0x810
 SET C, 128
-
-JSR clock.init ;initialize the clock
-
 JSR cat.mountSystem ;initialize FS
 
 JSR p.init ;initialize DPH
-
-SET A, 0
-SET B, 6
-HWI [HW.GenericClock]
-
-SET A, 0
-SET B, 0x0FFF
-HWI [HW.Speaker]
-
-SET A, 1
-:__BOOT.wait
-HWI [HW.GenericClock]
-IFL C, 15
-  SET PC, __BOOT.wait
-
-SET A, 0
-SET B, 0
-HWI [HW.Speaker]
 
 JSR s.instance ;spawn an instance of the DASH Shell
 
