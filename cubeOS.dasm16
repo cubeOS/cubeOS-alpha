@@ -17,6 +17,7 @@ DAT SYSTEM.CRASH
 :env.cwds DAT 0
 :env.fs DAT 0
 :env.heap DAT 0
+:env.uptime DAT 0, 0 ;32-bit word
  ;;
 
 ; ; ; ;
@@ -149,7 +150,31 @@ HWI [HW.GenericClock]
 SET A, 0
 SET B, 1
 HWI [HW.GenericClock]
+
+SET A, clock.uptime
+SET B, 60
+JSR clock.newCall ;define once-per-second call to the uptime routine
+
 SET PC, POP
+
+;:### clock.uptime
+;:Adds one to the uptime counter (32 bit)
+;:
+:clock.uptime
+SET A, env.uptime
+
+:clock.uptime.loop
+ADD [A], 1
+IFE EX, 0
+  SET PC, POP
+
+:clock.uptime.addmore
+ADD A, 1
+IFN A, env.uptime+2
+  SET PC, clock.uptime.loop
+
+;This area of code is what happens if the uptime counter overflows.
+SUB PC, 1
 
 ;:### clock.newCall (notifyLocation, frequency)
 ;:
@@ -2889,21 +2914,31 @@ SET PC, dview.write.loop
 ;:
 ;:##### Formatting ASCII codes
 ;:
-;:**packed string** `70` as referring to **p** <br />
-;:**string**        `73` as referring to **s** <br />
-;:**hexidecimal**   `78` as referring to **x** <br />
+;:`0b0000 0000 m000 0000`, where m is the "memory" bit, implying that the next word is a pointer to the actual word to be interpreted
+;:
+;:**decimal**       `64` as referring to **d**; *literal* <br />
+;:**packed string** `70` as referring to **p**; *pointer* <br />
+;:**string**        `73` as referring to **s**; *pointer* <br />
+;:**hexidecimal**   `78` as referring to **x**; *literal* <br />
 ;:
 :dview.write.directive.substitute
 SET C, 0xff00 ;get the first 8 bits
 AND C, [I]    ;of the directive
 SHR C, 8      ;and make them the rightmost 8 bits of C
 
-SET A, [I+1] ;get the hextet to display
+SET A, [I+1] ;relevant word
+
+IFB [I], 0x0080 ;if the eighth bit from the left is on,
+  SET A, [A]    ;A is interpreted as a pointer
+
 SET B, J     ;get the output location
 
 SET PUSH, B
 SET PUSH, dview.write.directive.substitute.color
  ;when the formatting subroutine exits, go to this point
+
+IFE C, 0x64 ;decimal
+  SET PC, typ.dtoascii
 
 IFE C, 0x70 ;packed string
   SET PC, typ.cUnpack
@@ -3015,7 +3050,13 @@ JSR p.loadPackage
 SET A, package.ls
 JSR p.loadPackage
 
+SET A, package.asciitod
+JSR p.loadPackage
+
 SET A, package.memdump
+JSR p.loadPackage
+
+SET A, package.rpnmath
 JSR p.loadPackage
 
 SET A, package.rainbow
@@ -3169,7 +3210,7 @@ SET Z, X
 
 :package.calc.pushloop
 SET A, [X]
-;we don't want to convert the operators to ASCII, they already are
+;we don't want to convert the operators to ASCII; they already are
 IFN [A], 0x002B
  IFN [A], 0x002D
   IFN [A], 0x002A
@@ -3187,6 +3228,8 @@ IFN X, Y
 SET PC, package.calc.pushloop
 
 ;handle each val-val-postfix triplet as a discrete unit (no support for unary operators yet)
+;ADD Z, 1
+SUB X, 1
 :package.calc.mathloop
 SET A, POP
 SET B, POP
@@ -3212,14 +3255,18 @@ DIV A, B
 IFE C, 0x0025
 MOD A, B
 
+;given an invalid operator, A just gets pushed back to the stack
+
 ;push the result back onto the stack
 SET PUSH, A
 
-SUB X, 1
-IFN X, Z
+SUB X, 2
+;IFN X, Z
+IFG X, Z
 SET PC, package.calc.mathloop
 
 SET A, POP
+;B should be stdout
 SET B, POP
 SET PC, typ.htoascii
 :package.break ;Header
@@ -3297,6 +3344,18 @@ SET [B+0xffff], 0 ;set the last newline to 0, so it prints cleanly
 SET I, POP
 SET PC, POP
  ;
+:package.asciitod
+DAT 0xffab, 0xcdff
+DAT "asciitod", 0
+
+SET PUSH, C
+SET A, [B+1]
+JSR typ.asciitod
+
+SET B, POP
+JSR typ.dtoascii
+SET [A], 0
+SET PC, POP
 :package.memdump
 DAT 0xffab, 0xcdff
 DAT "memdump", 0
@@ -3334,6 +3393,48 @@ SET Y, X
 ;discard the pushed $2 because we don't want it and it technically doesn't exist
 SET 0, POP
 SET PC, package.memdump.skip
+:package.rpnmath
+DAT 0xffab, 0xcdff
+DAT "rpnmath", 0
+
+; + 2B
+; - 2D
+; * 2A
+; / 2F
+; % 25
+
+SET A, [B+1]
+SET PUSH, C
+SET PUSH, [B+3]
+;SET PUSH, A
+SET PUSH, [B+2]
+JSR typ.asciitoh
+SET X, A
+SET A, POP
+JSR typ.asciitoh
+SET B, A
+;SET A, POP
+SET A, X
+SET C, POP
+
+;addition
+IFE [C], 0x002B
+ADD A, B
+;subtraction
+IFE [C], 0x002D
+SUB A, B
+;multiplication
+IFE [C], 0x002A
+MUL A, B
+;division
+IFE [C], 0x002F
+DIV A, B
+;mod
+IFE [C], 0x0025
+MOD A, B
+
+SET B, POP
+SET PC, typ.htoascii
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
 ;:
@@ -3470,30 +3571,14 @@ SET C, 1 ;directory
 SET PC, cat.newFile
 :package.stopwatch
 DAT 0xffab, 0xcdff
-DAT "watch", 0
+DAT "uptime", 0
 
-JSR dview.newScreen ;register a new screen
-                    ;this makes A the screen's location
+SET A, C
+SET B, package.uptime.text
+SET PC, dview.write
 
-SET B, package.stopwatch.showtext
-JSR dview.write
-
-SET PUSH, A ;push the output location
-
-:package.stopwatch.displayloop
-SET [package.stopwatch.location], [clock.count]
-
-SET A, PEEK
-SET B, package.stopwatch.counter
-JSR dview.write                  ;write the tick count onscreen, replacing the old one
-SET PC, package.stopwatch.displayloop
-
-:package.stopwatch.showtext
-DAT "Clock ticks: ", 0
-:package.stopwatch.counter
-DAT 0x781a
-:package.stopwatch.location
-DAT 0, 0
+:package.uptime.text
+DAT "Uptime: ", 0x789a, env.uptime+1, " ", 0x789a, env.uptime, 0
  ;
 :package.benchmark
 DAT 0xffab, 0xcdff

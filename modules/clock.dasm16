@@ -23,7 +23,31 @@ HWI [HW.GenericClock]
 SET A, 0
 SET B, 1
 HWI [HW.GenericClock]
+
+SET A, clock.uptime
+SET B, 60
+JSR clock.newCall ;define once-per-second call to the uptime routine
+
 SET PC, POP
+
+;:### clock.uptime
+;:Adds one to the uptime counter (32 bit)
+;:
+:clock.uptime
+SET A, env.uptime
+
+:clock.uptime.loop
+ADD [A], 1
+IFE EX, 0
+  SET PC, POP
+
+:clock.uptime.addmore
+ADD A, 1
+IFN A, env.uptime+2
+  SET PC, clock.uptime.loop
+
+;This area of code is what happens if the uptime counter overflows.
+SUB PC, 1
 
 ;:### clock.newCall (notifyLocation, frequency)
 ;:
