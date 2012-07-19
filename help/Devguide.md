@@ -30,3 +30,30 @@ n     : EOF; 0x4
 ## Communication ##
 When sending files, `EOF`(0x4) should be stripped from the end of files, along with the inode `(Words 0x0000 - 0x0004 of the file.)`  
 When receiving files, these should be re-added so the files can be recognized by the OS.
+
+## Subroutines ##
+
+### Tasker ###
+
+#### tusk.newProcess ####
+Registers a new process of unique ID. <strike>Adds the process id to the table at *v.tusk.PIDloc*.</strike>
+**Modifies:** A
+**Returns:** a pointer to the first memory for the process's use
+
+#### tusk.getMem (length) ####
+Reserves a *length* amount of memory from the heap using *heap.alloc*, and stores *length* and the location of the reserved memory on the "memory stack," which allows that memory to be freed either when the process calls *tusk.free* or when it terminates.
+
+**Modifies** A
+**Returns** the first location of the reserved memory
+
+#### tusk.dropMem ####
+Frees up the memory previously reserved by tusk.getMem
+**Modifies:** Nothing
+**Returns:** Nothing
+
+### Template ###
+
+#### Template.title(input) ####
+Description
+**Modifies:** Register 1, Register 2
+**Returns:** Return 1, Return 2
