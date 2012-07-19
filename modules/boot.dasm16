@@ -18,10 +18,6 @@ SET [0], 0x7f81 ;jump to SYSTEM.CRASH instruction if instruction 0 is ever reach
 
 JSR HWM
 
-SET A, videoRAM
-SET B, fontRAM
-JSR sv.init ;set up boot screen and screen
-
 SET A, 0x2000 ;heap location
 SET B, 0x5000 ;length
 SET C, 0x0040 ;block size (64)
@@ -29,14 +25,15 @@ JSR heap.init
 
 JSR pih.init
 
-JSR clock.init ;initialize the clock
-
 SET A, 0x8000
 SET B, 0x810
 SET C, 128
+
 JSR cat.mountSystem ;initialize FS
 
 JSR p.init ;initialize DPH
+
+JSR clock.init
 
 JSR s.instance ;spawn an instance of the DASH Shell
 
