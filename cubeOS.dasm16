@@ -40,6 +40,10 @@ SET [0], 0x7f81 ;jump to SYSTEM.CRASH instruction if instruction 0 is ever reach
 
 JSR HWM
 
+SET A, videoRAM
+SET B, fontRAM
+JSR sv.init ;set up boot screen and screen
+
 SET A, 0x2000 ;heap location
 SET B, 0x5000 ;length
 SET C, 0x0040 ;block size (64)
@@ -138,6 +142,293 @@ SET PC, POP
  ;
  ;;
  
+
+; ; ; ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SIMVID ; Video Manager ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+:v.scrnLoc DAT 0
+:v.scrnEnd DAT 0
+:v.scrnHeight DAT 12
+:v.scrnWidth DAT 32
+
+;:### sv.init (videoRAMPointer, fontRAMPointer)
+;:Maps the screen's font to *fontRAMPointer* and the screen's video ram to *videoRAMPointer* in that order.
+;:
+:sv.init
+
+SET PUSH, A
+SET A, 1
+HWI [HW.LEM1802] ;MEM_MAP_FONT
+
+SET B, POP
+SET A, 0
+HWI [HW.LEM1802] ;MEM_MAP_SCREEN
+
+SET [v.scrnLoc], B
+ADD B, 0x180
+SET [v.scrnEnd], B
+SET PC, POP
+ ;
+
+;:### sv.newWindow
+;:Reserves screen space in the heap, maps the screen to it.
+;:
+;:**returns** the first index in the new screen location
+;:
+:sv.newWindow
+SET A, 0x120
+JSR tusk.getMem ;reserve 384 words
+
+SET B, A
+SET A, 0
+HWI [HW.LEM1802] ;remap the screen to this heap location
+
+SET A, B ;return the location of the screen
+SET PC, POP
+
+;:### sv.write (inputPointer, outputPointer)
+;:Writes ASCII to the screen using special characters to act as directives. (This does not perform preprocessing such as translating normal ASCII into those special characters.) Special characters are as follows.
+;:**returns** the location of the null following the written text
+;:
+;:#### Color `0x01`
+;:Substitutes the first nine bits of every word following this with the first nine bits of this word.
+;:
+;:
+;:
+:sv.write
+IFC [A], 0x007F ;if the last 7 bits are 0b0000 000
+  SET PC, sv.write.exitEarly ;exit early
+
+SET PUSH, I
+SET PUSH, J
+
+SET I, A
+SET J, B
+SET [sv.write.v.color], 0xF000 ;default to white on black
+
+:sv.write.loop
+SET A, [I]
+AND A, 0x007F
+
+IFE A, 0x01
+  SET PC, sv.write.s.color
+
+BOR A, [sv.write.v.color]
+
+STI [J], A ;set the destination to the processed source and increment destination pointer and source pointer
+
+IFN [I], 0
+  SET PC, sv.write.loop
+  
+SET [J], [I] ;write the terminating null
+
+SET A, J
+SET J, POP
+SET I, POP
+SET PC, POP
+
+:sv.write.exitEarly
+SET [B], 0x0000 ;make the first word in the output null
+SET A, B ;return the index that sv.write would have written to
+         ;if there had been content
+SET PC, POP
+
+:sv.write.s.color
+SET [sv.write.v.color], [I]
+AND [sv.write.v.color], 0xFF80 ;first 9 bits
+ADD I, 1 ;increment the source, but not the destination
+SET PC, sv.write.loop
+
+:sv.write.v.color DAT 0
+ ;
+ 
+:sv.clear
+SET PUSH, I
+SET PUSH, J
+
+SET I, [v.scrnLoc]
+
+:sv.clear.loop
+STI [I], 0
+
+IFL I, [v.scrnEnd]
+  SET PC, sv.clear.loop
+
+SET J, POP
+SET I, POP
+SET PC, POP
+ ;
+
+:sv.getLoc ; (xOffset, yOffset)
+IFL A, [v.scrnWidth]
+  IFL B, [v.scrnHeight]
+    SET PC, sv.getLoc.loc ;if onscreen, continue
+SET PC, exf
+
+:sv.getLoc.loc
+MUL B, [v.scrnWidth] ;make yOffset a line index
+ADD A, B              ;combine them
+ADD A, [v.scrnLoc]    ;make the index an index onscreen
+SET PC, POP           ;return in A
+ ;
+
+:sv.autoScroll ; () does not modify registers
+SET PUSH, X
+
+SET X, [v.scrnEnd]
+SUB X, [v.scrnWidth]
+
+IFE [X], 0
+  SET PC, sv.autoScroll.ex
+
+SET PUSH, I
+SET PUSH, J
+SET I, [v.scrnLoc]
+SET J, I
+ADD J, [v.scrnWidth]
+
+:sv.autoScroll.loop
+STI [I], [J]
+IFN J, X
+  SET PC, sv.autoScroll.loop
+
+SET X, J
+:sv.autoScroll.looplast
+STI [I], [X]
+SET [X], 0
+ADD X, 1
+IFG X, [v.scrnEnd]
+  SET PC, sv.autoScroll.subex
+SET PC, sv.autoScroll.looplast
+
+:sv.autoScroll.subex
+SET J, POP
+SET I, POP
+
+:sv.autoScroll.ex
+SET X, POP
+SET PC, POP
+ ;
+
+:sv.scrollUp
+SET PUSH, I
+SET PUSH, J
+
+SET I, [v.scrnLoc]
+SET J, I
+ADD J, [v.scrnWidth]
+
+:sv.scrollUp.loop
+STI [I], [J]
+IFL J, [v.scrnEnd]
+  SET PC, sv.scrollUp.loop
+
+:sv.scrollUp.clearLast
+SET I, [v.scrnEnd]
+SUB I, [v.scrnWidth]
+
+:sv.scrollUp.clearLast.loop
+STI [I], 0
+IFL I, [v.scrnEnd]
+  SET PC, sv.scrollUp.clearLast.loop
+
+SET J, POP
+SET I, POP
+SUB I, [v.scrnWidth] ;adjust I for caller, hopefully
+SET PC, POP
+ ;
+ 
+:sv.getNewLine ; (currentLoc)
+SET PUSH, I
+SET I, [v.scrnLoc]
+JSR sv.autoScroll
+SET PC, sv.getNewLine.loop.sub
+
+:sv.getNewLine.loop
+ADD I, [v.scrnWidth]
+
+:sv.getNewLine.loop.sub
+IFG A, I ;exit successful if line scrnindex >= currentindex
+  SET PC, sv.getNewLine.loop
+
+IFE I, [v.scrnEnd]
+  SUB I, [v.scrnWidth]
+
+SET A, I
+SET I, POP
+SET PC, POP
+ ;
+ ;;
+
+; ; ; ;
+:clock.heapSpace DAT 0
+:clock.count DAT 0
+:clock.heapEnd DAT 0
+
+;:### clock.init 
+;:
+:clock.init
+SET A, 32
+JSR tusk.getMem
+SET [clock.heapSpace], A
+ADD A, 32
+SET [clock.heapEnd], A
+SET [clock.count], 0
+SET A, 0
+SET B, 1
+HWI [HW.GenericClock]
+SET A, clock.tick
+JSR pih.newMsg
+SET B, A
+SET A, 2
+HWI [HW.GenericClock]
+SET PC, POP
+
+;:### clock.newCall (notifyLocation, frequency)
+;:
+:clock.newCall
+SET C, [clock.heapSpace]
+
+:clock.newCall.findSpace
+IFE [C], 0
+  SET PC, clock.newCall.addCall
+ADD C, 2
+IFN C, [clock.heapEnd]
+  SET PC, clock.newCall.findSpace
+
+:clock.newCall.addCall
+SET [C], A
+SET [C+1], B
+
+;:### clock.tick
+;:
+:clock.tick
+SET A, [clock.heapSpace]
+SET B, [clock.count]
+
+:clock.tick.alert
+ADD B, 1
+IFE B, 60
+  SET B, 0
+SET C, 60
+MOD C, [A+1]
+IFE C, 0
+  JSR clock.tick.jump
+ADD A, 2
+IFN A, [clock.heapEnd]
+  SET PC, clock.tick.alert
+
+:clock.tick.jump
+SET PUSH, A
+SET PUSH, B
+SET PUSH, C
+JSR [A]
+SET C, POP
+SET B, POP
+SET A, POP
+SET PC, POP
 
 ; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -768,7 +1059,6 @@ add C, 1
 SET PC, typ.cUnpack.loop
 
 :typ.cUnpack.exit
-add c, 1
 set [c], 0
 SET A, C
 SET I, POP
@@ -2101,7 +2391,7 @@ DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 ;:
 ;:## Subroutines
 
-:v.sPrompt DAT 0x2001, "$ ", 0
+:v.sPrompt DAT 0xF001, "$ ", 0
 
 :dash.processMemory
 
@@ -2138,7 +2428,9 @@ JSR tusk.newProcess
 SET Z, A
 
 JSR dview.newScreen ;get screen location
-SET PUSH, A         ;store it
+
+SET B, fontRAM ;get fontRAM location
+JSR sv.init
 
 SET A, 0x80
 JSR tusk.getMem
@@ -2146,9 +2438,15 @@ SET [Z+v.stdin], A ;store the pointer in memory + v.stdin offset
 
 SET A, 0x80
 JSR tusk.getMem
-SET [Z+v.stdout], A ;store the poitner in memory + v.stdout offset
+SET [Z+v.stdout], A ;store the pointer in memory + v.stdout offset
 
-SET A, POP ;restore screen location
+;SET A, 0x120 ;384 words, for the screen
+;JSR tusk.getMem
+;SET [Z+v.screenLoc], A
+
+JSR sv.clear ;clear the screen
+SET A, [v.scrnLoc]
+
 :s.instance.promptLoop
 JSR s.takeIn
 SET PUSH, A ;keep track of cursor location
@@ -2169,31 +2467,92 @@ SET PC, POP
 ;:**returns** the cursor location on exit
 ;:
 :s.takeIn
-                   ;A is the screen output pointer
-SET B, v.sPrompt   ;make B the location of the prompt
-SET C, [Z+v.stdin] ;make C the raw output location
-JSR dview.prompt   ;write a prompt to the screen, put the output in stdout
+SET PUSH, I
+SET PUSH, J
+SET I, 0
 
-SET C, A ;make C the location after the user prompt
+JSR sv.getNewLine ;get the next blank line after *cursorPointer*
+JSR s.drawPrompt ;draw the prompt using s.drawPrompt
 
-SET A, 0
-SET B, 0
-JSR dview.getLoc ;get the screen location of the current screen
+SET A, 1 ;HWI parameter
 
-SUB C, A      ;make C a hypothetical screen index
-AND C, 0xffe0 ;make the X coordinate 0
-ADD C, 32     ;increase the Y coordinate by 1
-ADD A, C      ;make A the actual screen index
+:s.takeIn.loop
+IFL I, [v.promptLoc]
+  SET I, [v.promptLoc]
+SET [I], 0xf09e ;cursor character
 
+:s.takeIn.wait
+HWI [HW.GenericKeyboard]
+
+IFG C, 0x1f
+  IFL C, 0x80
+    SET PC, s.takeIn.write
+
+IFE C, 0x10
+  SET PC, s.takeIn.backspace
+
+IFE C, 0x11
+  SET PC, s.takeIn.enter
+  
+;INSERT (0x12)
+  
+IFE C, 0x13
+  SET PC, s.takeIn.delete
+  
+SET PC, s.takeIn.wait
+
+
+:s.takeIn.write
+XOR C, 0xF000
+STI [I], C
+
+IFN I, [v.scrnEnd] ;write normally
+  SET PC, s.takeIn.loop
+
+:s.takeIn.write.scroll
+SUB [v.promptLoc], [v.scrnWidth] ;make prompt scroll, too
+JSR sv.scrollUp ;scroll everything up
+SET PC, s.takeIn.loop
+
+
+:s.takeIn.backspace
+STD [I], 0
+SET [I], 0
+SET PC, s.takeIn.loop
+ ;
+
+:s.takeIn.delete
+SET A, 2 ;changes interrupt action, so must be reset afterward
+SET B, 0x91 ;sets B to the *Control* key
+HWI [HW.GenericKeyboard] ;C becomes 1 if *Control* is pressed
+
+IFE C, 1 ;exit if 
+  SET PC, s.instance
+
+SET A, 1 ;reset interrupt action
+SET PC, s.takeIn.loop
+ ;
+
+:s.takeIn.enter
+SET [I], 0
+SET A, [v.promptLoc]
+SET B, I ;UNNECESSARY ASSIGNMENT OF CURSOR POSITION
+JSR s.stdin
+
+SET A, I;return location in A
+SET I, POP
+SET J, POP
 SET PC, POP
  ;
 
 ;:### s.parse
-;:This subroutine isolates the first argument in *v.stdin* by scanning through, then stopping on null or 0x20. Then, it gets the *crp.sum* of the string. Then, it calls *p.lookup*, sets `B` to the location of stdin, and invokes the subroutine returned by *p.lookup*.
+;:This subroutine isolates the first argument in *v.stdin* by scanning through, then stopping on null or 0x20. Then, it gets the *crp.sum* of the string. Then, it calls *p.lookup*, sets `B` to the location of stdin and `C` to the location of stdout, and invokes the subroutine returned by *p.lookup*.
+;:
+;:This should also point the process to the starts of the remaining arguments.
 ;:
 :s.parse
-SET A, [Z+v.stdout] ;prepare stdout
-SET [A], 0          ;by nullifying the first word
+SET A, [Z+v.stdout] ;prepare stdout by nullifying the first word
+SET [A], 0x0000   ;to overwrite old output if it exists
 
 SET A, [Z+v.stdin] ;make both A and B the location of stdin
 SET B, A         ;for length-finding later
@@ -2235,6 +2594,22 @@ SET I, POP
 ;SET A, 0
 ;SET B, [v.scrnLoc]
 ;HWI [HW.LEM1802]
+
+SET PC, POP
+ ;
+
+;:### s.drawPrompt (pointer)
+;:Draws a prompt using *env.cwds* and *v.sPrompt* at *pointer* and sets *v.promptLoc* to the location following the prompt.
+;:
+;:**returns** the location following the prompt
+;:
+:s.drawPrompt
+
+SET B, A
+SET A, v.sPrompt
+JSR sv.write
+
+SET [v.promptLoc], A
 
 SET PC, POP
  ;
@@ -2287,15 +2662,22 @@ IFL X, 15
 ADD X, 1
 SET PC, POP
 
+
+
+;:s.stdin.escflag DAT 0 ;is 1 if "\" was the most recent character
+
+;:s.stdin.args ;for handling arguments
+;DAT 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
+ ;
+
 ;:### s.stdout (outputPointer)
 ;:Does a C-style copy from *v.stdout* to *outputPointer*.
 :s.stdout
-;change A to the next new line
+JSR sv.getNewLine
 
-                    ;A is the output pointer
-SET B, [Z+v.stdout] ;input
-SET PC, dview.write ;process to screen (null-terminated)
-SUB PC, 1 ;debug
+SET B, A ;output
+SET A, [Z+v.stdout] ;input
+SET PC, sv.write ;process to screen (null-terminated)
  ;
 ;;RESERVED SPACE
 
@@ -2794,9 +3176,9 @@ SET PC, dview.write.directive.substitute.color.loop
  ;
 
 ;:### dview.prompt (screenOutputPointer, inputPointer, userTextOutput)
-;:Uses *dview.write* to write a prompt (from *inputPointer*) to *screenOutputPointer*.
+;:Uses *dview.write* to write a prompt (from *inputPointer*) to *screenOutputPointer*, assuming the last non-null word pointed to by *inputPointer* is a cursor character, and will be moved accordingly as the user types.
 ;:
-;:**returns** the screen location following the last user-entered key
+;:**under development**
 ;:
 :dview.prompt
 SET PUSH, C
@@ -2817,15 +3199,13 @@ JSR tusk.getMem
 
 SET [B], A
 
-SET [A+1], POP             ;the output location (after the prompt)
+SET [A+1], POP             ;the output location (after the prompt
 SET [A], POP               ;*userTextOutput*
 SET [A+2], dview.endPrompt ;end the prompt waitloop
 SET [A+3], 0x11            ;set the exit key to "return"
 
 SET [A+4], [A+1] ;minimum-location is the starting location (as normal)
-SET [A+5], 0     ;disable the max-location
-
-SET PUSH, A ;store A for screen pointer retreival
+SET [A+5],0      ;disable the max-location
 
 ;SET A, 1
 ;JSR tusk.getMem ;get 1 word of memory (at minimum)
@@ -2835,11 +3215,6 @@ SET [dview.temp.promptflag], 1
 :dview.prompt.loop
 IFN [dview.temp.promptflag], 0
   SET PC, dview.prompt.loop
-
-SET A, POP ;restore memory location
-SET A, [A+1] ;make A the last screen index
-
-JSR tusk.dropMem
 
 SET PC, POP
 
@@ -2868,9 +3243,6 @@ JSR dl.makeHashTable
 ;">loadcalls" is replaced by the calls necessary to load included packages
 
 SET A, package.calc
-JSR p.loadPackage
-
-SET A, package.break
 JSR p.loadPackage
 
 SET A, package.ls
@@ -2904,6 +3276,9 @@ SET A, package.showmaps
 JSR p.loadPackage
 
 SET A, package.inferno
+JSR p.loadPackage
+
+SET A, package.ctest
 JSR p.loadPackage
 
 SET A, package.mkdir
@@ -3086,22 +3461,6 @@ SET PC, package.calc.mathloop
 SET A, POP
 SET B, POP
 SET PC, typ.htoascii
-:package.break ;Header
-DAT 0xffab, 0xcdff
-DAT "break", 0
-
-set a, break.Out
-set b, break.In
-jsr typ.cUnpack
-ife [break.Out +1], 0
-	jsr ext
-jsr exf
-
-:break.Out
-DAT "HI"
-
-:break.In
-DAT 0x0025
 ;:### package.ls
 ;:Writes the names all of the links (files and directories) in the current working directory to stdout.
 ;:
@@ -3349,6 +3708,21 @@ SET PC, typ.cCopy
 
 :pack.inferno.text DAT 0xF001, "Lasciate ogne speranza, voi ch'intrate.", 0
  ;
+:package.ctest
+DAT 0xffab, 0xcdff
+DAT "ctest", 0
+
+SET A, package.ctest.notify
+SET B, 6
+JSR clock.newCall
+
+SET PC, POP
+
+:package.ctest.notify
+ADD [package.ctest.count], 1
+SET PC, POP
+
+:package.ctest.count DAT 0
 :package.mkdir
 DAT 0xffab, 0xcdff
 DAT "mkdir", 0
