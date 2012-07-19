@@ -290,21 +290,31 @@ SET PC, dview.write.loop
 ;:
 ;:##### Formatting ASCII codes
 ;:
-;:**packed string** `70` as referring to **p** <br />
-;:**string**        `73` as referring to **s** <br />
-;:**hexidecimal**   `78` as referring to **x** <br />
+;:`0b0000 0000 m000 0000`, where m is the "memory" bit, implying that the next word is a pointer to the actual word to be interpreted
+;:
+;:**decimal**       `64` as referring to **d**; *literal* <br />
+;:**packed string** `70` as referring to **p**; *pointer* <br />
+;:**string**        `73` as referring to **s**; *pointer* <br />
+;:**hexidecimal**   `78` as referring to **x**; *literal* <br />
 ;:
 :dview.write.directive.substitute
 SET C, 0xff00 ;get the first 8 bits
 AND C, [I]    ;of the directive
 SHR C, 8      ;and make them the rightmost 8 bits of C
 
-SET A, [I+1] ;get the hextet to display
+SET A, [I+1] ;relevant word
+
+IFB [I], 0x0080 ;if the eighth bit from the left is on,
+  SET A, [A]    ;A is interpreted as a pointer
+
 SET B, J     ;get the output location
 
 SET PUSH, B
 SET PUSH, dview.write.directive.substitute.color
  ;when the formatting subroutine exits, go to this point
+
+IFE C, 0x64 ;decimal
+  SET PC, typ.dtoascii
 
 IFE C, 0x70 ;packed string
   SET PC, typ.cUnpack
