@@ -366,7 +366,7 @@ JSR pih.newMsg
 
 SET B, A
 SET A, 2
-HWI [HW.GenericClock]
+;HWI [HW.GenericClock]
 
 SET A, 0
 SET B, 1
@@ -2731,7 +2731,7 @@ SET PC, POP
 
 :pih
 IAQ 1 ;trigger interrupt queueing
-
+;SUB PC, 1 ;debug
 SET PUSH, X
 
 SET X, A
@@ -2761,6 +2761,7 @@ SET B, POP
 SET 0, POP ;drop the value that needed to be pushed for the jump
 :pih.exitearly
 SET X, POP
+;SUB PC, 1 ;debug
 RFI 1
 
 ;:### Messages
