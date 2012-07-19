@@ -1,3 +1,7 @@
+;;;;;;;;;;;;;;;;;;;;;;
+; ICD ; Clock Daemon ;
+;;;;;;;;;;;;;;;;;;;;;;
+
 :clock.heapSpace DAT 0
 :clock.count DAT 0
 :clock.heapEnd DAT 0
@@ -64,6 +68,7 @@ IFN C, [clock.heapEnd]
 :clock.newCall.addCall
 SET [C], A
 SET [C+1], B
+SET PC, POP
 
 ;:### clock.tick
 ;:
