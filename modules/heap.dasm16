@@ -107,90 +107,76 @@ SET PC, POP
 
 
 
-;:### heap.free (location, length)
-;:Marks the blocks specified by *location* and *length* as free, and clears them.
-;:
-;:**returns** *location*
+;:### heap.free (location)
+;:Marks the region starting at *location* as free. **MUST BE THE BEGINNING OF THE .alloc'd REGION.**
+;:Collapses adjacent free blocks into one.
 ;:
 :heap.free
-SET PUSH, B
-SET PUSH, A
-
-SET C, [env.heap]
-
-SUB A, [C+1] ;subtract the first block's location from A
-DIV A, [C+2] ;divide by the size of a block, to get the
-             ;block index, rounding down
-
-;DIV A, [C+2] not coming out evenly (EX != 0) implies corruption
-;of some sort. Impose a check here?
-
-DIV B, [C+2] ;make B the number of blocks implied by *length*
-IFN EX, 0    ;rounding up, as the allocation subroutine does
-  ADD B, 1
-
-SET C, 0 ;"unused"
-JSR heap.mark
-
-SET A, POP
-SET B, POP
-ADD B, A
-ADD B, 1
-SET C, A
-
-:heap.free.clear
-SET [A], 0
-ADD A, 1
-IFN A, B
-SET PC, heap.free.clear
-
-SET PC, POP
- ;
-
-;:### heap.mark (block, number, used/unused)
-;:Marks *number* of blocks used or unused, starting from the index *block*. `1` in *used/unused* denotes `used`, and `0` denotes `unused`.
-;:
-;:**return** *block*
-;:
-:heap.mark
-SET PUSH, A
 SET PUSH, X
-SET X, [env.heap]
-ADD X, 4 ;make X a pointer to the first word in the bitmap
+SET PUSH, Y
 
-SUB B, 1 ;for use later
-SET PUSH, C ;store used/unused type
-SET PUSH, B ;store B
-SET PUSH, A ;store A
+SET X, [env.heap+1] ; X points at the first region's header.
+SET Y, 0
+SUB A, 2 ; A now points at the header of the provided pointer.
 
-SHR A, 4 ;divide by 16, to get the word index
-ADD A, X ;make A a pointer to the relevant word
+:heap.free.find
+IFE X, A
+	SET PC, heap.free.found
+IFE X, 0
+	SET PC, heap.free.done ; couldn't find and error this memory TODO report an error of some kind
 
-SET B, POP ;restore the block index
-AND B, 0x000f ;get the bit index
+SET Y, X
+SET X, [X+1]
+SET PC, heap.free.find
 
-SET C, 0x8000 ;set the leftmost bit
-ASR C, POP    ;make the leftmost *number* bits 1
+:heap.free.found
+; Now Y is the previous region (or 0), X is the region to be freed.
 
-SHR C, B ;make C apply to all of the blocks to be reserved
+IFE Y, 0
+	SET PC, heap.free.afterPrevJoin ; No previous region.
 
-SET B, POP ;restore used/unused
-IFE B, 1
-  SET PC, heap.mark.used
+SET A, [Y]
+AND A, 0x8000 ; The free flag of the previous region.
+IFE A, 0
+	SET PC, heap.free.afterPrevJoin ; Not free, so nothing to do.
 
-:heap.mark.unused
-XOR C, 0xffff ;flip the bits to reflect what needs to be changed
-AND [A], C    ;set the bits that need to be changed to 0
+; prevJoining: the previous region is free, so combine it with the newly freed region.
+SET A, [X] ; The size of the newly freed region. (Still has the free flag set).
+ADD A, 2 ; Include the header.
+ADD A, [Y] ; Add the size (and free bit, which we can ignore) of the previous region.
+SET [Y], A ; And write it.
 
+; Y is previous region, X is now defunct current region.
+SET [Y+1], [X+1]
+SET X, Y
+
+; Now both are pointing to the same place. afterPrevJoin below will move Y to be the next region.
+
+:heap.free.afterPrevJoin
+; At this point, we've got the current region in X. That might mean the newly freed region or the newly combined regions. Either way, we set Y to the next region and see if they can be combined.
+; First set the size of the current region to ensure it's marked free.
+BOR [X], 0x8000
+
+; Then consider the next region.
+SET Y, [X+1]
+
+IFE Y, 0
+	SET PC, heap.free.done ; No next region, this is the last.
+
+SET A, [Y]
+AND A, 0x8000 ; The free flag
+IFE A, 0
+	SET PC, heap.free.done ; Next region is in use, so nothing to do.
+
+SET A, [Y]
+AND A, 0x7fff ; The size of the next region.
+ADD A, 2 ; Include the header.
+ADD [X], A ; Now the size holds the whole area and a free bit.
+SET [X+1], [Y+1] ; Connect the linked list.
+
+:heap.free.done
+SET Y, POP
 SET X, POP
-SET A, POP
-SET PC, POP
-
-:heap.mark.used
-BOR [A], C ;set the bits that need to be changed to 1
-
-SET X, POP
-SET A, POP ;return *blocks*
 SET PC, POP
  ;
  ;;
