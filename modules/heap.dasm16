@@ -3,85 +3,84 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;:# Heap Manager
 ;:
+;:The heap is essentially a linked list of regions. Each region consists of a two-word header (see below) followed by the allocated memory.
+;:
+;:The header consists of a size for the region (not including the header) and a pointer to the header of the next region (0 for last region).
+;:
 
 ;:### heap.init
-;:(location, length, blocksize)
-;:heap.init reserves a 4 word header followed by a bit map of all blocks. The size of the bit map is (*maxlength*/*blocksize*)/16. *length* is actually the length of the heap, excluding the header and bit map.
+;:(location, length)
+;:heap.init reserves a 2-word header. *length* is actually the length of the heap, excluding the header.
 ;:
-;:The header consists of a magic word, **0x9ea9**, the location of the first block in memory, the size of each block, and the maximum length of the heap.
+;:The header consists of a magic word, **0x9ea9** and the location of the first heap region in memory.
 ;:
-;:**This subroutine clears all of the space given to it.**
+;:**The heap is not zeroed; the contents of newly allocated memory are arbitrary and undefined.**
 ;:
 ;:**returns** location of header
 ;:
 
 :heap.init
-SET PUSH, I
-SET PUSH, J
-
 SET [env.heap], A
-
-SET I, A
-SET PUSH, A ;store the location for returning
-SET A, B
-
-DIV A, C ;find the number of necessary blocks
-IFN EX, 0
-  ADD A, 1 ;round up
-
-         ;make A the number of words needed for the bitmap:
-SHR A, 4 ;divide by 16
-IFE EX, 0
-  SET PC, heap.init.evenbitmap ;if that goes evenly, skip the next step
-
-ADD A, 1 ;round up
-SET PUSH, A ;for restoring at the end of this part
-SET PUSH, B ;for use in this part
-
-ADD A, I ;add the heap offset
-ADD A, 4 ;add the size of the header
-         ;to make A the location of the last word in the bitmap
-
-SET [A], 0xffff ;set it to be filled
-SET B, PICK 2   ;set B to the number of blocks
-AND B, 0x000f   ;make B the number of blocks left in the last word of memory
-SHR [A], B      ;set B number of blocks to 0 in the bitmap
-
-SET B, POP ;restore B
-SET A, POP ;restore the number of words needed for the bitmap
-
-:heap.init.evenbitmap
-
-;A is already the number of words needed for the bitmap
-ADD A, I ;add the header offset
-ADD A, 4 ;make A the location of the start of the first block
-
-STI [I], 0x9EA9
-STI [I], A
-STI [I], C
-STI [I], B
-
-SET I, A   ;since A is already the starting location, 
-ADD I, POP ;create ending location
-
-:heap.init.loop ;clear backwards
-IFE I, A
-  SET PC, heap.init.exit
-STD [I], 0
-SET PC, heap.init.loop
-
-:heap.init.exit
-SET J, POP
-SET I, POP
+ADD A, 2
+SET [env.heap+1], A ; The address of the first region header.
+SUB B, 2 ; Subtract the two bytes of the region header.
+BOR B, 0x8000 ; Mark it as free.
+SET [A], B
+SET [A+1], 0 ; No next region.
 SET PC, POP
- ;
+
 
 ;:### heap.alloc (length)
-;:Reserves the first consecutive *length* of memory in the heap.
+;:Reserves a consecutive block of *length* words of memory in the heap.
 ;:
-;:**returns** the location of the reserved memory, <strike>or 1 if no such block of memory is available</strike>
+;:Currently a bit dim; uses the first sufficiently large region, not necessarily the best one. This trades increased memory fragmentation for speed.
+;:
+;:**returns** the location of the reserved memory, or 0 if no block of the requested size could be found.
 ;:
 :heap.alloc
+; Walks the pointers with X to find a free region
+SET PUSH, C
+SET PUSH, X
+SET PUSH, Y
+
+SET X, [env.heap+1] ; Retrieve the address of the first region header.
+
+:heap.alloc.search
+SET Y, [X]
+AND Y, 0x8000 ; Retrieve the free pointer
+IFG Y, 0
+  SET PC, heap.alloc.found ; START HERE: Need to make sure it's actually big enough!
+SET X, [X+1] ; X now points at the next region's header
+IFG X, 0
+  SET PC, heap.alloc.search
+
+; If we fell through to here, X is 0 and we haven't found a big enough region.
+SET A, 0
+SET PC, heap.alloc.done
+
+:heap.alloc.found
+; At this point, X points at the region header, and Y is junk.
+; Write the new length, and set the pointer.
+SET Y, [X]
+AND Y, 0x7fff ; Just the length itself.
+SUB Y, A
+SUB Y, 2 ; Y holds the new length of the next, free, region.
+SET [X], A ; Store the length of this region.
+
+IFE Y, 0 ; If Y is 0 the new region filled the whole free region exactly, 
+
+
+:heap.alloc.done
+SET Y, POP
+SET X, POP
+SET C, POP
+SET PC, POP
+; END OF MY NEW CODE
+
+
+
+
+
 SET PUSH, X
 SET PUSH, I
 SET PUSH, J
