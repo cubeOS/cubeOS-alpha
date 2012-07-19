@@ -125,6 +125,10 @@ SET PC, POP
  
 
 ; ; ; ;
+;;;;;;;;;;;;;;;;;;;;;;
+; ICD ; Clock Daemon ;
+;;;;;;;;;;;;;;;;;;;;;;
+
 :clock.heapSpace DAT 0
 :clock.count DAT 0
 :clock.heapEnd DAT 0
@@ -191,6 +195,7 @@ IFN C, [clock.heapEnd]
 :clock.newCall.addCall
 SET [C], A
 SET [C+1], B
+SET PC, POP
 
 ;:### clock.tick
 ;:
@@ -3065,6 +3070,9 @@ JSR p.loadPackage
 SET A, package.val
 JSR p.loadPackage
 
+SET A, package.uptime
+JSR p.loadPackage
+
 SET A, package.touch
 JSR p.loadPackage
 
@@ -3081,9 +3089,6 @@ SET A, package.inferno
 JSR p.loadPackage
 
 SET A, package.mkdir
-JSR p.loadPackage
-
-SET A, package.stopwatch
 JSR p.loadPackage
 
 SET A, package.benchmark
@@ -3471,6 +3476,17 @@ JSR typ.htoascii
 
 SET [B], 0
 SET PC, POP
+:package.uptime
+DAT 0xffab, 0xcdff
+DAT "uptime", 0
+
+SET A, C
+SET B, package.uptime.text
+SET PC, dview.write
+
+:package.uptime.text
+DAT "Uptime: ", 0x789a, env.uptime+1, " ", 0x789a, env.uptime, 0
+ ;
 :package.touch
 DAT 0xffab, 0xcdff
 DAT "touch", 0
@@ -3569,17 +3585,6 @@ SET A, [v.cwd]
 SET B, [B+1]
 SET C, 1 ;directory
 SET PC, cat.newFile
-:package.stopwatch
-DAT 0xffab, 0xcdff
-DAT "uptime", 0
-
-SET A, C
-SET B, package.uptime.text
-SET PC, dview.write
-
-:package.uptime.text
-DAT "Uptime: ", 0x789a, env.uptime+1, " ", 0x789a, env.uptime, 0
- ;
 :package.benchmark
 DAT 0xffab, 0xcdff
 DAT "benchmark", 0
