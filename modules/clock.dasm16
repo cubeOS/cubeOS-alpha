@@ -8,16 +8,20 @@
 SET A, 32
 JSR tusk.getMem
 SET [clock.heapSpace], A
+
 ADD A, 32
 SET [clock.heapEnd], A
 SET [clock.count], 0
-SET A, 0
-SET B, 1
-HWI [HW.GenericClock]
+
 SET A, clock.tick
 JSR pih.newMsg
+
 SET B, A
 SET A, 2
+HWI [HW.GenericClock]
+
+SET A, 0
+SET B, 1
 HWI [HW.GenericClock]
 SET PC, POP
 
@@ -40,20 +44,29 @@ SET [C+1], B
 ;:### clock.tick
 ;:
 :clock.tick
-SET A, [clock.heapSpace]
-SET B, [clock.count]
+SET A, [clock.heapSpace] ;make A the location of the schedule
+SET B, [clock.count]     ;make B the number of ticks (mod 60) so far
+ADD B, 1                 ;add one to that number of ticks
+IFE B, 60                ;if the value has topped out,
+  SET B, 0               ;set it to zero
+
+SET [clock.count], B     ;then update clock.count
 
 :clock.tick.alert
-ADD B, 1
-IFE B, 60
-  SET B, 0
+IFE [A+1], 0                            ;if there is no frequency registered,
+  SET PC, clock.tick.alert.continueloop ;then just move along.
 SET C, 60
 MOD C, [A+1]
 IFE C, 0
-  JSR clock.tick.jump
+  SET PC, clock.tick.jump
+
+:clock.tick.alert.continueloop
 ADD A, 2
-IFN A, [clock.heapEnd]
+
+IFL A, [clock.heapEnd]
   SET PC, clock.tick.alert
+
+SET PC, POP
 
 :clock.tick.jump
 SET PUSH, A
@@ -63,4 +76,4 @@ JSR [A]
 SET C, POP
 SET B, POP
 SET A, POP
-SET PC, POP
+SET PC, clock.tick.alert.continueloop
