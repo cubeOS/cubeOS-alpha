@@ -291,3 +291,73 @@ SET C, 0
 SET PC, typ.memfill
  ;
  ;;
+
+;:### typ.asciitod (inputPointer)
+;:Reads decimal digits from the null-terminated ASCII string *inputPointer*. Returns the value of that decimal number in A.
+;:Returns 0 on empty string.
+;:Does NOT check for overflow, but it won't crash if fed too large a number (> 65535)
+;:Doesn't check that the characters in the string are actually digits.
+;:Reads the value unsigned, and doesn't expect a -.
+;:
+
+:typ.asciitod
+; Advance A through the list. Keep a running total in C.
+SET PUSH, C
+SET PUSH, X
+
+SET C, 0
+
+:typ.asciitod.loop
+SET X, [A]
+IFE X, 0
+  SET PC, typ.asciitod.done
+
+SUB X, 0x30 ; turns ASCII 0 into actual 0, etc.
+MUL C, 10
+ADD C, X
+ADD A, 1
+SET PC, typ.asciitod.loop
+
+:typ.asciitod.done
+SET A, C
+SET X, POP
+SET C, POP
+SET PC, POP
+
+
+
+;:### typ.dtoascii (word, outputBuffer)
+;:Writes the (unsigned) value of *word* to *outputBuffer* as ASCII.
+;:Returns the position after the last character in *outputBuffer*.
+;:Reads the value unsigned, and doesn't expect a -.
+;:
+
+:typ.dtoascii
+; Repeatedly divide and mod the number, pushing ASCII values to the stack, then popping and outputting.
+SET PUSH, C
+
+SET PUSH, 0xffff ; sentinel value for the end of the digits
+
+:typ.dtoascii.divloop
+SET C, A
+MOD C, 10
+SET PUSH, C
+DIV A, 10
+IFG A, 0
+  SET PC, typ.dtoascii.divloop
+
+; Now the output phase begins. Pop to A and write it until it's 0xffff.
+:typ.dtoascii.outloop
+SET A, POP
+IFE A, 0xffff
+  SET PC, typ.dtoascii.done
+ADD A, 0x30 ; convert to an ASCII digit.
+SET [B], A
+ADD B, 1
+SET PC, typ.dtoascii.outloop
+
+:typ.dtoascii.done
+SET A, B
+SET C, POP
+SET PC, POP
+
