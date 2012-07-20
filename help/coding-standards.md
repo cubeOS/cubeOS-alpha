@@ -31,18 +31,18 @@ Calling functions.
 
 ### Arguments
 
-Arguments are passed in the general purpose registers, in the order `A`, `B`, `C`, `X`, `Y`, `Z`, `I`, `J`. If you need more than that, you should seriously reconsider the design of your code. If you still need more, use the stack and document it carefully.
+Arguments are passed in the first three general purpose registers, in the order `A`, `B`, `C`. Any further arguments must be pushed to the stack in the order specified by the documentation of the target subroutine. If you need more than that, you should seriously reconsider the design of your code. If you still need more, use the stack and document it carefully.
 
 Argument values need *not* be preserved by a call, so they may be changed without documenting it as a clobber.
 
 ### Return values
 
-Return values are to be placed in `A`. If you want multiple return values, reconsider your design. If you still want them, use `B`, `C` and so on, and document very clearly.
+Return values are to be placed in `A`. If you want multiple return values, reconsider your design, make `A` a pointer to the relevant information. If necessary, reserve an amount of heap space for the purpose, but *be very clear in doing so*, because the program calling your routine must then unreserve it.
 
 ## Strings
 
-C-style null-terminated strings. Prefer "unpacked" strings where each character uses one full word (16 bits) since they are easy to work with. Use "packed" strings only when space is at a premium. CPU time is in general more expensive than memory and converting to and from packed strings is expensive.
+The preferred string type is C-style null-terminated strings. Although "unpacked" (one ASCII value per word) strings are preferred where said strings must be frequently accessed, "packed strings" (two ASCII values per word in little endian) are preferred in situations where reading is relatively infrequent, or the size of the string is relatively large.
 
 ## Heap memory
 
-The functions `heap.alloc` and `heap.free` work similarly to C's `malloc` and `free`. `heap.alloc` takes a size in words and returns a pointer, `heap.free` takes a pointer and frees the memory. Free your memory! The system does not presently keep track of memory allocated by tasks and will not free anything for you.
+The functions `heap.alloc` and `heap.free` work similarly to C's `malloc` and `free`. `heap.alloc` takes a size in words and returns a pointer, `heap.free` takes a pointer and frees the memory. Free your memory! Although calls to the heap can be made directly by routines in the kernel, it is highly recommended for processes to call `tusk.getMem`, which behaves similarly to `heap.free`, but keeps track of the location of the heap that it returns. The next call to `tusk.dropMem` will free the memory reserved by the last call to `tusk.getMem`.
