@@ -137,6 +137,7 @@ SET PC, POP
 ;:**returns** the first open message
 ;:
 :pih.newMsg
+SET PUSH, B
 SET B, 64
 
 :pih.newMsg.findOpen
@@ -148,4 +149,5 @@ SET PC, pih.newMsg.findOpen
 :pih.newMsg.found
 SET [pih.cmdtable + B], A
 SET A, B
+SET B, POP
 SET PC, POP

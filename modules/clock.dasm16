@@ -20,12 +20,17 @@ SET [clock.count], 0
 SET A, clock.tick
 JSR pih.newMsg
 
-SET B, A
-SET A, 2
-HWI [HW.GenericClock]
+; Save the message number for later.
+SET PUSH, A
 
+; A=0: Clock will tick 60/B times per second, we want 60, so B=1.
 SET A, 0
 SET B, 1
+HWI [HW.GenericClock]
+
+; A=2: Clock will send interrupts with message 
+SET B, POP ; Retrieve the saved message number.
+SET A, 2
 HWI [HW.GenericClock]
 
 SET A, clock.uptime
