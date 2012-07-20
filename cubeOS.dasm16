@@ -16,7 +16,7 @@ DAT SYSTEM.CRASH
 ;;;;;;;
 :env.cwds DAT 0
 :env.fs DAT 0
-:env.heap DAT 0
+:env.heap DAT 0 ; the address of the heap header
  ;;
 
 ; ; ; ;
@@ -1138,6 +1138,76 @@ SET PC, POP
  ;
  ;;
 
+;:### typ.asciitod (inputPointer)
+;:Reads decimal digits from the null-terminated ASCII string *inputPointer*. Returns the value of that decimal number in A.
+;:Returns 0 on empty string.
+;:Does NOT check for overflow, but it won't crash if fed too large a number (> 65535)
+;:Doesn't check that the characters in the string are actually digits.
+;:Reads the value unsigned, and doesn't expect a -.
+;:
+
+:typ.asciitod
+; Advance A through the list. Keep a running total in C.
+SET PUSH, C
+SET PUSH, X
+
+SET C, 0
+
+:typ.asciitod.loop
+SET X, [A]
+IFE X, 0
+  SET PC, typ.asciitod.done
+
+SUB X, 0x30 ; turns ASCII 0 into actual 0, etc.
+MUL C, 10
+ADD C, X
+ADD A, 1
+SET PC, typ.asciitod.loop
+
+:typ.asciitod.done
+SET A, C
+SET X, POP
+SET C, POP
+SET PC, POP
+
+
+
+;:### typ.dtoascii (word, outputBuffer)
+;:Writes the (unsigned) value of *word* to *outputBuffer* as ASCII.
+;:Returns the position after the last character in *outputBuffer*.
+;:Reads the value unsigned, and doesn't expect a -.
+;:
+
+:typ.dtoascii
+; Repeatedly divide and mod the number, pushing ASCII values to the stack, then popping and outputting.
+SET PUSH, C
+
+SET PUSH, 0xffff ; sentinel value for the end of the digits
+
+:typ.dtoascii.divloop
+SET C, A
+MOD C, 10
+SET PUSH, C
+DIV A, 10
+IFG A, 0
+  SET PC, typ.dtoascii.divloop
+
+; Now the output phase begins. Pop to A and write it until it's 0xffff.
+:typ.dtoascii.outloop
+SET A, POP
+IFE A, 0xffff
+  SET PC, typ.dtoascii.done
+ADD A, 0x30 ; convert to an ASCII digit.
+SET [B], A
+ADD B, 1
+SET PC, typ.dtoascii.outloop
+
+:typ.dtoascii.done
+SET A, B
+SET C, POP
+SET PC, POP
+
+
 ; ; ; ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; HWMAN ; Hardware Manager ;
@@ -1930,249 +2000,181 @@ SET PC, POP
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;:# Heap Manager
 ;:
+;:The heap is essentially a linked list of regions. Each region consists of a two-word header (see below) followed by the allocated memory.
+;:
+;:The header consists of a size for the region (not including the header) and a pointer to the header of the next region (0 for last region). The high bit of the size word is actually a flag, with 1 meaning the region is free, and 0 meaning it's in use.
+;:
 
 ;:### heap.init
-;:(location, length, blocksize)
-;:heap.init reserves a 4 word header followed by a bit map of all blocks. The size of the bit map is (*maxlength*/*blocksize*)/16. *length* is actually the length of the heap, excluding the header and bit map.
+;:(location, length)
+;:heap.init reserves a 2-word header. *length* is actually the length of the heap, excluding the header.
 ;:
-;:The header consists of a magic word, **0x9ea9**, the location of the first block in memory, the size of each block, and the maximum length of the heap.
+;:The header consists of a magic word, **0x9ea9** and the location of the first heap region in memory.
 ;:
-;:**This subroutine clears all of the space given to it.**
+;:**The heap is not zeroed; the contents of newly allocated memory are arbitrary and undefined.**
 ;:
 ;:**returns** location of header
 ;:
 
 :heap.init
-SET PUSH, I
-SET PUSH, J
-
 SET [env.heap], A
-
-SET I, A
-SET PUSH, A ;store the location for returning
-SET A, B
-
-DIV A, C ;find the number of necessary blocks
-IFN EX, 0
-  ADD A, 1 ;round up
-
-         ;make A the number of words needed for the bitmap:
-SHR A, 4 ;divide by 16
-IFE EX, 0
-  SET PC, heap.init.evenbitmap ;if that goes evenly, skip the next step
-
-ADD A, 1 ;round up
-SET PUSH, A ;for restoring at the end of this part
-SET PUSH, B ;for use in this part
-
-ADD A, I ;add the heap offset
-ADD A, 4 ;add the size of the header
-         ;to make A the location of the last word in the bitmap
-
-SET [A], 0xffff ;set it to be filled
-SET B, PICK 2   ;set B to the number of blocks
-AND B, 0x000f   ;make B the number of blocks left in the last word of memory
-SHR [A], B      ;set B number of blocks to 0 in the bitmap
-
-SET B, POP ;restore B
-SET A, POP ;restore the number of words needed for the bitmap
-
-:heap.init.evenbitmap
-
-;A is already the number of words needed for the bitmap
-ADD A, I ;add the header offset
-ADD A, 4 ;make A the location of the start of the first block
-
-STI [I], 0x9EA9
-STI [I], A
-STI [I], C
-STI [I], B
-
-SET I, A   ;since A is already the starting location, 
-ADD I, POP ;create ending location
-
-:heap.init.loop ;clear backwards
-IFE I, A
-  SET PC, heap.init.exit
-STD [I], 0
-SET PC, heap.init.loop
-
-:heap.init.exit
-SET J, POP
-SET I, POP
+ADD A, 2
+SET [env.heap+1], A ; The address of the first region header.
+SUB B, 2 ; Subtract the two bytes of the region header.
+BOR B, 0x8000 ; Mark it as free.
+SET [A], B
+SET [A+1], 0 ; No next region.
 SET PC, POP
- ;
+
 
 ;:### heap.alloc (length)
-;:Reserves the first consecutive *length* of memory in the heap.
+;:Reserves a consecutive block of *length* words of memory in the heap.
 ;:
-;:**returns** the location of the reserved memory, <strike>or 1 if no such block of memory is available</strike>
+;:Currently a bit dim; uses the first sufficiently large region, not necessarily the best one. This trades increased memory fragmentation for speed.
+;:
+;:**returns** the location of the reserved memory, or 0 if no block of the requested size could be found. <br />
+;:**modifies** A
 ;:
 :heap.alloc
+; Walks the pointers with X to find a free region
+SET PUSH, B
+SET PUSH, C
 SET PUSH, X
-SET PUSH, I
-SET PUSH, J
+SET PUSH, Y
 
-SET X, [env.heap] ;make X the heap location
+SET X, [env.heap+1] ; Retrieve the address of the first region header.
 
-SET B, [X+2] ;make B the block length
-DIV A, B ;make A the number of blocks needed
-IFN EX, 0
-  ADD A, 1 ;round up
-SET I, A ;make I the iterator for number of blocks needed
+:heap.alloc.search
+SET Y, [X]
+SET C, Y
+AND Y, 0x8000 ; Retrieve the free flag
+AND C, 0x7fff ; And the size
+ADD C, 1 ; Add 1 so we can use IFG below but avoid the off-by-one error.
+IFG Y, 0
+	IFG C, A
+		SET PC, heap.alloc.found
+SET X, [X+1] ; X now points at the next region's header
+IFG X, 0
+  SET PC, heap.alloc.search
 
-SET B, X ;make B the location of the header
-ADD B, 4 ;add the length of the header to make B the location of the bitmap
+; If we fell through to here, X is 0, so we haven't found a big enough region.
+SET A, 0xfffe ; Will be turned to 0 by the ADD A, 2 in heap.alloc.done. HACK
+SET PC, heap.alloc.done
 
-SET A, [B] ;make A the first word of the usagemap
+:heap.alloc.found
+; At this point, X points at the region header, C holds the size+1, and B and Y are junk.
+; Write the new length, and set the pointer.
+SUB C, 3 ; 1 for the above fudge, 2 for the new header.
+SUB C, A ; C now holds the size of the new, following free region.
 
-SET PUSH, I ;store iterator for easy access
-SET J, 0 ;make J the iterator to keep track of the bit number
+SET [X], A ; Store the length of this region.
+SET Y, X
+ADD Y, A
+ADD Y, 2 ; Y now points at the header of the following, free region.
+SET A, X
+SET X, [X+1] ; X now points at the next-next region, after the newly created free region in Y.
+SET [A+1], Y ; Store the pointer to the following, free region.
 
-:heap.alloc.checkbits
+SET B, X
+SUB B, Y ; The difference between the two pointers
+IFG 3, B ; If the difference between the pointers to the next and next-next regions is < 3, there's no room for data.
+	SET PC, heap.alloc.emptyNext
 
-IFE J, 16 ;if the last bit in the word has been scanned
-  SET PC, heap.alloc.newword
+; If we come here, the next region is of a workable size, so set it up.
+BOR C, 0x8000 ; Set the free flag.
+SET [Y], C
+SET [Y+1], X
+SET PC, heap.alloc.done
 
-IFC A, 0x8000 ;if the leftmost bit of A is 0,
-  SET PC, heap.alloc.openbit
 
-;if it's 1, note the closed bit
-SET I, PEEK ;reset the iterator
-SHL A, 1
-ADD J, 1 ;increase bit iterator
-SET PC, heap.alloc.checkbits
+:heap.alloc.emptyNext
+; Here, the supposed free region is too small to hold a header and data, so we roll it into this region.
+; At this point A is the new region, Y the next (too-small, free) region, X the next-next region.
+SET C, X
+SUB C, A
+SUB C, 2 ; C is now the new size of the new region.
+SET [A], C
 
-:heap.alloc.newword ;go to the next word
-ADD B, 1 ;increase the pointer by 1
-
-;SHOULD DETECT THE END OF THE BLOCK MAP
-
-SET A, [B]
-SET J, 0
-SET PC, heap.alloc.checkbits
-
-:heap.alloc.openbit
-SUB I, 1
-SHL A, 1
-ADD J, 1 ;increase bit iterator
-
-IFN I, 0 ;if the iterator has not reached zero, continue
-  SET PC, heap.alloc.checkbits
-
-SET C, X ;set C to the location of the header
-ADD C, 4 ;set C to the location of the bitmap
-
-SUB B, C ;set B to the number of full words passed
-SHL B, 4 ;set B to the number of bits passed (MUL 16)
-
-SUB J, PEEK ;subtract the number of needed blocks from the
-            ;bit iterator to get the first index of the open area
-            ;but keep the number of blocks needed for later
-
-ADD B, J ;add the index of the first block in the open area
-         ;in order to get the actual first block index
-
-SET A, B   ;set A to the block index
-SET B, POP ;set B to the number of blocks needed
-SET C, 1   ;set C to "mark the blocks used"
-JSR heap.mark
-
-MUL A, [X+2] ;multiply by the length of each block
-ADD A, [X+1] ;add the location of the first block in memory
-             ;to produce the location of the first word of the first
-             ;reserved block
-
-SET J, POP
-SET I, POP
+:heap.alloc.done
+ADD A, 2 ; A now points at the new memory for returning to the user.
+SET Y, POP
 SET X, POP
+SET C, POP
+SET B, POP
 SET PC, POP
- ;
 
-;:### heap.free (location, length)
-;:Marks the blocks specified by *location* and *length* as free, and clears them.
-;:
-;:**returns** *location*
+
+
+;:### heap.free (location)
+;:Marks the region starting at *location* as free. **MUST BE THE BEGINNING OF THE .alloc'd REGION.**
+;:Collapses adjacent free blocks into one.
 ;:
 :heap.free
-SET PUSH, B
-SET PUSH, A
-
-SET C, [env.heap]
-
-SUB A, [C+1] ;subtract the first block's location from A
-DIV A, [C+2] ;divide by the size of a block, to get the
-             ;block index, rounding down
-
-;DIV A, [C+2] not coming out evenly (EX != 0) implies corruption
-;of some sort. Impose a check here?
-
-DIV B, [C+2] ;make B the number of blocks implied by *length*
-IFN EX, 0    ;rounding up, as the allocation subroutine does
-  ADD B, 1
-
-SET C, 0 ;"unused"
-JSR heap.mark
-
-SET A, POP
-SET B, POP
-ADD B, A
-ADD B, 1
-SET C, A
-
-:heap.free.clear
-SET [A], 0
-ADD A, 1
-IFN A, B
-SET PC, heap.free.clear
-
-SET PC, POP
- ;
-
-;:### heap.mark (block, number, used/unused)
-;:Marks *number* of blocks used or unused, starting from the index *block*. `1` in *used/unused* denotes `used`, and `0` denotes `unused`.
-;:
-;:**return** *block*
-;:
-:heap.mark
-SET PUSH, A
 SET PUSH, X
-SET X, [env.heap]
-ADD X, 4 ;make X a pointer to the first word in the bitmap
+SET PUSH, Y
 
-SUB B, 1 ;for use later
-SET PUSH, C ;store used/unused type
-SET PUSH, B ;store B
-SET PUSH, A ;store A
+SET X, [env.heap+1] ; X points at the first region's header.
+SET Y, 0
+SUB A, 2 ; A now points at the header of the provided pointer.
 
-SHR A, 4 ;divide by 16, to get the word index
-ADD A, X ;make A a pointer to the relevant word
+:heap.free.find
+IFE X, A
+	SET PC, heap.free.found
+IFE X, 0
+	SET PC, heap.free.done ; couldn't find and error this memory TODO report an error of some kind
 
-SET B, POP ;restore the block index
-AND B, 0x000f ;get the bit index
+SET Y, X
+SET X, [X+1]
+SET PC, heap.free.find
 
-SET C, 0x8000 ;set the leftmost bit
-ASR C, POP    ;make the leftmost *number* bits 1
+:heap.free.found
+; Now Y is the previous region (or 0), X is the region to be freed.
 
-SHR C, B ;make C apply to all of the blocks to be reserved
+IFE Y, 0
+	SET PC, heap.free.afterPrevJoin ; No previous region.
 
-SET B, POP ;restore used/unused
-IFE B, 1
-  SET PC, heap.mark.used
+SET A, [Y]
+AND A, 0x8000 ; The free flag of the previous region.
+IFE A, 0
+	SET PC, heap.free.afterPrevJoin ; Not free, so nothing to do.
 
-:heap.mark.unused
-XOR C, 0xffff ;flip the bits to reflect what needs to be changed
-AND [A], C    ;set the bits that need to be changed to 0
+; prevJoining: the previous region is free, so combine it with the newly freed region.
+SET A, [X] ; The size of the newly freed region. (Still has the free flag set).
+ADD A, 2 ; Include the header.
+ADD A, [Y] ; Add the size (and free bit, which we can ignore) of the previous region.
+SET [Y], A ; And write it.
 
+; Y is previous region, X is now defunct current region.
+SET [Y+1], [X+1]
+SET X, Y
+
+; Now both are pointing to the same place. afterPrevJoin below will move Y to be the next region.
+
+:heap.free.afterPrevJoin
+; At this point, we've got the current region in X. That might mean the newly freed region or the newly combined regions. Either way, we set Y to the next region and see if they can be combined.
+; First set the size of the current region to ensure it's marked free.
+BOR [X], 0x8000
+
+; Then consider the next region.
+SET Y, [X+1]
+
+IFE Y, 0
+	SET PC, heap.free.done ; No next region, this is the last.
+
+SET A, [Y]
+AND A, 0x8000 ; The free flag
+IFE A, 0
+	SET PC, heap.free.done ; Next region is in use, so nothing to do.
+
+SET A, [Y]
+AND A, 0x7fff ; The size of the next region.
+ADD A, 2 ; Include the header.
+ADD [X], A ; Now the size holds the whole area and a free bit.
+SET [X+1], [Y+1] ; Connect the linked list.
+
+:heap.free.done
+SET Y, POP
 SET X, POP
-SET A, POP
-SET PC, POP
-
-:heap.mark.used
-BOR [A], C ;set the bits that need to be changed to 1
-
-SET X, POP
-SET A, POP ;return *blocks*
 SET PC, POP
  ;
  ;;
@@ -2266,6 +2268,13 @@ SET PC, POP
 ;:**returns** a pointer to the first memory for the process's use
 ;:**under development**
 ;:
+;:```
+;: +----------------+
+;: | Process Memory |
+;: | ...            |
+;: | Heap Allocs    | <- begins at word 64
+;: +----------------+
+;:
 :tusk.newProcess
 SET PUSH, B
 SET PUSH, C
@@ -2301,39 +2310,28 @@ SET PC, POP
 ;:### tusk.getMem (length)
 ;:Reserves a *length* amount of memory from the heap using *heap.alloc*, and stores *length* and the location of the reserved memory on the "memory stack," which allows that memory to be freed either when the process calls *tusk.free* or when it terminates.
 ;:
-;:**modifies** A
+;:**modifies** A <br />
 ;:**returns** the first location of the reserved memory
 ;:
 :tusk.getMem.int
-SET A, PICK 4 ;restore from original interrupt push
-JSR tusk.getMem ;run the routine
-SET PC, pih.return ;return A
+SET PUSH, pih.return ;return A
  ;
 :tusk.getMem
 SET PUSH, B
-SET PUSH, C ;for the location the stack pointer is at
-
-SET C, [v.tusk.memStack]
-SET C, [C] ;v.tusk.memStack points to the pointer
-
-SET [C], A ;push length to the memstack
-ADD C, 1
-
 SET PUSH, C
-JSR heap.alloc
-SET C, POP
-
-SET [C], A ;push location to the memstack
-ADD C, 1
 
 SET B, [v.tusk.memStack]
-SET [B], C ;update the stack pointer carrier
+SET C, [B] ;v.tusk.memStack points to a pointer
+           ;the pointer is the open space after the current memory, though
+ADD [B], 1 ;add 1 to the pointer, so we don't have to do it later
 
+SET [B], A
+
+JSR heap.alloc
 SET C, POP
 SET B, POP
 SET PC, POP
-
-
+ ;
 
 ;:### tusk.dropMem ()
 ;:
@@ -2341,31 +2339,18 @@ SET PC, POP
 ;:**does not modify registers**
 ;:
 :tusk.dropMem.int
-SET A, PICK 4 ;restore from original interrupt push
-JSR tusk.getMem ;run the routine
-SET PC, pih.return ;return A
+SET PUSH, pih.return ;return A
  ;
 :tusk.dropMem
 SET PUSH, A
 SET PUSH, B
 SET PUSH, C
 
-SET C, [v.tusk.memStack]
-SET C, [C] ;v.tusk.memStack points to a pointer
-           ;the pointer is the open space after the current memory, though
+SET A, [v.tusk.memStack]
+SUB [A], 1 ;decrease the pointer, so it points to the most recent item
+SET A, [A] ;v.tusk.memStack points to a pointer
 
-SET A, [C+0xffff] ;retreive the location from the stack
-SET B, [C+0xfffe] ;retreive the length from the stack
-
-SET PUSH, B
-
-SUB C, 2 ;decrement the stack
-SET B, [v.tusk.memStack]
-SET [B], C
-
-SET B, POP
-
-JSR heap.free ;location, length
+JSR heap.free ;location
 
 SET C, POP
 SET B, POP
@@ -3245,16 +3230,19 @@ JSR dl.makeHashTable
 SET A, package.calc
 JSR p.loadPackage
 
+SET A, package.break
+JSR p.loadPackage
+
 SET A, package.ls
 JSR p.loadPackage
 
-SET A, package.testbin
+SET A, package.asciitod
 JSR p.loadPackage
 
 SET A, package.memdump
 JSR p.loadPackage
 
-SET A, package.test
+SET A, package.rpnmath
 JSR p.loadPackage
 
 SET A, package.rainbow
@@ -3276,9 +3264,6 @@ SET A, package.showmaps
 JSR p.loadPackage
 
 SET A, package.inferno
-JSR p.loadPackage
-
-SET A, package.ctest
 JSR p.loadPackage
 
 SET A, package.mkdir
@@ -3408,7 +3393,7 @@ SET Z, X
 
 :package.calc.pushloop
 SET A, [X]
-;we don't want to convert the operators to ASCII, they already are
+;we don't want to convert the operators to ASCII; they already are
 IFN [A], 0x002B
  IFN [A], 0x002D
   IFN [A], 0x002A
@@ -3426,6 +3411,8 @@ IFN X, Y
 SET PC, package.calc.pushloop
 
 ;handle each val-val-postfix triplet as a discrete unit (no support for unary operators yet)
+;ADD Z, 1
+SUB X, 1
 :package.calc.mathloop
 SET A, POP
 SET B, POP
@@ -3451,16 +3438,36 @@ DIV A, B
 IFE C, 0x0025
 MOD A, B
 
+;given an invalid operator, A just gets pushed back to the stack
+
 ;push the result back onto the stack
 SET PUSH, A
 
-SUB X, 1
-IFN X, Z
+SUB X, 2
+;IFN X, Z
+IFG X, Z
 SET PC, package.calc.mathloop
 
 SET A, POP
+;B should be stdout
 SET B, POP
 SET PC, typ.htoascii
+:package.break ;Header
+DAT 0xffab, 0xcdff
+DAT "break", 0
+
+set a, break.Out
+set b, break.In
+jsr typ.cUnpack
+ife [break.Out +1], 0
+	jsr ext
+jsr exf
+
+:break.Out
+DAT "HI"
+
+:break.In
+DAT 0x0025
 ;:### package.ls
 ;:Writes the names all of the links (files and directories) in the current working directory to stdout.
 ;:
@@ -3520,32 +3527,18 @@ SET [B+0xffff], 0 ;set the last newline to 0, so it prints cleanly
 SET I, POP
 SET PC, POP
  ;
-:package.testbin
+:package.asciitod
 DAT 0xffab, 0xcdff
-DAT "testbin", 0
+DAT "asciitod", 0
 
-SET A, 0
-SET B, [B+1]
-SET C, 2
-JSR cat.newFile
+SET PUSH, C
+SET A, [B+1]
+JSR typ.asciitod
 
-SET PUSH, A
-SET B, 0xa000
-JSR cat.open
-
-SET A, package.testbin.binary
-SET B, 0xa004
-JSR typ.cCopy
-
-SET [0xa003], 5 ;the length of the binary is 5 words
-
-SET A, 0xa004
 SET B, POP
-JSR cat.write
-
-:package.testbin.binary
-DAT 0x7d41, 0x0030, 0x8842, 0x8541, 0x6381, 0 ;simple binary executable
-
+JSR typ.dtoascii
+SET [A], 0
+SET PC, POP
 :package.memdump
 DAT 0xffab, 0xcdff
 DAT "memdump", 0
@@ -3583,11 +3576,48 @@ SET Y, X
 ;discard the pushed $2 because we don't want it and it technically doesn't exist
 SET 0, POP
 SET PC, package.memdump.skip
-:package.test
+:package.rpnmath
 DAT 0xffab, 0xcdff
-DAT "test", 0
+DAT "rpnmath", 0
 
-SET PC, 0 ;crash
+; + 2B
+; - 2D
+; * 2A
+; / 2F
+; % 25
+
+SET A, [B+1]
+SET PUSH, C
+SET PUSH, [B+3]
+;SET PUSH, A
+SET PUSH, [B+2]
+JSR typ.asciitoh
+SET X, A
+SET A, POP
+JSR typ.asciitoh
+SET B, A
+;SET A, POP
+SET A, X
+SET C, POP
+
+;addition
+IFE [C], 0x002B
+ADD A, B
+;subtraction
+IFE [C], 0x002D
+SUB A, B
+;multiplication
+IFE [C], 0x002A
+MUL A, B
+;division
+IFE [C], 0x002F
+DIV A, B
+;mod
+IFE [C], 0x0025
+MOD A, B
+
+SET B, POP
+SET PC, typ.htoascii
 ;:### package.rainbow
 ;:Prints gawdgasm in glorious rainbowy letters
 ;:
@@ -3667,6 +3697,12 @@ SET B, package.tdview.prompt
 SET C, [Z+v.stdout]
 JSR dview.prompt
 
+SET A, 0xffff
+:package.tdview.loop
+SUB A, 1
+IFN A, 0
+  SET PC, package.tdview.loop
+
 JSR dview.close
 
 SET PC, POP
@@ -3708,21 +3744,6 @@ SET PC, typ.cCopy
 
 :pack.inferno.text DAT 0xF001, "Lasciate ogne speranza, voi ch'intrate.", 0
  ;
-:package.ctest
-DAT 0xffab, 0xcdff
-DAT "ctest", 0
-
-SET A, package.ctest.notify
-SET B, 6
-JSR clock.newCall
-
-SET PC, POP
-
-:package.ctest.notify
-ADD [package.ctest.count], 1
-SET PC, POP
-
-:package.ctest.count DAT 0
 :package.mkdir
 DAT 0xffab, 0xcdff
 DAT "mkdir", 0
