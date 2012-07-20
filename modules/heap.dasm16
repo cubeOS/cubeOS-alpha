@@ -35,7 +35,8 @@ SET PC, POP
 ;:
 ;:Currently a bit dim; uses the first sufficiently large region, not necessarily the best one. This trades increased memory fragmentation for speed.
 ;:
-;:**returns** the location of the reserved memory, or 0 if no block of the requested size could be found.
+;:**returns** the location of the reserved memory, or 0 if no block of the requested size could be found. <br />
+;:**modifies** A
 ;:
 :heap.alloc
 ; Walks the pointers with X to find a free region
