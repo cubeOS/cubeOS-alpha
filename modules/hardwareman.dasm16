@@ -11,6 +11,8 @@
 :HW.GenericClock DAT 0xffff
 ;:- *[LEM1802](http://0x10c.com/highnerd/rc_1/lem1802.txt)
 :HW.LEM1802 DAT 0xffff
+;:- *Block device
+:HW.Disk DAT 0xffff
 ;:- *[Generic Keyboard](http://0x10c.com/highnerd/rc_1/keyboard.txt)
 :HW.GenericKeyboard DAT 0xffff
 ;:- *[Speaker](http://bitbucket.org/benedek/dcpu-16/src/477043e85337/doc/speaker.txt)
@@ -52,6 +54,10 @@ IFE A, 0x0001
 IFE A, 0x4cae
   IFE B, 0x74fa
     SET [HW.HMD2043], J
+
+IFE A, 0x79d2
+  IFE B, 0x89e1
+    SET [HW.Disk], J
 
 ADD J, 1
 

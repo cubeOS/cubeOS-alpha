@@ -1,0 +1,198 @@
+;;;;;;;;;;;;;;;;;;;;
+; FS ; File System ;
+;;;;;;;;;;;;;;;;;;;;
+;:# File system
+;:
+;:Implements CEFS, the Cube Extended File System. See help/Filesystem.md for full details.
+;:
+;:## Organization
+;:
+;:This file is split into several parts. First, the low-level functions to acquire a new block, to acquire a new inode, to release an inode/block. Second, high-level functions to create new files and directories, look up files, to copy, move and delete files and directories.
+;:
+;:## Low level
+;:
+;:### fs.bitmapSearch(type)
+;:Searches either the block bitmap (`type` = 0) or inode bitmap (`type` = 1) to find an empty one. Returns the number of that object. The disk block loaded into the MMR on return is undefined, do not rely on it!
+;:
+;:**Returns**: The number of the newly reserved inode/block in `A`.
+
+:fs.bitmapSearch
+SET PUSH, B
+SET PUSH, C
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+
+; First, load the bitmap blocks one at a time and find a free inode/block using it.
+
+SET B, A ; The type
+MUL B, 4 ; Now B is either 0 or 4.
+ADD B, 1 ; Now B is either 1 or 5, the block number for the first block of either bitmap.
+SET Y, B
+ADD Y, 4 ; And Y is either 5 or 9, one higher than the last block of either bitmap.
+
+:fs.bitmapSearch.bitmapBlockLoop ; Loops over bitmap blocks, of which there are four for either type.
+JSR disk.read
+
+SET C, [disk.mmr] ; Index into the block
+SET X, C
+ADD X, 1024 ; The end condition
+
+:fs.bitmapSearch.bitmapLoop
+IFG 0xffff, [C]
+  SET PC, fs.bitmapSearch.bitmapFound
+ADD C, 1
+IFG X, C
+  SET PC, fs.bitmapSearch.bitmapLoop
+
+; At this point, we've failed to find a free bitmap word in this block.
+ADD B, 1
+IFG Y, B
+  SET PC, fs.bitmapSearch.bitmapBlockLoop
+
+; At this point, we've failed to find a free block/inode completely, so exit.
+SET A, 0
+SET PC, fs.bitmapSearch.done
+
+:fs.bitmapSearch.bitmapFound
+; Here, we've found a non-full bitmap word that needs reducing to find which bit is free.
+; The bitmap word is [C], B holds the block number.
+; Loop from 0 to 15 in Z, shifting the set bit in Y left by 1 each time until ANDing Y and X=[C] yields 0, meaning that bit was unset.
+SET Y, 1 ; The bitmask
+SET Z, 0 ; The bit in question.
+
+:fs.bitmapSearch.bitLoop
+SET X, [C] ; The working value
+AND X, Y
+IFE X, 0
+  SET PC, fs.bitmapSearch.bitFound
+
+ADD Z, 1
+SHL Y, 1
+SET PC, fs.bitmapSearch.bitLoop
+; No exit condition is necessary because we already know the word is != 0xffff and so has a free bit.
+
+:fs.bitmapSearch.bitFound
+; At this point, Y holds the relevant bitmask and Z the bit itself.
+; Set the bit in [C], then compute the block number, storing it in X.
+BOR [C], Y ; Now the bit is set.
+SET Y, A ; Save A, the type.
+SET A, B ; Put the block number into A
+JSR disk.write ; And write that block back to the disk.
+
+; Now to compute the block number. There are several steps to this: block * 16K + word * 16 + bit
+SET A, Y ; Restore A, the type.
+MUL Y, 4 ; 0 or 4
+ADD Y, 1 ; 1 or 5, the first block of the bitmap.
+SUB B, Y ; The relative block number.
+MUL B, 0x4000 ; Multiply by the number of bits per block of bitmap.
+
+; C holds the word where it was found, as an absolute address in memory.
+SUB C, [disk.mmr] ; Convert it back to a relative offset into the block.
+MUL C, 16 ; Multiply by the number of blocks/inodes per word.
+ADD B, C
+ADD B, Z ; Finally, the answer.
+
+; A holds the type, B the block/inode number, which has been reserved in the bitmap and the bitmap block written back to the disk.
+; The last thing to do is update the used count in the header.
+
+SET Y, A ; Save the type again.
+SET A, 0
+JSR disk.read ; Load the header.
+
+SET C, 2
+ADD C, Y ; (Y the type now) Either 2 or 3, the offsets of the block and inode count, respectively.
+ADD C, [disk.mmr]
+ADD [C], 1 ; One more used block/inode.
+
+JSR disk.write ; Write the block back to the disk.
+
+SET A, B ; B holds the block/inode number.
+
+:fs.bitmapSearch.done
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET C, POP
+SET B, POP
+SET PC, POP
+
+
+;:### fs.newBlock()
+;:Uses fs.bitmapSearch to find a new block and reads it into the MMR.
+;:Returns the block number in `A`.
+;:
+
+:fs.newBlock
+SET PUSH, Z
+
+SET A, 0 ; The type of a block
+JSR fs.bitmapSearch
+; Now a block is reserved and A holds the number of it.
+SET Z, A ; Save the block number.
+JSR disk.read ; Load that block into the MMR.
+SET A, Z ; Restore the block number.
+
+SET Z, POP
+SET PC, POP
+
+
+;:### Commentary on inodes
+;:An inode is stored in a block containing 64 inodes. Therefore its index in this table can be found with the lower 6 bits of the inode number, mask 0x003f, and the index into the inode meta table is the high 10 bits, mask 0xffc0.
+
+
+;:### fs.getInode(inodeNumber)
+;:Given an inode number, loads the disk block containing its table and returns the block number.
+;:If the relevant inode table does not exist, reserves a new block and sets it up in the inode meta table.
+;:Returns the block number for the inode table.
+;:
+
+:fs.getInode
+SET PUSH, B
+SET PUSH, C
+
+SET B, A ; Store the inode number aside.
+SET A, 9 ; The block number for the inode meta table.
+JSR disk.read ; Read that block.
+
+SET A, B
+AND A, 0xffc0 ; Mask the meta index.
+SHR A, 6 ; And shift it down.
+ADD A, [disk.mmr] ; Index into the disk block
+
+SET B, [A] ; B is the block number for the inode table.
+
+IFG B, 0 ; If the inode table exists, skip ahead.
+  SET PC, fs.getInode.loadTable
+
+; If we come here, the inode table doesn't exist. Therefore, reserve a block and use it.
+
+SET C, A ; Back up the index into the meta table.
+JSR fs.newBlock
+
+; Now the new block is loaded, and A holds its number.
+SET B, A ; Back up the block number.
+SET A, 9 ; The block number for the inode meta table.
+JSR disk.read
+
+SET [C], B ; Write the block number into the inode meta table.
+
+SET A, B
+JSR disk.read ; And now load the inode table.
+
+SET A, B ; Ensure the block number is indeed returned.
+
+SET C, POP
+SET B, POP
+SET PC, POP
+
+;:### fs.newInode()
+;:Reserves a new inode and returns its number. **Does not** read the inode table into the MMR, use `fs.getInode`. Returns the inode number.
+;:
+
+:fs.newInode
+SET A, 1 ; Type 1 is for inodes.
+JSR fs.bitmapSearch
+; Now A contains the inode number.
+SET PC, POP
+

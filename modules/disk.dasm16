@@ -1,0 +1,60 @@
+;;;;;;;;;;;;;;;;;;;;;;;;
+; DISK ; Block Devices ;
+;;;;;;;;;;;;;;;;;;;;;;;;
+;:# Block device driver
+;:
+;: This file contains low-level functions for accessing disk blocks. See `fs.dasm16` for the filesystem code.
+
+;:### MMR
+;: The Memory Map Region is the location in memory where the 1024 words of memory mapped data from the disk reside.
+;: Calls to `disk.map` set both this value and the value in the hardware device.
+;:
+
+:disk.mmr
+DAT 0x4000
+
+;:### disk.map(address)
+;:Sets the location in memory to map the disk blocks. The memory mapped region is 1024 words long.
+;: 
+
+:disk.map
+SET PUSH, B
+
+SET [disk.mmr], A
+SET B, A
+SET A, 1
+HWI [HW.Disk] ; Sets the MMR in the device.
+
+SET B, POP
+SET PC, POP
+
+
+;:### disk.read(block)
+;:Asks the drive to load the given block number into the memory mapped region.
+;:
+
+:disk.read
+SET PUSH, B
+
+SET B, A
+SET A, 2 ; Read message
+HWI [HW.Disk]
+
+SET B, POP
+SET PC, POP
+
+
+;:### disk.write(block)
+;:Asks the drive to write the data found in the MMR to the given block of the disk.
+;:
+
+:disk.write
+SET PUSH, B
+
+SET B, A
+SET A, 3 ; Write message
+HWI [HW.Disk]
+
+SET B, POP
+SET PC, POP
+

@@ -30,7 +30,7 @@ The header sits in block 0 and describes the layout of the disk. It contains:
 * A magic number. In this case, 0x6201. The high byte 0x62 indicates a CEFS filesystem, and the lower byte the version, 1.
 * Number of 1K blocks on the disk, counting this one.
 * Number of blocks which are used.
-* Number of inodes which are used.
+* Number of inodes which are used (the number of inodes is always 64K).
 
 ## Used block bitmap
 
@@ -38,9 +38,11 @@ This is a bitmap of all 64K blocks on the disk, with a 1 indicating the block is
 
 For simplicity, all four blocks are reserved even for disks with fewer than 64K blocks.
 
+Contrary to the direction of the bits on the disk, bit 0 (the least significant bit) represents the first block of the 16, and bit 15, the most significant, represents the last block. This is more confusing when consider as a sequence of bits, but easier to compute with.
+
 ## Used inode bitmap
 
-Similar to the used block bitmap, this is a 4-block-long bitmap of inode use. 1 indicates in use, 0 indicates free.
+Similar to the used block bitmap, this is a 4-block-long bitmap of inode use. 1 indicates in use, 0 indicates free. The bits are in the same order as above as well.
 
 ## Inode Meta-Table
 
