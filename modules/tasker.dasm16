@@ -16,6 +16,13 @@
 ;:**returns** a pointer to the first memory for the process's use
 ;:**under development**
 ;:
+;:```
+;: +----------------+
+;: | Process Memory |
+;: | ...            |
+;: | Heap Allocs    | <- begins at word 64
+;: +----------------+
+;:
 :tusk.newProcess
 SET PUSH, B
 SET PUSH, C
@@ -51,39 +58,28 @@ SET PC, POP
 ;:### tusk.getMem (length)
 ;:Reserves a *length* amount of memory from the heap using *heap.alloc*, and stores *length* and the location of the reserved memory on the "memory stack," which allows that memory to be freed either when the process calls *tusk.free* or when it terminates.
 ;:
-;:**modifies** A
+;:**modifies** A <br />
 ;:**returns** the first location of the reserved memory
 ;:
 :tusk.getMem.int
-SET A, PICK 4 ;restore from original interrupt push
-JSR tusk.getMem ;run the routine
-SET PC, pih.return ;return A
+SET PUSH, pih.return ;return A
  ;
 :tusk.getMem
 SET PUSH, B
-SET PUSH, C ;for the location the stack pointer is at
-
-SET C, [v.tusk.memStack]
-SET C, [C] ;v.tusk.memStack points to the pointer
-
-SET [C], A ;push length to the memstack
-ADD C, 1
-
 SET PUSH, C
-JSR heap.alloc
-SET C, POP
-
-SET [C], A ;push location to the memstack
-ADD C, 1
 
 SET B, [v.tusk.memStack]
-SET [B], C ;update the stack pointer carrier
+SET C, [B] ;v.tusk.memStack points to a pointer
+           ;the pointer is the open space after the current memory, though
+ADD [B], 1 ;add 1 to the pointer, so we don't have to do it later
 
+SET [B], A
+
+JSR heap.alloc
 SET C, POP
 SET B, POP
 SET PC, POP
-
-
+ ;
 
 ;:### tusk.dropMem ()
 ;:
@@ -91,31 +87,18 @@ SET PC, POP
 ;:**does not modify registers**
 ;:
 :tusk.dropMem.int
-SET A, PICK 4 ;restore from original interrupt push
-JSR tusk.getMem ;run the routine
-SET PC, pih.return ;return A
+SET PUSH, pih.return ;return A
  ;
 :tusk.dropMem
 SET PUSH, A
 SET PUSH, B
 SET PUSH, C
 
-SET C, [v.tusk.memStack]
-SET C, [C] ;v.tusk.memStack points to a pointer
-           ;the pointer is the open space after the current memory, though
+SET A, [v.tusk.memStack]
+SUB [A], 1 ;decrease the pointer, so it points to the most recent item
+SET A, [A] ;v.tusk.memStack points to a pointer
 
-SET A, [C+0xffff] ;retreive the location from the stack
-SET B, [C+0xfffe] ;retreive the length from the stack
-
-SET PUSH, B
-
-SUB C, 2 ;decrement the stack
-SET B, [v.tusk.memStack]
-SET [B], C
-
-SET B, POP
-
-JSR heap.free ;location, length
+JSR heap.free ;location
 
 SET C, POP
 SET B, POP
