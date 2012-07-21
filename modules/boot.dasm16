@@ -33,7 +33,7 @@ JSR cat.mountSystem ;initialize FS
 
 JSR p.init ;initialize DPH
 
-JSR clock.init
+;JSR clock.init
 
 JSR s.instance ;spawn an instance of the DASH Shell
 
