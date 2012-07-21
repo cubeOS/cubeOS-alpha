@@ -30,13 +30,21 @@ IFE C, [A+3] ;if C is the exit character
     JSR [A+2] ;jump to "notify" location
 
 IFG C, 0x1f ;if the key is an ASCII key
-  SET PC, kd.keystroke.writeChar
+	SET PC, kd.checkASCII ;; Arrow keys ASCII codes are more than 0x1f, so we should check them, else we print the character.
 
 IFE C, 0x10 ;backspace
-  JSR kd.keystroke.backspace
+  SET PC, kd.keystroke.backspace
 
 SET PC, POP
- ;return from the interrupt
+
+:kd.checkASCII
+IFG C, 0x7f
+	IFL C, 0x84
+		IFN [A+6], 0
+			SET PC, [A+6]    ;; Arrow keys.
+
+; Else:
+SET PC, kd.keystroke.writeChar ;; I know this is not necessary as this function is down here. If you expand code in between here, it'll cause NULL pain.
 
 :kd.keystroke.writeChar
 SET B, [A+5] ;max onscreen position
@@ -83,6 +91,7 @@ SET B, [A+1] ;make B the screen write location
 SET [B], 0   ;erase the previous character
 
 SET PC, POP
+
 
 ;:## Data Structures
 ;:
