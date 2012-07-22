@@ -271,7 +271,7 @@ SET PC, POP
 ;:
 
 :typ.memcopy
-SET X, PUSH
+SET PUSH, X
 
 ; Check first if there is overlap.
 IFG A, B ; Destination before source, no danger.

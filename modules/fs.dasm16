@@ -179,6 +179,7 @@ SET [C], B ; Write the block number into the inode meta table.
 SET A, 9
 JSR disk.write ; And write the meta table back to the disk.
 
+:fs.getInode.loadTable
 SET A, B
 JSR disk.read ; And now load the inode table.
 
@@ -237,7 +238,7 @@ IFG [B+1], 8 ; If the high word is >8,
 ; Otherwise it's singly indirect.
 ;TODO: Handle the singly indirect block.
 
-:fs.readFileAt.doubleIndirectBlock
+:fs.readFileAt.doublyIndirectBlock
 HCF 0 ; Halt and catch file, unimplemented code.
 ; TODO: Handle the doubly indirect block.
 
@@ -453,7 +454,7 @@ SET PUSH, I
 SET PUSH, J
 
 SET I, A ; Store the inode number for the directory.
-JSR getInode
+JSR fs.getInode
 ; A now contains the disk block number, and the inode table is loaded. Look up the inode itself.
 
 SET A, I
@@ -611,7 +612,7 @@ JSR heap.free ; The inode copy.
 SET A, X
 JSR heap.free ; The directory entry buffer.
 SET A, Y
-JSR heap,free ; the offset
+JSR heap.free ; the offset
 
 :fs.addDir.done
 
@@ -635,11 +636,11 @@ SET C, POP
 ; * Fetch the inode of the parent directory and add this entry.
 ; * Load the inode for this file and populate it appropriately.
 
-SET C, PUSH
-SET X, PUSH
-SET Y, PUSH
-SET I, PUSH
-SET J, PUSH
+SET PUSH, C
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, I
+SET PUSH, J
 
 SET X, A
 SET Y, B
@@ -710,9 +711,9 @@ DAT "..", 0
 
 :fs.newDir
 
-SET C, PUSH
-SET I, PUSH
-SET J, PUSH
+SET PUSH, C
+SET PUSH, I
+SET PUSH, J
 
 SET I, A ; I holds the inode number of the parent, which I'll need later for `..`
 
