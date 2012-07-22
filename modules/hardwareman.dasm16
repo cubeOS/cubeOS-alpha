@@ -69,7 +69,7 @@ ADD J, 1
 
 IFN I, J
   SET PC, HWM.loop
-  
+
 SET PC, popReg
  ;
  

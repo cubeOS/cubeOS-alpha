@@ -6,4 +6,4 @@
 
 python build.py
 das -o cubeOS.bin cubeOS.dasm16
-dcpu-16 cubeOS.bin
+dcpu-16 -s disk.cefs cubeOS.bin 

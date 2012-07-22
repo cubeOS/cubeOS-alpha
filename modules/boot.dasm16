@@ -27,6 +27,8 @@ SET B, 0x5000 ;length
 SET C, 0x0040 ;block size (64)
 JSR heap.init
 
+JSR disk.init
+
 JSR pih.init
 
 SET A, 0x8000

@@ -35,6 +35,16 @@ SET B, POP
 SET PC, POP
 
 
+;:### disk.init()
+;:Initializes the disk, reserving memory for the MMR and setting it.
+:disk.init
+SET A, 1024
+JSR heap.alloc
+JSR disk.map
+SET PC, POP
+
+
+
 ;:### disk.read(block)
 ;:Asks the drive to load the given block number into the memory mapped region.
 ;:
