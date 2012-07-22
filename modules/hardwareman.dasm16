@@ -17,6 +17,8 @@
 :HW.GenericKeyboard DAT 0xffff
 ;:- *[Speaker](http://bitbucket.org/benedek/dcpu-16/src/477043e85337/doc/speaker.txt)
 :HW.Speaker DAT 0xffff
+;:- *Debug peripheral - Stops execution and enters single step mode when HWI'd.
+:HW.Debug DAT 0xffff
 ;:- *[HMD2043](https://gist.github.com/2516406)
 :HW.HMD2043
 ;:
@@ -58,6 +60,10 @@ IFE A, 0x4cae
 IFE A, 0x79d2
   IFE B, 0x89e1
     SET [HW.Disk], J
+
+IFE A, 0x923d
+  IFE B, 0x581f
+    SET [HW.Debug], J
 
 ADD J, 1
 
