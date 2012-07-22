@@ -7,7 +7,7 @@
 ;:
 ;:## Organization
 ;:
-;:This file is split into several parts. First, the low-level functions to acquire a new block, to acquire a new inode, to release an inode/block. Second, high-level functions to create new files and directories, look up files, to copy, move and delete files and directories.
+;:This file is split into several parts. First, the low-level functions to acquire a new block, to acquire a new inode, to release an inode/block. Second, mid-level functions to create new files and directories, manipulate directory entries, look up an entry in a directory, seek to a location in a file.
 ;:
 ;:## Low level
 ;:
@@ -144,7 +144,7 @@ SET PC, POP
 ;:### fs.getInode(inodeNumber)
 ;:Given an inode number, loads the disk block containing its table and returns the block number.
 ;:If the relevant inode table does not exist, reserves a new block and sets it up in the inode meta table.
-;:Returns the block number for the inode table.
+;:Returns the block number for the inode table (which is loaded).
 ;:
 
 :fs.getInode
@@ -176,11 +176,13 @@ SET A, 9 ; The block number for the inode meta table.
 JSR disk.read
 
 SET [C], B ; Write the block number into the inode meta table.
+SET A, 9
+JSR disk.write ; And write the meta table back to the disk.
 
 SET A, B
 JSR disk.read ; And now load the inode table.
 
-SET A, B ; Ensure the block number is indeed returned.
+SET A, B ; Return the block number.
 
 SET C, POP
 SET B, POP
@@ -196,3 +198,516 @@ JSR fs.bitmapSearch
 ; Now A contains the inode number.
 SET PC, POP
 
+
+;:## Mid-level
+;:
+
+;:### fs.readFileAt(inodePointer, offset)
+;:Given a **pointer** to an inode in memory (**not** an inode number), and a pointer to a little endian 32-bit offset into the file, loads the relevant disk block into the MMR and returns the block number.
+;:The offset of the requested data in the MMR can be computed by masking the low word of the offset with 0x03ff. Care must be taken not to read past the end of the MMR.
+;:
+;:Since the code that allocates memory is responsible for freeing it, this function as a courtesy preserves the value of the offset argument.
+;:
+
+:fs.readFileAt
+; First, a sanity check: If the offset is >= the file's length, bail.
+IFG [B+1], [A+4] ; If the high word of the offset is larger, it's too big
+  SET PC, fs.readFileAt.tooBig
+IFG [A+4], [B+1] ; If the high word of the size is larger, it's small enough.
+  SET PC, fs.readFileAt.offsetOK
+; If we come here then they're equal, jump accordingly:
+IFG [A+3], [B] ; the file size's low word is larger, then it's good
+  SET PC, fs.readFileAt.offsetOK
+
+:fs.readFileAt.tooBig
+; We either jumped or fell through to here because the offset is outside the file. Return 0. Callers are responsible for freeing the offset.
+SET A, 0
+SET PC, POP
+
+:fs.readFileAt.offsetOK
+; Next step is to find which block contains the offset in question.
+
+IFE [B+1], 0 ; if the high word is 0
+  IFG 0x2000, [B] ; and the low word is < 8K
+    SET PC, fs.readFileAt.directBlocks ; Then it's in one of the direct blocks.
+
+IFG [B+1], 8 ; If the high word is >8,
+  SET PC, fs.readFileAt.doublyIndirectBlock ; Then it's doubly indirect
+
+; Otherwise it's singly indirect.
+;TODO: Handle the singly indirect block.
+
+:fs.readFileAt.doubleIndirectBlock
+HCF 0 ; Halt and catch file, unimplemented code.
+; TODO: Handle the doubly indirect block.
+
+
+:fs.readFileAt.directBlocks
+; The offset is inside the first 8K words that can be accessed through the direct blocks.
+; Next step is to determine which one. That's best done by shifting the offset.
+SET PUSH, C
+
+SET C, [B] ; The low word of the offset.
+SHR C, 10 ; Knock off the low 10 bits. C now counts in blocks, not words.
+
+ADD C, A ; Points into the inode
+ADD C, 6 ; and now at the right block.
+SET A, [C] ; Fetch the block number.
+JSR disk.read ; And read it.
+SET A, [C]
+SET C, POP
+
+SET PC, POP
+
+
+
+;:### fs.dirLookup(directory, filename)
+;:Given a directory's inode number and a filename (pointer to an unpacked C string), returns the inode number of the entry (file or directory), or 0 if no such entry exists. 0 is the inode number of the root directory, but `/` is not a legal filename, and there's no directory in which to look it up, so there's no ambiguity.
+;:
+
+:fs.dirLookup
+SET PUSH, C
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+SET PUSH, I
+SET PUSH, J
+
+; Acquire enough memory to store an inode (16 words).
+SET C, A ; Set aside the inode number.
+SET A, 16
+JSR heap.alloc
+SET X, A ; Set aside the memory location too. X will hold the inode throughout the function.
+
+SET A, C ; Put the inode number into A.
+JSR fs.getInode ; And load the inode. A holds the block number but we don't care about that.
+SET A, C ; The inode number
+AND A, 0x3f ; Extract the index into the inode table.
+ADD A, [disk.mmr] ; And turn it into an absolute address on the filesystem.
+
+SET PUSH, B ; Save B, the filename pointer.
+SET B, X ; The heap location set aside for the inode.
+SET C, 16 ; The size of an inode.
+JSR typ.memcopy ; Copy the inode data from the disk to the heap.
+SET B, POP
+
+; At this point, X points to the inode on the heap, and B holds the filename pointer.
+; Now we begin checking the directory entries for data.
+; First, sanity-check that this is actually a directory.
+SET A, [B] ; The type value from the inode.
+AND A, 0x0007 ; Mask out the type only.
+IFE A, 0x0002 ; If it's a directory, then skip over the error handling.
+  SET PC, fs.dirLookup.inodeOK
+
+; Handle the case where it's not a directory.
+SET A, X
+JSR heap.free ; Free the inode copy.
+SET PC, fs.dirLookup.error
+
+
+:fs.dirLookup.inodeOK
+; At this point we need to pack the string for comparison to the filenames.
+SET A, B
+JSR typ.ffz ; Find the first 0 in the string, A now holds its length.
+
+ADD A, 1
+DIV A, 2 ; (x+1)/2 rounded down yields x/2 rounded up. (8+1)/2 = 9/2 = 4.5 = 4, and (7+1)/2 = 4, so we can be sure A is long enough for the packed string.
+SET Y, A ; Back up the length.
+JSR heap.alloc ; A now holds the location where we'll put the packed string.
+
+SET C, A ; Move the destination pointer to C,
+SET A, B ; the source pointer to A,
+SET B, Y ; and the length to B,
+JSR typ.pPack
+
+; Now we have the packed string in the allocated memory in C, the length in packed words in Y, and the address of the inode in X.
+; Now we loop through each entry in the directory, using I to hold the offset into the file. Since the filesize is 32 bits, I actually holds a pointer to a two-word 32-bit number.
+SET A, 2
+JSR heap.alloc
+SET [A], 0
+SET [A+1], 0
+SET I, A ; I holds a pointer to the 32-bit length.
+
+:fs.dirLookup.entryLoop
+SET A, X
+SET B, I
+; TODO: Optimization: Don't fetch if the offsets are in the same block.
+JSR fs.readFileAt ; Takes the inode pointer (not number!) and pointer to the 32-bit offset, and returns a pointer to the place in memory where that word of the file now resides.
+
+; A now holds the block number in memory, which is useless since we're not planning to write.
+SET A, [I] ; The low word of the offset.
+AND A, 0x03ff ; Mask out just the offset into the block.
+ADD A, [disk.mmr] ; And now A points at the required data in memory.
+
+; Compare the lengths
+IFE Y, [A+2]
+  SET PC, fs.dirLookup.nextEntry
+
+; Lengths match, so start comparing strings.
+SET B, A
+ADD B, 3 ; B now points in memory at the start of the filename.
+SET Z, C ; Z is the start of search query.
+SET J, Y ; J the length.
+
+:fs.dirLookup.filenameLoop
+IFN [B], [Z] ; On a mismatch, jump out.
+  SET PC, fs.dirLookup.nextEntry
+ADD B, 1
+ADD Z, 1
+SUB J, 1
+IFG J, 0
+  SET PC, fs.dirLookup.filenameLoop
+
+; If we reach this point, the filenames match and we have a winner. Store the inode number in A, free the two chunks of memory, and return.
+; Those two chunks of memory are the search query packed string at C and the inode at X.
+SET Z, [A+1] ; Set aside the inode number of the found entry.
+SET A, C
+JSR heap.free
+SET A, X
+JSR heap.free
+SET A, I
+JSR heap.free
+
+SET A, Z ; A is the inode number.
+SET PC, fs.dirLookup.done
+
+
+:fs.dirLookup.nextEntry
+; Look up the next entry in the directory. The offset into the directory is still in I.
+; Increment it by the delta given here (if it's nonzero) and loop. If it's zero, not found.
+IFE [A], 0 ; End of the entry list
+  SET PC, fs.dirLookup.notFound
+
+ADD [I], [A]
+ADD [I+1], EX
+SET PC, fs.dirLookup.entryLoop
+
+:fs.dirLookup.error
+:fs.dirLookup.notFound ; These labels currently point to the same place; error could be separated.
+SET A, 0
+
+:fs.dirLookup.done
+SET J, POP
+SET I, POP
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET C, POP
+SET PC, POP
+
+
+
+
+;:### fs.addBlock(inodePointer)
+;:Given an inode **pointer**, retrieves a new block, adds it to the inode, and returns the block number with the block loaded. Does not write the inode to disk, which must be done by the caller.
+;:
+
+:fs.addBlock
+; * Acquire a new block.
+; * Insert the block number into the inode at the appropriate spot.
+; * Update the number of blocks in the inode.
+
+SET PUSH, Z
+SET PUSH, I
+
+SET I, A ; I holds the inode pointer.
+JSR fs.newBlock
+SET Z, A
+; Z holds the disk block number
+; The block is loaded, though I don't need it. I leave it loaded for my caller, though.
+
+SET A, [I+2] ; A holds the original block count.
+ADD A, 6 ; A now points at the offset into the inode of the next available block.
+
+IFG A, 13 ; Points at the singly or doubly indirect block, which I need to implement.
+  HCF 0 ; TODO Handle indirect blocks.
+
+ADD A, I ; A is now the real address of the block
+SET [A], Z ; Write the block number.
+ADD [I+2], 1 ; Add a block to the block count.
+
+; All done. Return the block number of the new block.
+SET A, Z
+SET I, POP
+SET Z, POP
+SET PC, POP
+
+
+;:### fs.addToDir(parent, inode, filename)
+;:Given the inode number of a directory, the inode number of a file, and the name of the file (unpacked C string), adds the file to the directory. Returns nothing. The disk block loaded into the MMR upon return is undefined.
+;:
+
+:fs.addToDir
+; * Look up the directory and check it really is one.
+; * Construct the new entry, including its length.
+; * Find the current last entry.
+; * Set its pointer to after the end of itself, skipping onto the next block if necessary.
+; * Write the new entry.
+; * Update the block count and file size of the directory.
+
+SET PUSH, C
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+SET PUSH, I
+SET PUSH, J
+
+SET I, A ; Store the inode number for the directory.
+JSR getInode
+; A now contains the disk block number, and the inode table is loaded. Look up the inode itself.
+
+SET A, I
+AND A, 0x003f ; Mask just the index into the inode table.
+SHL A, 4 ; Offset in words
+ADD A, [disk.mmr] ; Absolute address.
+
+SET X, [A]
+AND X, 0x0007 ; Mask just the type.
+
+IFN X, 2 ; Check the type is 2=directory
+  ; Trying to add a file to a non-directory, so exit with an error. There's no return value, so we just fail silently.
+  ; Using HCF for now for debugging purposes.
+  HCF 0
+  ;SET PC, fs.addToDir.done
+
+; At this point, the directory inode shows it is indeed a directory.
+; Now copy the inode into memory.
+
+SET A, 16
+JSR heap.alloc
+SET J, A ; J holds the directory inode copy in memory.
+
+; Next step is to construct the new filename entry.
+; The maximum size of an entry is 3 + 128 = 131.
+SET A, 131
+JSR heap.alloc
+SET X, A ; X holds the entry address.
+
+SET [X], 0 ; Relative position of next entry. 0 to indicate this is the last entry.
+SET [X+1], B ; Inode number of the file we're adding.
+
+; Compute the length of the string:
+SET A, C
+JSR typ.ffz
+; A now holds the length of the string in characters.
+SET Y, A ; Save the character length.
+SET A, C ; A holds the source string
+SET B, Y ; B the character length
+SET C, X
+ADD C, 3 ; C the pointer to the destination.
+JSR typ.pPack ; Packs the string into the destination.
+
+ADD Y, 1
+SHR Y, 1 ; (x+1)/2 divides by two, rounding up.
+; Y now holds the length of the packed filename in words.
+SET [X+2], Y ; And store that length in the directory entry.
+
+; Now the constructed directory entry is ready.
+; Registers: I the directory's inode number, X the new entry's address, J the directory inode address in memory.
+; Next, find the last directory entry.
+
+SET A, 2
+JSR heap.alloc
+SET Y, A ; Store the offset pointer in Y.
+
+SET [Y], 0
+SET [Y+1], 0
+
+:fs.addToDir.entryLoop
+SET A, J ; The inode pointer
+SET B, Y ; And the offset
+JSR fs.readFileAt
+SET Z, A ; Z holds the block number of the directory entries.
+
+SET A, [Y]
+AND A, 0x03ff ; Offset into this block.
+ADD A, [disk.mmr] ; Address in memory
+IFE [A], 0
+  SET PC, fs.addToDir.lastEntry
+
+ADD [Y], 1
+ADD [Y+1], EX
+SET PC, fs.addToDir.entryLoop
+
+:fs.addToDir.lastEntry
+; We found the last entry. A points at it in memory. Z holds the block number, I the directory inode number, and J the directory inode pointer, and Y the offset (32 bits)
+
+; Move the offset forward by the length of the last entry.
+SET B, [A+2] ; B is the length of the entry's name.
+ADD B, 3 ; B is now the length of the entry in total.
+
+; Check that this value is in the same block
+SET C, B
+ADD C, A ; C points at the memory location where the new block is to be written.
+
+IFG [disk.mmrTop], C
+  SET PC, fs.addToDir.copyEntry
+
+; If we come here, the entry needs to be bumped onto the next block.
+; Compute the relative offset, write it, write this block, acquire a new block, write its number into the inode copy, load it, and write the entry there.
+
+SET C, [disk.mmrTop]
+SUB C, A ; The relative difference between the old last entry and the new entry.
+SET [A], C ; And now it's written into this entry.
+
+SET A, Z ; The block number
+JSR disk.write ; Write out that data block.
+
+; Call the helper function to append a new block to a file.
+SET A, J ; The inode pointer.
+JSR fs.addBlock
+SET Z, A ; Z holds, again, the data block number.
+; New block's number is in A, and it's loaded.
+; Regs: Z new block number, I inode number, J inode pointer, Y offset, X new entry.
+ADD [Y], 0x03ff ; Bump the offset definitely into the next 1K
+ADD [Y+1], EX ; Update the high word appropriately.
+AND [Y], 0xfc00 ; And then mask away the low 10 bits, so the offset is now the beginning of the new block. HACK
+
+:fs.addToDir.copyEntry
+; Expects Y to be the offset pointer, that gives where it should write. The data block should be loaded and Z holds its number. X points to the entry data computed earlier.
+SET A, X ; source
+SET B, [Y] ; destination
+AND B, 0x03ff ; offset into this block
+ADD B, [disk.mmr] ; absolute address of destination
+
+SET C, [X+2] ; length of the filename field.
+ADD C, 3 ; length of the new entry.
+SET PUSH, C ; save the length for later.
+
+JSR typ.memcopy ; copies into the data block.
+
+SET A, Z
+JSR disk.write ; write the data block to disk.
+
+; Finally we need to update the file size in the inode. Y's offset points at the start of the new entry
+SET C, POP ; Pop the length we saved earlier.
+ADD [Y], C
+ADD [Y+1], EX ; Update the offset properly.
+; Y's offset now points after the last word of data in the file, and so is its length. Write it into the inode:
+SET [J+3], [Y]
+SET [J+4], [Y+1]
+
+; Now, fetch the inode again and write it back to the disk.
+SET A, I
+JSR fs.getInode
+SET Z, A ; Z holds the disk block
+
+SET A, J ; source
+SET C, 16 ; length
+
+SET B, I ; destination. currently the inode number
+AND B, 0x003f ; now an index into the table
+SHL B, 4 ; now a word offset into the table
+ADD B, [disk.mmr] ; now the real address
+
+JSR typ.memcopy ; copy the inode data into the table.
+SET A, Z ; The disk block
+JSR disk.write ; Write the inode table back to the disk.
+
+
+; Whole assload of memory to free:
+SET A, J
+JSR heap.free ; The inode copy.
+SET A, X
+JSR heap.free ; The directory entry buffer.
+SET A, Y
+JSR heap,free ; the offset
+
+:fs.addDir.done
+
+SET J, POP
+SET I, POP
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET C, POP
+
+
+
+
+;:### typ.memcopy (source, destination, length)
+
+
+
+
+
+
+;:### fs.newFile(parent, filename)
+;:Given the inode number of a directory and a pointer to an unpacked C-style string `filename`, create the file's inode and the necessary directory entry. Returns the inode number of the new file, or the inode number of the file, if it exists. The disk block loaded into the MMR after return is undefined.
+;:
+
+:fs.newFile
+; * Check that no entry with that name already exists in the parent directory (failed file lookup).
+; * Request a new inode.
+; * Fetch the inode of the parent directory and add this entry.
+; * Load the inode for this file and populate it appropriately.
+
+SET C, PUSH
+SET X, PUSH
+SET Y, PUSH
+SET I, PUSH
+SET J, PUSH
+
+SET X, A
+SET Y, B
+JSR fs.dirLookup ; Try to look up the file we were just told to create.
+
+IFE A, 0
+  SET PC, fs.newFile.doesNotExist
+
+; If we came here, the file exists already, so we return the same A as we got from dirLookup, since that's the inode of the file.
+SET PC, fs.newFile.done
+
+:fs.newFile.doesNotExist
+; The file doesn't already exist, so we can start creating it.
+; First, acquire a new inode.
+JSR fs.newInode
+SET I, A ; Hang on to that inode number.
+; And then load it.
+JSR fs.getInode
+; A now contains the block number for the inode.
+SET J, A ; Hang onto the block number as well.
+
+; I (inode number) and J (block number) are now reserved for the remainder of the function.
+; Set up the inode.
+
+SET A, I
+AND A, 0x003f ; Mask out the inode number (low 6 bits).
+SHL A, 4 ; Shift left by 4, effective multiply by 16. This is now a word offset into the inode block.
+ADD A, [disk.mmr] ; Now it's a real memory address for the inode.
+
+SET [A], 1 ; Mark it as a file. If this was a new directory, newDir will update this value.
+SET [A+1], 1 ; One link to this file. Hard links aren't implemented yet anyway.
+SET [A+2], 0 ; No blocks currently assigned.
+SET [A+3], 0 ; Size low word, 0.
+SET [A+4], 0 ; Size high word, 0.
+SET [A+5], 0 ; Reserved word, set to 0 so it has a consistent value when it becomes used later.
+
+SET A, J ; The block number
+JSR disk.write ; Write out the inode table.
+
+SET A, X ; The parent directory,
+SET B, I ; the inode number
+SET C, Y ; and filename
+JSR fs.addToDir
+
+; Now the file is created and empty, and inserted into its directory.
+; We return the inode number.
+SET A, I
+
+:fs.newFile.done
+SET J, POP
+SET I, POP
+SET Y, POP
+SET X, POP
+SET C, POP
+SET PC, POP
+
+
+
+;:### fs.format(size_in_KW)
+;:Given a size (measured in 1K blocks), formats the attached disk to that size. If the size exceeds that of the disk, Bad Things will happen but no errors will be generated. The size should be the total size of the disk, without worrying about headers vs. data space.
+
+:fs.format
+; Needs to populate the header and block bitmap blocks (mark the header blocks as used, and all nonexistent blocks at the end as used as well).
+; Also must define the inode for the root directory, inode 0.

@@ -93,7 +93,7 @@ A directory is stored like a file, but its contents take a particular form. That
 
 * Relative position of the next entry
 * inode number for this file/directory.
-* Length of the name field (in characters, not words)
+* Length of the name field in **words**, not characters.
 * File name (ASCII string, packed (see appendix A))
 
 The maximum length of a filename is 255 characters (128 words). The name need not have a null terminator because its length is given.
@@ -101,6 +101,8 @@ The maximum length of a filename is 255 characters (128 words). The name need no
 The entries are *not* kept in any specified order, except for the two special subdirectories described below.
 
 A directory entry must fit fully inside a block, and cannot span two blocks. If an entry to be added is too long to fit in this block, leave the space blank and place the entry at the start of a new block.
+
+The last entry in the directory should have 0 as the relative position to the next entry, to signal the end of the list.
 
 
 ### Special directory entries

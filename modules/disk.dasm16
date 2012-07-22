@@ -12,6 +12,8 @@
 
 :disk.mmr
 DAT 0x4000
+:disk.mmrTop
+DAT 0x4400
 
 ;:### disk.map(address)
 ;:Sets the location in memory to map the disk blocks. The memory mapped region is 1024 words long.
@@ -22,6 +24,10 @@ SET PUSH, B
 
 SET [disk.mmr], A
 SET B, A
+
+ADD A, 1024
+SET [disk.mmrTop], A
+
 SET A, 1
 HWI [HW.Disk] ; Sets the MMR in the device.
 

@@ -265,6 +265,55 @@ SET I, POP
 SET PC, POP
  ;
 
+;:### typ.memcopy (source, destination, length)
+;:Copies `length` words from `source` to `destination`.
+;:Correctly handles overlapping regions. Returns nothing.
+;:
+
+:typ.memcopy
+SET X, PUSH
+
+; Check first if there is overlap.
+IFG A, B ; Destination before source, no danger.
+  SET PC, typ.memcopy.copyForwards
+
+; Check if the source extends into the destination.
+SET X, A
+ADD X, C
+SUB X, 1 ; X is now the last value of the source.
+IFG B, X ; No problem, destination does not overlap.
+  SET PC, typ.memcopy.copyForwards
+
+; If we arrive here, we need to copy backwards.
+ADD A, C
+SUB A, 1 ; A now points at the end of the source.
+ADD B, C
+SUB B, 1 ; And B at the end of the destination.
+
+SET X, C
+:typ.memcopy.backwardLoop
+SET [B], [A]
+SUB A, 1
+SUB B, 1
+SUB X, 1
+IFG X, 0
+  SET PC, typ.memcopy.backwardLoop
+
+SET PC, typ.memcopy.done
+
+:typ.memcopy.copyForwards
+SET [B], [A]
+ADD A, 1
+ADD B, 1
+SUB C, 1
+IFG C, 0
+  SET PC, typ.memcopy.copyForwards
+
+:typ.memcopy.done
+SET X, POP
+SET PC, POP
+
+
 ;:### typ.memfill (startPointer, length, value)
 ;:Fills *length* words with *value*, starting at *startPointer*
 ;:
