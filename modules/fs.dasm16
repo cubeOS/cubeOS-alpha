@@ -625,13 +625,6 @@ SET C, POP
 
 
 
-;:### typ.memcopy (source, destination, length)
-
-
-
-
-
-
 ;:### fs.newFile(parent, filename)
 ;:Given the inode number of a directory and a pointer to an unpacked C-style string `filename`, create the file's inode and the necessary directory entry. Returns the inode number of the new file, or the inode number of the file, if it exists. The disk block loaded into the MMR after return is undefined.
 ;:
@@ -655,7 +648,8 @@ JSR fs.dirLookup ; Try to look up the file we were just told to create.
 IFE A, 0
   SET PC, fs.newFile.doesNotExist
 
-; If we came here, the file exists already, so we return the same A as we got from dirLookup, since that's the inode of the file.
+; If we came here, the file exists already, so we return 0.
+SET A, 0
 SET PC, fs.newFile.done
 
 :fs.newFile.doesNotExist
@@ -704,10 +698,229 @@ SET C, POP
 SET PC, POP
 
 
+;:### fs.newDir(parent, name)
+;:Creates a new directory under the given parent and with the given name (unpacked string)
+;:Returns the inode number of the new directory, or 0 if one with that name already exists.
+;:
+
+:fs.newDir.dot
+DAT ".", 0
+:fs.newDir.dotdot
+DAT "..", 0
+
+:fs.newDir
+
+SET C, PUSH
+SET I, PUSH
+SET J, PUSH
+
+SET I, A ; I holds the inode number of the parent, which I'll need later for `..`
+
+JSR fs.newFile
+
+IFE A, 0
+  SET PC, fs.newFile.done
+
+; If we're still here, we've got some work to do. We've constructed a new file whose inode number is in A. The inode type needs updating, and the . and .. entries
+; A holds the inode of the new directory.
+SET J, A ; Back up. J holds the inode of this new directory
+
+; Update the inode type first so fs.addToDir won't error out.
+JSR fs.getInode
+; A holds the block number.
+SET B, J
+AND B, 0x003f ; index into the inode table
+SHL B, 4 ; offset into the table
+ADD B, [disk.mmr] ; address in real memory.
+SET [B], 2 ; Set the type.
+
+JSR disk.write ; A still holds the block number, so write it out.
+
+; Now add the two special directories, . and ..
+SET A, J ; A holds the directory we're adding to, the new one.
+SET B, J ; B holds the inode of the file to add to the directory, which is the newly created one.
+SET C, fs.newDir.dot ; Filename
+JSR fs.addToDir
+
+SET A, J ; This directory.
+SET B, I ; The parent
+SET C, fs.newDir.dotdot ; Filename
+JSR fs.addToDir
+
+
+:fs.newDir.done
+; Return the new directory's inode number.
+SET A, J
+SET J, POP
+SET I, POP
+SET C, POP
+SET PC, POP
+
+
+
 
 ;:### fs.format(size_in_KW)
-;:Given a size (measured in 1K blocks), formats the attached disk to that size. If the size exceeds that of the disk, Bad Things will happen but no errors will be generated. The size should be the total size of the disk, without worrying about headers vs. data space.
+;:Given a size (measured in 1K blocks), formats the attached disk to that size. If the given size exceeds that of the disk, Bad Things will happen but no errors will be generated. You have been warned. The size should be the total size of the disk, without worrying about headers vs. data space.
+;: Returns nothing. The loaded disk block on return is undefined.
 
 :fs.format
 ; Needs to populate the header and block bitmap blocks (mark the header blocks as used, and all nonexistent blocks at the end as used as well).
 ; Also must define the inode for the root directory, inode 0.
+
+SET PUSH, B
+SET PUSH, C
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+SET PUSH, I
+
+SET X, A ; Set aside the size.
+SET A, 0
+JSR disk.read ; Read the first block of the disk.
+
+SET A, [disk.mmr]
+
+SET [A], 0x6201 ; Magic number, version 1 of CEFS.
+SET [A+1], X ; Number of blocks on the disk.
+SET [A+2], 12 ; Number of blocks which are used: 1 header, 4 block bitmap, 4 inode bitmap, 1 inode meta table, 1 inode table, 1 data block (root dir)
+SET [A+3], 1 ; Number of used inodes (1, the root dir).
+
+SET A, 0
+JSR disk.write ; Write out the header block.
+
+; Reg plan: I holds the block number, B the word number, X the size in blocks, C the current block. Y and Z are used for scratch.
+; This code fills the bitmap coarsely, ignoring the beginning 12 used blocks and the tricky block at the seam. Those two words are set after the loop.
+
+SET C, 0
+SET I, 1
+:fs.format.usedBlocksLoop
+  SET B, 0
+  :fs.format.usedWordsLoop
+    SET Y, 0xffff ; used
+    IFG X, C
+      SET Y, 0 ; free
+
+    SET Z, [disk.mmr]
+    ADD Z, B
+    SET [Z], Y
+
+    ADD B, 1
+    ADD C, 1
+    IFG 1024, B
+      SET PC, fs.format.usedWordsLoop
+
+  SET A, I
+  JSR disk.write
+  ADD I, 1
+  IFG 5, I
+    SET PC, fs.format.usedBlocksLoop
+
+; Now write the first word again
+SET A, 1
+JSR disk.read
+SET A, [disk.mmr]
+SET [A], 0x0fff ; First 12 blocks used.
+SET A, 1
+JSR disk.write ; Write it back.
+
+
+; Now to compute the troublesome word of the bitmap directly from the size.
+SET A, X
+SHR A, 13 ; 0-3 for the block number
+ADD A, 1
+SET I, A ; I holds the block number
+JSR disk.read
+
+SET B, X
+AND B, 0x000f ; size mod 16
+SET Y, 0xffff
+SHR Y, B ; Shift it down
+SHL Y, B ; And back, leaving the bottom B bits 0 and the rest 1, as desired.
+; Y holds the value to store.
+
+SET A, X
+SHR A, 4 ; The word to set, from 0
+AND A, 0x03ff ; The offset into the block.
+
+ADD A, [disk.mmr] ; A is now pointing at the spot.
+SET [A], Y ; Write the value.
+
+SET A, I ; The block number.
+JSR disk.write ; And done.
+
+
+; Now to set up the inode tables. I holds the block number, B the word. All are set to 0000.
+SET I, 5
+:fs.format.usedInodeBlockLoop
+SET B, [disk.mmr]
+:fs.format.usedInodeWordLoop
+SET [B], 0
+ADD B, 1
+IFG [disk.mmrTop], B
+  SET PC, fs.format.usedInodeWordLoop
+
+SET A, I
+JSR disk.write
+ADD I, 1
+IFG 9, I
+  SET PC, fs.format.usedInodeBlockLoop
+
+; There, all the inode bitmap is zeroed. Now mark the first inode as used.
+SET A, 5
+JSR disk.read
+SET A, [disk.mmr]
+SET [A], 1 ; inode 0 is used.
+SET A, 5
+JSR disk.write
+
+; Now write the inode meta table
+SET A, [disk.mmr]
+:fs.format.inodeMetaLoop
+SET [A], 0
+ADD A, 1
+IFG [disk.mmrTop], A
+  SET PC, fs.format.inodeMetaLoop
+
+SET A, [disk.mmr]
+SET [A], 10 ; first inode table block
+SET A, 9
+JSR disk.write ; Write out the inode meta table.
+
+
+; Now write the inode for the root directory.
+SET A, [disk.mmr]
+SET [A], 2 ; Type 2, directory.
+SET [A+1], 1 ; One link
+SET [A+2], 1 ; One block
+SET [A+3], 8 ; Size low word (next, inode, length, 1-word string, twice)
+SET [A+4], 0 ; Size high word
+SET [A+5], 0 ; Reserved word
+SET [A+6], 11 ; Block 11
+
+SET A, 10
+JSR disk.write ; write out the inode table.
+
+SET A, [disk.mmr]
+SET [A], 4 ; offset to next entry
+SET [A+1], 0 ; Inode number
+SET [A+2], 1 ; Length of string
+SET [A+3], 0x002e ; packed string for .
+
+SET [A+4], 0 ; offset to next entry (none)
+SET [A+5], 0 ; inode number
+SET [A+6], 1 ; Lenght of string (in words)
+SET [A+7], 0x2e2e ; packed string for ..
+
+SET A, 11
+JSR disk.write ; and write the directory entry.
+
+:fs.format.done
+
+SET I, POP
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET C, POP
+SET B, POP
+SET PC, POP
+
