@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # This is a platform-independent script to automate building, compiling,
 # and assembling cubeOS. Windows users must have das and dcpu-16 binaries
 # in the cubeOS directory, or in their system PATH location
