@@ -256,8 +256,8 @@ ADD C, 6 ; and now at the right block.
 SET A, [C] ; Fetch the block number.
 JSR disk.read ; And read it.
 SET A, [C]
-SET C, POP
 
+SET C, POP
 SET PC, POP
 
 
@@ -446,7 +446,6 @@ SET PC, POP
 ; * Write the new entry.
 ; * Update the block count and file size of the directory.
 
-SET PUSH, C
 SET PUSH, X
 SET PUSH, Y
 SET PUSH, Z
@@ -457,7 +456,6 @@ SET I, A ; Store the inode number for the directory.
 JSR fs.getInode
 ; A now contains the disk block number, and the inode table is loaded. Look up the inode itself.
 
-HWI [HW.Debug]
 SET A, I
 AND A, 0x003f ; Mask just the index into the inode table.
 SHL A, 4 ; Offset in words
@@ -469,15 +467,28 @@ AND X, 0x0007 ; Mask just the type.
 IFN X, 2 ; Check the type is 2=directory
   ; Trying to add a file to a non-directory, so exit with an error. There's no return value, so we just fail silently.
   ; Using HCF for now for debugging purposes.
-  SUB PC, 1
+  HCF 0
   ;SET PC, fs.addToDir.done
 
 ; At this point, the directory inode shows it is indeed a directory.
 ; Now copy the inode into memory.
 
+SET Y, A ; Set aside the address of the inode.
 SET A, 16
 JSR heap.alloc
+HWI [HW.Debug]
 SET J, A ; J holds the directory inode copy in memory.
+
+; Save my arguments, and then copy the inode into memory.
+SET PUSH, B
+SET PUSH, C
+SET B, A ; The destination.
+SET A, Y ; The source
+SET C, 16 ; The length
+JSR typ.memcopy
+SET C, POP
+SET B, POP
+
 
 ; Next step is to construct the new filename entry.
 ; The maximum size of an entry is 3 + 128 = 131.
@@ -518,6 +529,7 @@ SET [Y+1], 0
 :fs.addToDir.entryLoop
 SET A, J ; The inode pointer
 SET B, Y ; And the offset
+HWI [HW.Debug]
 JSR fs.readFileAt
 SET Z, A ; Z holds the block number of the directory entries.
 
@@ -622,7 +634,7 @@ SET I, POP
 SET Z, POP
 SET Y, POP
 SET X, POP
-SET C, POP
+SET PC, POP
 
 
 
