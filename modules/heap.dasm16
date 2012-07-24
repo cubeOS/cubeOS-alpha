@@ -10,23 +10,17 @@
 
 ;:### heap.init
 ;:(location, length)
-;:heap.init reserves a 2-word header. *length* is actually the length of the heap, excluding the header.
-;:
-;:The header consists of a magic word, **0x9ea9** and the location of the first heap region in memory.
+;:Sets env.heap to the location of the first heap region's header, as given in `location`. The given `length` is the total length of the heap, including the header.
 ;:
 ;:**The heap is not zeroed; the contents of newly allocated memory are arbitrary and undefined.**
-;:
-;:**returns** location of header
 ;:
 
 :heap.init
 SET [env.heap], A
-ADD A, 2
-SET [env.heap+1], A ; The address of the first region header.
+SET [A+1], 0 ; No next region.
 SUB B, 2 ; Subtract the two bytes of the region header.
 BOR B, 0x8000 ; Mark it as free.
 SET [A], B
-SET [A+1], 0 ; No next region.
 SET PC, POP
 
 
@@ -45,7 +39,7 @@ SET PUSH, C
 SET PUSH, X
 SET PUSH, Y
 
-SET X, [env.heap+1] ; Retrieve the address of the first region header.
+SET X, [env.heap] ; Retrieve the address of the first region header.
 
 :heap.alloc.search
 SET Y, [X]
@@ -116,7 +110,7 @@ SET PC, POP
 SET PUSH, X
 SET PUSH, Y
 
-SET X, [env.heap+1] ; X points at the first region's header.
+SET X, [env.heap] ; X points at the first region's header.
 SET Y, 0
 SUB A, 2 ; A now points at the header of the provided pointer.
 
@@ -178,6 +172,71 @@ SET [X+1], [Y+1] ; Connect the linked list.
 :heap.free.done
 SET Y, POP
 SET X, POP
+SET PC, POP
+
+
+
+;:### heap.sanity ()
+;:Conducts sanity checking on the heap.
+;:Checks for three failure modes (given here in the order they are run, which is also descending importance):
+;:
+;:1. Regions do not overlap, nor are there gaps.
+;:2. No free regions are adjacent.
+;:
+;:Returns 0 if things are sane, or the number of the problem encountered otherwise.
+
+:heap.sanity
+SET PUSH, B
+
+; First check is that heap regions do not overlap each other or the headers.
+SET A, [env.heap]
+
+:heap.sanity.overlap.loop
+SET B, [A] ; The length and free bit
+AND B, 0x7fff ; Remove the free bit.
+ADD B, A ; Add the length to A.
+ADD B, 2 ; And the header length.
+; At this point, B should be pointing at the beginning of the next region.
+IFE [A+1], 0
+  SET PC, heap.sanity.overlap.done
+IFN B, [A+1]
+  SET PC, heap.sanity.overlap.error
+SET A, B
+SET PC, heap.sanity.overlap.loop
+
+:heap.sanity.overlap.error
+SET A, 1
+SET PC, heap.sanity.done
+
+:heap.sanity.overlap.done
+
+; Second, check that no free regions are adjacent.
+SET A, [env.heap]
+
+:heap.sanity.adjacent.loop
+IFE [A+1], 0 ; If there's no next region, we're done.
+  SET PC, heap.sanity.adjacent.done
+
+SET B, [A+1] ; B points at the next region.
+SET B, [B] ; B holds the length word of that region.
+AND B, [A] ; B holds the AND of the length words of this region and the next.
+AND B, 0x8000 ; B holds the AND of the free bits
+
+IFN B, 0 ; If B is nonzero, then both regions are free.
+  SET PC, heap.sanity.adjacent.error
+
+SET A, [A+1] ; Move on to the next region.
+SET PC, heap.sanity.adjacent.loop
+
+:heap.sanity.adjacent.error
+SET A, 2
+SET PC, heap.sanity.done
+
+
+:heap.sanity.adjacent.done
+SET A, 0 ; Success
+:heap.sanity.done
+SET B, POP
 SET PC, POP
  ;
  ;;
