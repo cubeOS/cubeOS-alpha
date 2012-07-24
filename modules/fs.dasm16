@@ -457,6 +457,7 @@ SET I, A ; Store the inode number for the directory.
 JSR fs.getInode
 ; A now contains the disk block number, and the inode table is loaded. Look up the inode itself.
 
+HWI [HW.Debug]
 SET A, I
 AND A, 0x003f ; Mask just the index into the inode table.
 SHL A, 4 ; Offset in words
@@ -468,7 +469,7 @@ AND X, 0x0007 ; Mask just the type.
 IFN X, 2 ; Check the type is 2=directory
   ; Trying to add a file to a non-directory, so exit with an error. There's no return value, so we just fail silently.
   ; Using HCF for now for debugging purposes.
-  HCF 0
+  SUB PC, 1
   ;SET PC, fs.addToDir.done
 
 ; At this point, the directory inode shows it is indeed a directory.
@@ -806,7 +807,7 @@ SET I, 1
     SET [Z], Y
 
     ADD B, 1
-    ADD C, 1
+    ADD C, 16
     IFG 1024, B
       SET PC, fs.format.usedWordsLoop
 
