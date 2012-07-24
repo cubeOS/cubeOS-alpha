@@ -4,7 +4,7 @@ DAT SYSTEM.CRASH
 ; ENV ;
 ;;;;;;;
 :env.cwds DAT 0
-:env.fs DAT 0
-:env.heap DAT 0
+:env.fs DAT 0   ;the address of the filesystem header
+:env.heap DAT 0 ;the address of the heap header
 :env.uptime DAT 0, 0 ;32-bit word
  ;;

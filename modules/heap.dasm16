@@ -3,249 +3,240 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;:# Heap Manager
 ;:
+;:The heap is essentially a linked list of regions. Each region consists of a two-word header (see below) followed by the allocated memory.
+;:
+;:The header consists of a size for the region (not including the header) and a pointer to the header of the next region (0 for last region). The high bit of the size word is actually a flag, with 1 meaning the region is free, and 0 meaning it's in use.
+;:
 
 ;:### heap.init
-;:(location, length, blocksize)
-;:heap.init reserves a 4 word header followed by a bit map of all blocks. The size of the bit map is (*maxlength*/*blocksize*)/16. *length* is actually the length of the heap, excluding the header and bit map.
+;:(location, length)
+;:Sets env.heap to the location of the first heap region's header, as given in `location`. The given `length` is the total length of the heap, including the header.
 ;:
-;:The header consists of a magic word, **0x9ea9**, the location of the first block in memory, the size of each block, and the maximum length of the heap.
-;:
-;:**This subroutine clears all of the space given to it.**
-;:
-;:**returns** location of header
+;:**The heap is not zeroed; the contents of newly allocated memory are arbitrary and undefined.**
 ;:
 
 :heap.init
-SET PUSH, I
-SET PUSH, J
-
 SET [env.heap], A
-
-SET I, A
-SET PUSH, A ;store the location for returning
-SET A, B
-
-DIV A, C ;find the number of necessary blocks
-IFN EX, 0
-  ADD A, 1 ;round up
-
-         ;make A the number of words needed for the bitmap:
-SHR A, 4 ;divide by 16
-IFE EX, 0
-  SET PC, heap.init.evenbitmap ;if that goes evenly, skip the next step
-
-ADD A, 1 ;round up
-SET PUSH, A ;for restoring at the end of this part
-SET PUSH, B ;for use in this part
-
-ADD A, I ;add the heap offset
-ADD A, 4 ;add the size of the header
-         ;to make A the location of the last word in the bitmap
-
-SET [A], 0xffff ;set it to be filled
-SET B, PICK 2   ;set B to the number of blocks
-AND B, 0x000f   ;make B the number of blocks left in the last word of memory
-SHR [A], B      ;set B number of blocks to 0 in the bitmap
-
-SET B, POP ;restore B
-SET A, POP ;restore the number of words needed for the bitmap
-
-:heap.init.evenbitmap
-
-;A is already the number of words needed for the bitmap
-ADD A, I ;add the header offset
-ADD A, 4 ;make A the location of the start of the first block
-
-STI [I], 0x9EA9
-STI [I], A
-STI [I], C
-STI [I], B
-
-SET I, A   ;since A is already the starting location, 
-ADD I, POP ;create ending location
-
-:heap.init.loop ;clear backwards
-IFE I, A
-  SET PC, heap.init.exit
-STD [I], 0
-SET PC, heap.init.loop
-
-:heap.init.exit
-SET J, POP
-SET I, POP
+SET [A+1], 0 ; No next region.
+SUB B, 2 ; Subtract the two bytes of the region header.
+BOR B, 0x8000 ; Mark it as free.
+SET [A], B
 SET PC, POP
- ;
+
 
 ;:### heap.alloc (length)
-;:Reserves the first consecutive *length* of memory in the heap.
+;:Reserves a consecutive block of *length* words of memory in the heap.
 ;:
-;:**returns** the location of the reserved memory, <strike>or 1 if no such block of memory is available</strike>
+;:Currently a bit dim; uses the first sufficiently large region, not necessarily the best one. This trades increased memory fragmentation for speed.
+;:
+;:**returns** the location of the reserved memory, or 0 if no block of the requested size could be found. <br />
+;:**modifies** A
 ;:
 :heap.alloc
+; Walks the pointers with X to find a free region
+SET PUSH, B
+SET PUSH, C
 SET PUSH, X
-SET PUSH, I
-SET PUSH, J
+SET PUSH, Y
 
-SET X, [env.heap] ;make X the heap location
+SET X, [env.heap] ; Retrieve the address of the first region header.
 
-SET B, [X+2] ;make B the block length
-DIV A, B ;make A the number of blocks needed
-IFN EX, 0
-  ADD A, 1 ;round up
-SET I, A ;make I the iterator for number of blocks needed
+:heap.alloc.search
+SET Y, [X]
+SET C, Y
+AND Y, 0x8000 ; Retrieve the free flag
+AND C, 0x7fff ; And the size
+ADD C, 1 ; Add 1 so we can use IFG below but avoid the off-by-one error.
+IFG Y, 0
+	IFG C, A
+		SET PC, heap.alloc.found
+SET X, [X+1] ; X now points at the next region's header
+IFG X, 0
+  SET PC, heap.alloc.search
 
-SET B, X ;make B the location of the header
-ADD B, 4 ;add the length of the header to make B the location of the bitmap
+; If we fell through to here, X is 0, so we haven't found a big enough region.
+SET A, 0xfffe ; Will be turned to 0 by the ADD A, 2 in heap.alloc.done. HACK
+SET PC, heap.alloc.done
 
-SET A, [B] ;make A the first word of the usagemap
+:heap.alloc.found
+; At this point, X points at the region header, C holds the size+1, and B and Y are junk.
+; Write the new length, and set the pointer.
+SUB C, 3 ; 1 for the above fudge, 2 for the new header.
+SUB C, A ; C now holds the size of the new, following free region.
 
-SET PUSH, I ;store iterator for easy access
-SET J, 0 ;make J the iterator to keep track of the bit number
+SET [X], A ; Store the length of this region.
+SET Y, X
+ADD Y, A
+ADD Y, 2 ; Y now points at the header of the following, free region.
+SET A, X
+SET X, [X+1] ; X now points at the next-next region, after the newly created free region in Y.
+SET [A+1], Y ; Store the pointer to the following, free region.
 
-:heap.alloc.checkbits
+SET B, X
+SUB B, Y ; The difference between the two pointers
+IFG 3, B ; If the difference between the pointers to the next and next-next regions is < 3, there's no room for data.
+	SET PC, heap.alloc.emptyNext
 
-IFE J, 16 ;if the last bit in the word has been scanned
-  SET PC, heap.alloc.newword
+; If we come here, the next region is of a workable size, so set it up.
+BOR C, 0x8000 ; Set the free flag.
+SET [Y], C
+SET [Y+1], X
+SET PC, heap.alloc.done
 
-IFC A, 0x8000 ;if the leftmost bit of A is 0,
-  SET PC, heap.alloc.openbit
 
-;if it's 1, note the closed bit
-SET I, PEEK ;reset the iterator
-SHL A, 1
-ADD J, 1 ;increase bit iterator
-SET PC, heap.alloc.checkbits
+:heap.alloc.emptyNext
+; Here, the supposed free region is too small to hold a header and data, so we roll it into this region.
+; At this point A is the new region, Y the next (too-small, free) region, X the next-next region.
+SET C, X
+SUB C, A
+SUB C, 2 ; C is now the new size of the new region.
+SET [A], C
 
-:heap.alloc.newword ;go to the next word
-ADD B, 1 ;increase the pointer by 1
-
-;SHOULD DETECT THE END OF THE BLOCK MAP
-
-SET A, [B]
-SET J, 0
-SET PC, heap.alloc.checkbits
-
-:heap.alloc.openbit
-SUB I, 1
-SHL A, 1
-ADD J, 1 ;increase bit iterator
-
-IFN I, 0 ;if the iterator has not reached zero, continue
-  SET PC, heap.alloc.checkbits
-
-SET C, X ;set C to the location of the header
-ADD C, 4 ;set C to the location of the bitmap
-
-SUB B, C ;set B to the number of full words passed
-SHL B, 4 ;set B to the number of bits passed (MUL 16)
-
-SUB J, PEEK ;subtract the number of needed blocks from the
-            ;bit iterator to get the first index of the open area
-            ;but keep the number of blocks needed for later
-
-ADD B, J ;add the index of the first block in the open area
-         ;in order to get the actual first block index
-
-SET A, B   ;set A to the block index
-SET B, POP ;set B to the number of blocks needed
-SET C, 1   ;set C to "mark the blocks used"
-JSR heap.mark
-
-MUL A, [X+2] ;multiply by the length of each block
-ADD A, [X+1] ;add the location of the first block in memory
-             ;to produce the location of the first word of the first
-             ;reserved block
-
-SET J, POP
-SET I, POP
+:heap.alloc.done
+ADD A, 2 ; A now points at the new memory for returning to the user.
+SET Y, POP
 SET X, POP
+SET C, POP
+SET B, POP
 SET PC, POP
- ;
 
-;:### heap.free (location, length)
-;:Marks the blocks specified by *location* and *length* as free, and clears them.
-;:
-;:**returns** *location*
+
+
+;:### heap.free (location)
+;:Marks the region starting at *location* as free. **MUST BE THE BEGINNING OF THE .alloc'd REGION.**
+;:Collapses adjacent free blocks into one.
 ;:
 :heap.free
-SET PUSH, B
-SET PUSH, A
-
-SET C, [env.heap]
-
-SUB A, [C+1] ;subtract the first block's location from A
-DIV A, [C+2] ;divide by the size of a block, to get the
-             ;block index, rounding down
-
-;DIV A, [C+2] not coming out evenly (EX != 0) implies corruption
-;of some sort. Impose a check here?
-
-DIV B, [C+2] ;make B the number of blocks implied by *length*
-IFN EX, 0    ;rounding up, as the allocation subroutine does
-  ADD B, 1
-
-SET C, 0 ;"unused"
-JSR heap.mark
-
-SET A, POP
-SET B, POP
-ADD B, A
-ADD B, 1
-SET C, A
-
-:heap.free.clear
-SET [A], 0
-ADD A, 1
-IFN A, B
-SET PC, heap.free.clear
-
-SET PC, POP
- ;
-
-;:### heap.mark (block, number, used/unused)
-;:Marks *number* of blocks used or unused, starting from the index *block*. `1` in *used/unused* denotes `used`, and `0` denotes `unused`.
-;:
-;:**return** *block*
-;:
-:heap.mark
-SET PUSH, A
 SET PUSH, X
-SET X, [env.heap]
-ADD X, 4 ;make X a pointer to the first word in the bitmap
+SET PUSH, Y
 
-SUB B, 1 ;for use later
-SET PUSH, C ;store used/unused type
-SET PUSH, B ;store B
-SET PUSH, A ;store A
+SET X, [env.heap] ; X points at the first region's header.
+SET Y, 0
+SUB A, 2 ; A now points at the header of the provided pointer.
 
-SHR A, 4 ;divide by 16, to get the word index
-ADD A, X ;make A a pointer to the relevant word
+:heap.free.find
+IFE X, A
+	SET PC, heap.free.found
+IFE X, 0
+	SET PC, heap.free.done ; couldn't find and error this memory TODO report an error of some kind
 
-SET B, POP ;restore the block index
-AND B, 0x000f ;get the bit index
+SET Y, X
+SET X, [X+1]
+SET PC, heap.free.find
 
-SET C, 0x8000 ;set the leftmost bit
-ASR C, POP    ;make the leftmost *number* bits 1
+:heap.free.found
+; Now Y is the previous region (or 0), X is the region to be freed.
 
-SHR C, B ;make C apply to all of the blocks to be reserved
+IFE Y, 0
+	SET PC, heap.free.afterPrevJoin ; No previous region.
 
-SET B, POP ;restore used/unused
-IFE B, 1
-  SET PC, heap.mark.used
+SET A, [Y]
+AND A, 0x8000 ; The free flag of the previous region.
+IFE A, 0
+	SET PC, heap.free.afterPrevJoin ; Not free, so nothing to do.
 
-:heap.mark.unused
-XOR C, 0xffff ;flip the bits to reflect what needs to be changed
-AND [A], C    ;set the bits that need to be changed to 0
+; prevJoining: the previous region is free, so combine it with the newly freed region.
+SET A, [X] ; The size of the newly freed region. (Still has the free flag set).
+ADD A, 2 ; Include the header.
+ADD A, [Y] ; Add the size (and free bit, which we can ignore) of the previous region.
+SET [Y], A ; And write it.
 
+; Y is previous region, X is now defunct current region.
+SET [Y+1], [X+1]
+SET X, Y
+
+; Now both are pointing to the same place. afterPrevJoin below will move Y to be the next region.
+
+:heap.free.afterPrevJoin
+; At this point, we've got the current region in X. That might mean the newly freed region or the newly combined regions. Either way, we set Y to the next region and see if they can be combined.
+; First set the size of the current region to ensure it's marked free.
+BOR [X], 0x8000
+
+; Then consider the next region.
+SET Y, [X+1]
+
+IFE Y, 0
+	SET PC, heap.free.done ; No next region, this is the last.
+
+SET A, [Y]
+AND A, 0x8000 ; The free flag
+IFE A, 0
+	SET PC, heap.free.done ; Next region is in use, so nothing to do.
+
+SET A, [Y]
+AND A, 0x7fff ; The size of the next region.
+ADD A, 2 ; Include the header.
+ADD [X], A ; Now the size holds the whole area and a free bit.
+SET [X+1], [Y+1] ; Connect the linked list.
+
+:heap.free.done
+SET Y, POP
 SET X, POP
-SET A, POP
 SET PC, POP
 
-:heap.mark.used
-BOR [A], C ;set the bits that need to be changed to 1
 
-SET X, POP
-SET A, POP ;return *blocks*
+
+;:### heap.sanity ()
+;:Conducts sanity checking on the heap.
+;:Checks for three failure modes (given here in the order they are run, which is also descending importance):
+;:
+;:1. Regions do not overlap, nor are there gaps.
+;:2. No free regions are adjacent.
+;:
+;:Returns 0 if things are sane, or the number of the problem encountered otherwise.
+
+:heap.sanity
+SET PUSH, B
+
+; First check is that heap regions do not overlap each other or the headers.
+SET A, [env.heap]
+
+:heap.sanity.overlap.loop
+SET B, [A] ; The length and free bit
+AND B, 0x7fff ; Remove the free bit.
+ADD B, A ; Add the length to A.
+ADD B, 2 ; And the header length.
+; At this point, B should be pointing at the beginning of the next region.
+IFE [A+1], 0
+  SET PC, heap.sanity.overlap.done
+IFN B, [A+1]
+  SET PC, heap.sanity.overlap.error
+SET A, B
+SET PC, heap.sanity.overlap.loop
+
+:heap.sanity.overlap.error
+SET A, 1
+SET PC, heap.sanity.done
+
+:heap.sanity.overlap.done
+
+; Second, check that no free regions are adjacent.
+SET A, [env.heap]
+
+:heap.sanity.adjacent.loop
+IFE [A+1], 0 ; If there's no next region, we're done.
+  SET PC, heap.sanity.adjacent.done
+
+SET B, [A+1] ; B points at the next region.
+SET B, [B] ; B holds the length word of that region.
+AND B, [A] ; B holds the AND of the length words of this region and the next.
+AND B, 0x8000 ; B holds the AND of the free bits
+
+IFN B, 0 ; If B is nonzero, then both regions are free.
+  SET PC, heap.sanity.adjacent.error
+
+SET A, [A+1] ; Move on to the next region.
+SET PC, heap.sanity.adjacent.loop
+
+:heap.sanity.adjacent.error
+SET A, 2
+SET PC, heap.sanity.done
+
+
+:heap.sanity.adjacent.done
+SET A, 0 ; Success
+:heap.sanity.done
+SET B, POP
 SET PC, POP
  ;
  ;;
