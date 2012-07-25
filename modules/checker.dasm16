@@ -1,0 +1,58 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; CHECKER ; Error Detector ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;:
+;:
+;:
+
+;:### check.all (outputLocation)
+;:Checks all modules listed below, and writes a DView-formatted c-string to *outputLocation*, containing the name of each functionality checked and the exit status (with 0 being implicit on strings printed green.)
+;:
+;:**modifies** A <br />
+;:**returns** the total exit status (0 if all successful, 1 if otherwise)
+;:
+:check.all
+SET PUSH, B
+SET PUSH, C
+SET PUSH, X
+SET PUSH, Y
+
+SET Y, A ;keep output location
+SET X, 0 ;exit status
+
+SET B, heap.sanity
+SET C, check.names.heap
+JSR check.all.docheck ;check sanity of the heap
+
+SET A, X ;return exit value
+SET Y, POP
+SET X, POP
+SET C, POP
+SET B, POP
+SET PC, POP ;end routine
+
+:check.all.docheck
+SET PUSH, C ;preserve C
+JSR B       ;jump to given label
+BOR X, A    ;if A > 0, set X > 0
+SET C, POP
+
+:check.all.write ;(A is exit status, C is label, Y is write position)
+IFE A, 0 ;if exit status is successful
+  SET [Y], 0xa001 ;green text
+IFN A, 0 ;if exit status is unsuccessful
+  SET [Y], 0xc001 ;red text
+
+SET [Y+1], 0x731a ;string
+SET [Y+2], C
+SET [Y+3], 0x20   ;space
+SET [Y+4], 0x641a ;decimal number
+SET [Y+5], A
+SET [Y+6], 0x000a ;newline
+
+ADD Y, 6
+SET PC, POP
+ ;
+
+
+:check.names.heap DAT "heap", 0
