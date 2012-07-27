@@ -198,6 +198,7 @@ SET PC, pop
 
 :typ.pPack
 SET PUSH, I
+SET PUSH, J
 SET PUSH, X
 SET PUSH, Y
 SET PUSH, Z
@@ -223,6 +224,7 @@ IFL I, B
 SET Z, POP
 SET Y, POP
 SET X, POP
+SET J, POP
 SET I, POP
 SET PC, POP
  ;
@@ -233,6 +235,7 @@ SET PC, POP
 
 :typ.pUnpack
 SET PUSH, I
+SET PUSH, J
 SET PUSH, X
 SET PUSH, Y
 SET PUSH, Z
@@ -261,6 +264,7 @@ SET A, I ;return in A
 SET Z, POP
 SET Y, POP
 SET X, POP
+SET J, POP
 SET I, POP
 SET PC, POP
  ;
