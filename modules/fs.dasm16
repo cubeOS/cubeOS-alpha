@@ -563,7 +563,6 @@ ADD C, [X+2] ; Add the length of the new entry's string
 ADD C, 2 ; Add the rest of the new entry (3 words) minus 1.
 ; C now points at where the last word of the new entry will go.
 
-HWI [HW.Debug]
 IFG [disk.mmrTop], C
   SET PC, fs.addToDir.thisBlock
 SET PC, fs.addToDir.nextBlock
@@ -610,7 +609,6 @@ SET C, [X+2] ; length of the filename field.
 ADD C, 3 ; length of the new entry.
 SET PUSH, C ; save the length for later.
 
-HWI [HW.Debug]
 JSR typ.memcopy ; copies into the data block.
 
 SET A, Z
@@ -739,12 +737,6 @@ SET PC, POP
 ;:Creates a new directory under the given parent and with the given name (unpacked string)
 ;:Returns the inode number of the new directory, or 0 if one with that name already exists.
 ;:
-
-:fs.newDir.dot
-DAT ".", 0
-:fs.newDir.dotdot
-DAT "..", 0
-
 :fs.newDir
 
 SET PUSH, C
@@ -752,6 +744,7 @@ SET PUSH, I
 SET PUSH, J
 
 SET I, A ; I holds the inode number of the parent, which I'll need later for `..`
+SET J, 0 ; Junk inode number, in case we short circuit to newDir.done.
 
 JSR fs.newFile
 
@@ -774,16 +767,38 @@ SET [B], 2 ; Set the type.
 JSR disk.write ; A still holds the block number, so write it out.
 
 ; Now add the two special directories, . and ..
-SET A, J ; A holds the directory we're adding to, the new one.
-SET B, J ; B holds the inode of the file to add to the directory, which is the newly created one.
-SET C, fs.newDir.dot ; Filename
-JSR fs.addToDir
+; We do this by hand, rather than calling fs.addToDir, because that would require a lot of special cases.
+JSR fs.newBlock
+SET PUSH, A ; Set aside the block number.
 
-SET A, J ; This directory.
-SET B, I ; The parent
-SET C, fs.newDir.dotdot ; Filename
-JSR fs.addToDir
+SET B, [disk.mmr]
+SET [B], 4 ; Length of the . entry
+SET [B+1], J ; Inode of this newly created directory.
+SET [B+2], 1 ; Length of the name in words.
+SET [B+3], 0x2e00 ; The ASCII for . is 2e
 
+SET [B+4], 0 ; No next entry, so offset 0.
+SET [B+5], I ; Inode of the parent
+SET [B+6], 1 ; Length of the name
+SET [B+7], 0x2e2e ; ..
+
+JSR disk.write ; Write it back to the disk.
+
+; Now write that new block into the inode.
+SET A, J
+JSR fs.getInode
+; A holds the inode block number.
+
+SET B, J
+AND B, 0x003f ; index into the inode table
+SHL B, 4 ; offset into the table
+ADD B, [disk.mmr] ; address in real memory.
+
+SET [B+2], 1 ; One block
+SET [B+3], 8 ; Size in words.
+SET [B+6], POP ; And the block number.
+
+JSR disk.write ; Write the inode data to disk.
 
 :fs.newDir.done
 ; Return the new directory's inode number.
