@@ -25,6 +25,8 @@ SET PUSH, Z
 
 ; First, load the bitmap blocks one at a time and find a free inode/block using it.
 
+SET PUSH, A ; Save the type on the stack.
+
 SET B, A ; The type
 MUL B, 4 ; Now B is either 0 or 4.
 ADD B, 1 ; Now B is either 1 or 5, the block number for the first block of either bitmap.
@@ -32,6 +34,7 @@ SET Y, B
 ADD Y, 4 ; And Y is either 5 or 9, one higher than the last block of either bitmap.
 
 :fs.bitmapSearch.bitmapBlockLoop ; Loops over bitmap blocks, of which there are four for either type.
+SET A, B
 JSR disk.read
 
 SET C, [disk.mmr] ; Index into the block
@@ -76,12 +79,11 @@ SET PC, fs.bitmapSearch.bitLoop
 ; At this point, Y holds the relevant bitmask and Z the bit itself.
 ; Set the bit in [C], then compute the block number, storing it in X.
 BOR [C], Y ; Now the bit is set.
-SET Y, A ; Save A, the type.
 SET A, B ; Put the block number into A
 JSR disk.write ; And write that block back to the disk.
 
 ; Now to compute the block number. There are several steps to this: block * 16K + word * 16 + bit
-SET A, Y ; Restore A, the type.
+SET Y, PEEK ; Restore A, the type.
 MUL Y, 4 ; 0 or 4
 ADD Y, 1 ; 1 or 5, the first block of the bitmap.
 SUB B, Y ; The relative block number.
@@ -93,10 +95,10 @@ MUL C, 16 ; Multiply by the number of blocks/inodes per word.
 ADD B, C
 ADD B, Z ; Finally, the answer.
 
-; A holds the type, B the block/inode number, which has been reserved in the bitmap and the bitmap block written back to the disk.
+; Y holds the type, B the block/inode number, which has been reserved in the bitmap and the bitmap block written back to the disk.
 ; The last thing to do is update the used count in the header.
 
-SET Y, A ; Save the type again.
+SET Y, POP ; Save the type again, and remove it from the stack.
 SET A, 0
 JSR disk.read ; Load the header.
 
@@ -105,6 +107,7 @@ ADD C, Y ; (Y the type now) Either 2 or 3, the offsets of the block and inode co
 ADD C, [disk.mmr]
 ADD [C], 1 ; One more used block/inode.
 
+SET A, 0
 JSR disk.write ; Write the block back to the disk.
 
 SET A, B ; B holds the block/inode number.
@@ -211,19 +214,25 @@ SET PC, POP
 ;:
 
 :fs.readFileAt
+SET PUSH, C
+HWI [HW.Debug]
+
 ; First, a sanity check: If the offset is >= the file's length, bail.
 IFG [B+1], [A+4] ; If the high word of the offset is larger, it's too big
   SET PC, fs.readFileAt.tooBig
 IFG [A+4], [B+1] ; If the high word of the size is larger, it's small enough.
   SET PC, fs.readFileAt.offsetOK
 ; If we come here then they're equal, jump accordingly:
-IFG [A+3], [B] ; the file size's low word is larger, then it's good
+SET C, [A+3]
+ADD C, 1
+IFG C, [B] ; the file size's low word is larger, then it's good
   SET PC, fs.readFileAt.offsetOK
 
 :fs.readFileAt.tooBig
 ; We either jumped or fell through to here because the offset is outside the file. Return 0. Callers are responsible for freeing the offset.
+HCF 0
 SET A, 0
-SET PC, POP
+SET PC, fs.readFileAt.done
 
 :fs.readFileAt.offsetOK
 ; Next step is to find which block contains the offset in question.
@@ -246,7 +255,6 @@ HCF 0 ; Halt and catch file, unimplemented code.
 :fs.readFileAt.directBlocks
 ; The offset is inside the first 8K words that can be accessed through the direct blocks.
 ; Next step is to determine which one. That's best done by shifting the offset.
-SET PUSH, C
 
 SET C, [B] ; The low word of the offset.
 SHR C, 10 ; Knock off the low 10 bits. C now counts in blocks, not words.
@@ -257,6 +265,7 @@ SET A, [C] ; Fetch the block number.
 JSR disk.read ; And read it.
 SET A, [C]
 
+:fs.readFileAt.done
 SET C, POP
 SET PC, POP
 
@@ -476,7 +485,6 @@ IFN X, 2 ; Check the type is 2=directory
 SET Y, A ; Set aside the address of the inode.
 SET A, 16
 JSR heap.alloc
-HWI [HW.Debug]
 SET J, A ; J holds the directory inode copy in memory.
 
 ; Save my arguments, and then copy the inode into memory.
@@ -529,7 +537,6 @@ SET [Y+1], 0
 :fs.addToDir.entryLoop
 SET A, J ; The inode pointer
 SET B, Y ; And the offset
-HWI [HW.Debug]
 JSR fs.readFileAt
 SET Z, A ; Z holds the block number of the directory entries.
 
@@ -670,6 +677,7 @@ SET PC, fs.newFile.done
 ; The file doesn't already exist, so we can start creating it.
 ; First, acquire a new inode.
 JSR fs.newInode
+HWI [HW.Debug]
 SET I, A ; Hang on to that inode number.
 ; And then load it.
 JSR fs.getInode
