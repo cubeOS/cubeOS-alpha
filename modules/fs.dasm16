@@ -215,7 +215,6 @@ SET PC, POP
 
 :fs.readFileAt
 SET PUSH, C
-HWI [HW.Debug]
 
 ; First, a sanity check: If the offset is >= the file's length, bail.
 IFG [B+1], [A+4] ; If the high word of the offset is larger, it's too big
@@ -546,7 +545,7 @@ ADD A, [disk.mmr] ; Address in memory
 IFE [A], 0
   SET PC, fs.addToDir.lastEntry
 
-ADD [Y], 1
+ADD [Y], [A]
 ADD [Y+1], EX
 SET PC, fs.addToDir.entryLoop
 
@@ -560,10 +559,26 @@ ADD B, 3 ; B is now the length of the entry in total.
 ; Check that this value is in the same block
 SET C, B
 ADD C, A ; C points at the memory location where the new block is to be written.
+ADD C, [X+2] ; Add the length of the new entry's string
+ADD C, 2 ; Add the rest of the new entry (3 words) minus 1.
+; C now points at where the last word of the new entry will go.
 
+HWI [HW.Debug]
 IFG [disk.mmrTop], C
-  SET PC, fs.addToDir.copyEntry
+  SET PC, fs.addToDir.thisBlock
+SET PC, fs.addToDir.nextBlock
 
+:fs.addToDir.thisBlock
+; If we come here, the entry will fit in this block and needs writing there.
+SET C, [A+2] ; The length of the old entry's string.
+ADD C, 3 ; And the length of the entry in total.
+SET [A], C ; Write that offset into the old entry's offset.
+
+ADD [Y], C ; And bump the master offset.
+
+SET PC, fs.addToDir.copyEntry
+
+:fs.addToDir.nextBlock
 ; If we come here, the entry needs to be bumped onto the next block.
 ; Compute the relative offset, write it, write this block, acquire a new block, write its number into the inode copy, load it, and write the entry there.
 
@@ -595,6 +610,7 @@ SET C, [X+2] ; length of the filename field.
 ADD C, 3 ; length of the new entry.
 SET PUSH, C ; save the length for later.
 
+HWI [HW.Debug]
 JSR typ.memcopy ; copies into the data block.
 
 SET A, Z
@@ -634,7 +650,7 @@ JSR heap.free ; The directory entry buffer.
 SET A, Y
 JSR heap.free ; the offset
 
-:fs.addDir.done
+:fs.addToDir.done
 
 SET J, POP
 SET I, POP
@@ -677,7 +693,6 @@ SET PC, fs.newFile.done
 ; The file doesn't already exist, so we can start creating it.
 ; First, acquire a new inode.
 JSR fs.newInode
-HWI [HW.Debug]
 SET I, A ; Hang on to that inode number.
 ; And then load it.
 JSR fs.getInode
