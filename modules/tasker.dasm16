@@ -2,12 +2,31 @@
 ; TASKER ; Process Manager ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+:v.tusk.processList DAT 0
+
 :v.tusk.IDiterator DAT 1000 ;the iterator through which to get unique IDs
 :v.tusk.runPID DAT 0 ;the ID of the process that is currently running
 
 :v.tusk.PIDloc DAT tusk.PIDs
 :v.tusk.memStack DAT 0 ;should be replaced with a file or heapspace
                        ;carrying a bunch of pointers to memstacks
+
+;:### tusk.init (ProcessSpace)
+;:Initializes the TUSK Process manager with enough memory for *ProcessSpace* simultaneous processes.
+;:
+:tusk.init
+SET PUSH, B
+SET PUSH, C
+
+SHL A, 1       ;multiply A by 2, because each process needs two words
+JSR heap.alloc ;allocate memory
+
+SET [v.tusk.processList], A ;store the location of the process list
+
+SET C, POP
+SET B, POP
+SET PC, POP
+ ;
 
 ;:### tusk.newProcess
 ;:Registers a new process of unique ID. <strike>Adds the process id to the table at *v.tusk.PIDloc*.</strike>
