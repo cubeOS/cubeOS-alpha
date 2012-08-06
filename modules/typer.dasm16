@@ -192,6 +192,27 @@ SET A, C
 SET I, POP
 SET PC, pop
 
+;:### typ.cPack (inputLocation, outputLocation)
+;:Reads an unpacked (`0b0000 0000 0XXX XXXX`) C-style null-terminated string from `inputLocation`, and writes a packed (`0b0YYY YYYY 0XXX XXXX`) little-endian packed string at `outputLocation`.
+;:
+
+:typ.cPack
+SET PUSH, C ; Going to overwrite C.
+
+SET PUSH, A ; Save the arguments
+SET PUSH, B
+
+JSR typ.ffz ; Find the first 0 in the input string.
+SET B, A ; B holds the length
+
+SET C, POP ; The output location.
+SET A, POP ; The input location.
+JSR typ.pPack
+
+SET C, POP ; Restore the original value of C.
+SET PC, POP
+
+
 ;:### typ.pPack (inputLocation, inputLength, outputLocation)
 ;:Reads an unpacked (`0b0000 0000 0XXX XXXX`) string from *inputLocation* of *inputLength* and outputs a packed (`0b0YYY YYYY 0XXX XXXX`) little-endian style string at *outputLocation*.
 ;:
@@ -268,6 +289,31 @@ SET J, POP
 SET I, POP
 SET PC, POP
  ;
+
+;:### typ.memeq (p1, p2, length)
+;:Compares `length` words after the two pointers. Returns 1 if they match, 0 if they don't.
+;:
+:typ.memeq
+IFE C, 0
+  SET PC, typ.memeq.equal
+
+IFN [A], [B]
+  SET PC, typ.memeq.unequal
+
+ADD A, 1
+ADD B, 1
+SUB C, 1
+SET PC, typ.memeq
+
+:typ.memeq.unequal
+SET A, 0
+SET PC, POP
+
+:typ.memeq.equal
+SET A, 1
+SET PC, POP
+
+
 
 ;:### typ.memcopy (source, destination, length)
 ;:Copies `length` words from `source` to `destination`.

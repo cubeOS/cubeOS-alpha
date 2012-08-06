@@ -7,7 +7,8 @@
 ;:
 ;:## Organization
 ;:
-;:This file is split into several parts. First, the low-level functions to acquire a new block, to acquire a new inode, to release an inode/block. Second, mid-level functions to create new files and directories, manipulate directory entries, look up an entry in a directory, seek to a location in a file.
+;:This file is split into several parts. First, the low-level functions to acquire a new block, to acquire a new inode, to release an inode/block. Second, mid-level functions to create new files and directories, manipulate directory entries, look up an entry in a directory, seek to a location in a file. Both of these levels are considered private to the filesystem, and calling them from elsewhere is discouraged.
+;:Finally, the high-level functions are the filesystem API which is exposed by the OS.
 ;:
 ;:## Low level
 ;:
@@ -203,6 +204,74 @@ JSR fs.bitmapSearch
 SET PC, POP
 
 
+
+;:### fs.bitmapFree(type, number)
+;:Frees block (type 0) or inode (type 1) with the given number. Does not check if the block/inode was already free. Does not zero inode entries or blocks!
+;:
+:fs.bitmapFree
+SET PUSH, C
+
+MUL A, 4 ; Either 0 or 4
+ADD A, 1 ; Either 1 or 5
+
+SET C, B
+SHR C, 13 ; C is the page number, 0-3
+ADD A, C ; A holds the actual page in question.
+
+SET PUSH, A
+JSR disk.read
+
+SET A, B
+SHR A, 4
+ADD A, [disk.mmr] ; A is the absolute address of the bitmap word.
+
+AND B, 0x000f ; Just the bit number remains in B
+SET C, 1
+SHL C, B ; C has the bit in question set.
+XOR C, 0xffff ; negate C
+AND [A], C ; Unset that bit in the bitmap word.
+
+SET A, POP ; Retrieve the block number
+JSR disk.write ; And write out the block again.
+
+SET C, POP
+SET PC, POP
+
+
+
+;:### fs.mkInodePtr(inodeNumber)
+;:Given an inode number, loads the inode table and copies the inode into freshly allocated heap memory. Returns the pointer to that memory, which the caller must free.
+:fs.mkInodePtr
+SET PUSH, B
+SET PUSH, C
+SET PUSH, X
+
+SET PUSH, A ; Save the inode number.
+
+SET A, 16
+JSR heap.alloc
+SET X, A ; The inode pointer.
+
+SET A, PEEK
+JSR fs.getInode
+
+SET A, POP
+AND A, 0x003f ; Index of the inode in the table
+SHL A, 4 ; Address in the table
+ADD A, [disk.mmr] ; Absolute address
+
+SET B, X ; destination
+SET C, 16 ; length
+JSR typ.memcopy
+
+SET A, X
+SET X, POP
+SET C, POP
+SET B, POP
+SET PC, POP
+
+
+
 ;:## Mid-level
 ;:
 
@@ -229,7 +298,6 @@ IFG C, [B] ; the file size's low word is larger, then it's good
 
 :fs.readFileAt.tooBig
 ; We either jumped or fell through to here because the offset is outside the file. Return 0. Callers are responsible for freeing the offset.
-HCF 0
 SET A, 0
 SET PC, fs.readFileAt.done
 
@@ -808,6 +876,217 @@ SET I, POP
 SET C, POP
 SET PC, POP
 
+
+
+;:### fs.deleteFile(inodeNumber)
+;:Given an inode number, deletes the file referred to by that inode. Frees the inode and all data blocks associated with the file. Does not zero out anything. Works for directories, but does not delete their contents, causing leaks if the directory was nonempty. There is no check for this.
+;:
+:fs.deleteFile
+SET PUSH, B
+SET PUSH, C
+SET PUSH, X
+SET PUSH, Y
+
+SET PUSH, A ; Hang on to the inode number for later.
+JSR fs.getInode
+; Loads the inode. A holds the block number for the inode table, though I won't need it.
+
+SET A, 16
+JSR heap.alloc
+SET X, A ; Store the address of the inode copy in X.
+
+SET A, PEEK ; Get the inode number on the stack.
+AND A, 0x003f ; Retrieve the index into this table.
+SHL A, 4 ; Multiply by 16, offset into the table.
+ADD A, [disk.mmr] ; Absolute address in memory.
+
+SET B, X ; destination
+SET C, 16 ; length
+JSR typ.memcopy
+
+SET C, [X+2] ; C holds the number of blocks in this file.
+IFE C, 0 ; If no blocks are used, skip the loop.
+  SET PC, fs.deleteFile.deleteInode
+
+; There are data blocks in the file, so deal with them.
+SET Y, X
+ADD Y, 6 ; A now points at the first data block in the inode.
+ADD C, Y ; C now points after the last block used in this file.
+; TODO: Handle indirect blocks.
+
+:fs.deleteFile.blockLoop
+SET A, 0 ; Type 0, block
+SET B, [Y] ; The block number
+JSR fs.bitmapFree
+
+IFG C, Y
+  SET PC, fs.deleteFile.blockLoop
+
+; If we come down here, time to free the inode.
+:fs.deleteFile.deleteInode
+SET A, 1 ; Type 1, inode
+SET B, POP ; Retrieve the inode number from the stack.
+JSR fs.bitmapFree
+
+SET A, 0
+JSR disk.read ; Read the header.
+SET A, [disk.mmr]
+SUB [A+1], [X+2] ; Subtract the number of blocks used in this file from the total used count.
+SET [A+2], 1 ; And 1 from the number of used inodes.
+
+SET A, 0
+JSR disk.write ; And write the header out again.
+
+SET A, X
+JSR heap.free ; Free the copy
+
+SET Y, POP
+SET X, POP
+SET C, POP
+SET B, POP
+SET PC, POP
+
+
+
+;:## High level
+;:These commands are the ones intended to be called by external code. The low- and mid-level functions in this file are considered more or less private to the filesystem. The functions presented here are to be considered the filesystem API exposed by the OS.
+;:Trying to delete `.` or `..` is not supported and will cause Bad Things to happen.
+;:
+;:### fs.delete(dirInode, filename)
+;:Takes the inode number of a directory and a filename within it, and deletes that file from the directory.
+;:
+:fs.delete
+SET PUSH, C
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+SET PUSH, I
+SET PUSH, J
+
+SET PUSH, B ; Set aside the filename
+; First, look up that file in the directory.
+SET I, A ; Save the directory inode.
+
+SET A, I
+JSR fs.mkInodePtr
+SET X, A ; X points at a copy of the inode.
+
+
+SET A, 2
+JSR heap.alloc
+SET Y, A ; Y holds the 32-bit offset.
+SET [Y], 0
+SET [Y+1], 0
+
+SET A, PEEK ; The string from the stack.
+JSR typ.ffz
+SET B, A ; The length
+SET Z, B
+
+JSR heap.alloc
+SET J, A ; The new string.
+SET C, J ; The destination string.
+SET A, POP ; The source string from the stack.
+JSR typ.pPack ; J now points at the newly packed string.
+
+SET C, Z ; The length of the string in characters.
+ADD C, 1
+SHR C, 1 ; Length in words
+
+; At this point, X points at the inode copy, J at the packed string, I holds the directory inode number, Y holds the offset pointer, which is set to 0, and C the string length.
+
+SET PUSH, I ; Set aside the inode number, I need the register.
+; I will hold the last delta
+
+; Note that the target entry will not be the first because the is always `.`
+:fs.delete.dirSearch
+SET A, X ; inode pointer
+SET B, Y ; offset pointer
+JSR fs.readFileAt
+; A holds the block number.
+
+SET A, [Y]
+AND A, 0x3ff ; index into the block
+ADD A, [disk.mmr] ; Address of the entry.
+
+; Check if the file matches.
+IFN C, [A+2]
+  SET PC, fs.delete.nextEntry ; Lengths don't match, not equal.
+
+; If we fall through the here, the file names were the same length. Iterate through the letters.
+SET PUSH, A
+SET PUSH, C
+ADD A, 3 ; Beginning of the string.
+SET B, J
+; C holds the length.
+JSR typ.memeq
+
+; Restore the two values from the stack, and save the response in B.
+SET B, A
+SET C, POP
+SET A, POP
+
+IFG B, 0 ; Match
+  SET PC, fs.delete.entryMatch
+
+; In this case, they don't match, so proceed to the next entry.
+:fs.delete.nextEntry
+SET I, [A] ; The previous offset.
+
+ADD [Y], I
+ADD [Y+1], EX
+
+SET PC, fs.delete.dirSearch
+
+
+:fs.delete.entryMatch
+SET A, [Y]
+AND A, 0x03ff
+ADD A, [disk.mmr]
+SET PUSH, [A] ; Store the offset from the entry to be deleted.
+
+; Found a matching entry. Subtract I from [Y] and load that location.
+SUB [Y], I
+ADD [Y+1], EX ; Yes, add, EX is 0xffff if there's an underflow.
+
+SET A, X ; inode pointer
+SET B, Y ; offset pointer
+JSR fs.readFileAt
+
+; A holds the block number.
+
+SET B, [Y]
+AND B, 0x3ff ; Just the offset into the block.
+ADD B, [disk.mmr] ; address
+
+SET I, POP
+IFE I, 0
+  SET [B], 0 ; If the entry to be deleted was the last one, then the previous one becomes last.
+
+ADD [B], I ; Add the offset of the to-be-deleted entry to that of the one before it. This offset now points over the deleted entry.
+JSR disk.write ; Write out the entry.
+
+
+; Now I need to delete the inode in question. Retrieve the inode number from the stack and delete it.
+SET A, 1 ; Type 1, inode.
+SET B, POP
+JSR fs.bitmapFree
+
+; Free my memory.
+SET A, X
+JSR heap.free
+SET A, J
+JSR heap.free
+SET A, Y
+JSR heap.free
+
+SET J, POP
+SET I, POP
+SET Z, POP
+SET Y, POP
+SET X, POP
+SET C, POP
+SET PC, POP
 
 
 
