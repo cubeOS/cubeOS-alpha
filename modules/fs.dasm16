@@ -206,10 +206,14 @@ SET PC, POP
 
 
 ;:### fs.bitmapFree(type, number)
-;:Frees block (type 0) or inode (type 1) with the given number. Does not check if the block/inode was already free. Does not zero inode entries or blocks!
+;:Frees block (type 0) or inode (type 1) with the given number.
+;:Does not check if the block/inode was already free. Calling this on an already free inode/block will make the header's counts of free blocks/inodes incorrect.
+;:Does not zero inode entries or blocks!
 ;:
 :fs.bitmapFree
 SET PUSH, C
+
+SET PUSH, A ; Set aside the type
 
 MUL A, 4 ; Either 0 or 4
 ADD A, 1 ; Either 1 or 5
@@ -233,6 +237,18 @@ AND [A], C ; Unset that bit in the bitmap word.
 
 SET A, POP ; Retrieve the block number
 JSR disk.write ; And write out the block again.
+
+
+SET A, 0
+JSR disk.read ; Load the header.
+
+SET B, POP ; Retrieve the type
+ADD B, 2 ; B is either 2 or 3, the index into the header of the used inode/block count.
+ADD B, [disk.mmr] ; Absolute address.
+SUB [B], 1
+
+SET A, 0
+JSR disk.write ; Write out the header again.
 
 SET C, POP
 SET PC, POP
@@ -954,6 +970,7 @@ SET PC, POP
 ;:
 ;:### fs.delete(dirInode, filename)
 ;:Takes the inode number of a directory and a filename within it, and deletes that file from the directory.
+;:Frees the file's blocks.
 ;:
 :fs.delete
 SET PUSH, C
@@ -995,7 +1012,6 @@ SHR C, 1 ; Length in words
 
 ; At this point, X points at the inode copy, J at the packed string, I holds the directory inode number, Y holds the offset pointer, which is set to 0, and C the string length.
 
-SET PUSH, I ; Set aside the inode number, I need the register.
 ; I will hold the last delta
 
 ; Note that the target entry will not be the first because the is always `.`
@@ -1043,11 +1059,12 @@ SET PC, fs.delete.dirSearch
 SET A, [Y]
 AND A, 0x03ff
 ADD A, [disk.mmr]
+SET PUSH, [A+1] ; Store the inode for the file.
 SET PUSH, [A] ; Store the offset from the entry to be deleted.
 
 ; Found a matching entry. Subtract I from [Y] and load that location.
 SUB [Y], I
-ADD [Y+1], EX ; Yes, add, EX is 0xffff if there's an underflow.
+ADD [Y+1], EX ; Yes, ADD. EX is 0xffff if there's an underflow.
 
 SET A, X ; inode pointer
 SET B, Y ; offset pointer
@@ -1067,18 +1084,51 @@ ADD [B], I ; Add the offset of the to-be-deleted entry to that of the one before
 JSR disk.write ; Write out the entry.
 
 
-; Now I need to delete the inode in question. Retrieve the inode number from the stack and delete it.
-SET A, 1 ; Type 1, inode.
-SET B, POP
-JSR fs.bitmapFree
-
-; Free my memory.
+; The directory entry has been removed. Now to remove all the blocks and the inode.
+; First, free the memory used in the above.
 SET A, X
 JSR heap.free
 SET A, J
 JSR heap.free
 SET A, Y
 JSR heap.free
+
+; Now the registers are all unreserved again.
+SET I, POP ; I holds the inode number of the file we're deleting.
+
+; Delete all its blocks.
+SET A, I
+JSR fs.mkInodePtr
+SET X, A ; X holds the inode pointer.
+
+SET Y, X
+ADD Y, 6 ; Y points at the first data block.
+SET Z, Y
+ADD Z, [X+2] ; Add the block count.
+; Y points at the current block, Z after the last one.
+; TODO: Support indirect blocks.
+:fs.delete.freeBlocks
+IFE Z, Y
+  SET PC, fs.delete.doneFreeBlocks
+
+SET A, 0 ; Type 0, blocks.
+SET B, [Y]
+JSR fs.bitmapFree
+
+ADD Y, 1
+SET PC, fs.delete.freeBlocks
+
+:fs.delete.doneFreeBlocks
+
+; Free the inode pointer.
+SET A, X
+JSR heap.free
+
+
+; Finally, delete the inode in question.
+SET A, 1 ; Type 1, inode.
+SET B, I ; Retrieve the inode number.
+JSR fs.bitmapFree
 
 SET J, POP
 SET I, POP
