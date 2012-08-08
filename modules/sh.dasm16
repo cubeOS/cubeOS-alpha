@@ -1,0 +1,101 @@
+;;;;;;;;;;;;;;
+; SH ; Shell ;
+;;;;;;;;;;;;;;
+
+;:# sh (pointerToCommand)
+;:Executes a single command pointed to by *pointerToCommand*.
+;:
+:sh
+SET PUSH, B
+SET PUSH, C ;save these
+SET PUSH, I ;for iteration
+SET PUSH, J ;for iteration
+
+SET PUSH, A		;store pointerToCommand
+SET A, 0x12		;memory for: (stdin, argc, argv[16])
+JSR heap.alloc	;reserve memory
+SET C, A		;store the memory location
+
+SET A, PEEK		;restore pointerToCommand
+JSR typ.ffz		;find the end of the string
+				;(the string cannot contain 0, because it is user input)
+ADD A, 1		;increase the length by one, so as to include the final 0
+
+JSR heap.alloc	;reserve memory for stdin, long enough to house the string
+SET [C], A		;store the location of stdin
+
+SET J, A		;make J the destination location
+SET I, POP		;restore pointerToCommand and remove it from the stack
+
+	;A is used for loop metadata
+	; - leftmost bit is one if the next character should mark the start
+	;	of an argument
+	; - rightmost bit is one if the next-processed character is escaped
+	; - second-right bit is one if current pointer is within quotes
+
+:sh.detectarg.loop
+IFE [I], 0
+  SET PC, sh.detectarg.exit
+
+IFB A, 0x8000	;if the markarg flag is set,
+  IFG [I], 0x20	;and the character is a printed, non-whitespace character,
+    JSR sh.detectarg.markarg	;then mark the argument
+
+
+IFC A, 0x0001	;if the character is not escaped, jump to processing
+  SET PC, sh.detectarg.process
+
+XOR A, 0x0001	;flip the option to off (instruction is smaller than ANDing)
+STI [J], [I]	;copy the character to stdin literally
+SET PC, sh.detectarg.loop
+
+:sh.detectarg.markarg
+XOR A, 0x8000	;flip the option to off
+
+SET B, C		;metadata location
+ADD B, 2		;go to argv location
+ADD B, [C+1]	;add argc in order to get the argv index (before adding 1)
+
+SET [B], J		;make that index store the location of the argument
+
+ADD [C+1], 1	;add 1 to argc
+SET PC, POP
+
+:sh.detectarg.escape
+XOR A, 0x0001	;enable the escape bit
+SET PC, sh.detectarg.loop
+
+:sh.detectarg.quote
+XOR A, 0x0002	;flip the quotation bit
+SET PC, sh.detectarg.loop
+
+:sh.detectarg.waitfornewarg
+IFB A, 0x8000	;if the wait-for-new-argument is already set,
+				;then ignore the extra space
+  SET PC, sh.detectarg.loop
+XOR A, 0x8000	;enable the wait-for-new-argument bit
+STI [J], 0		;insert a null to split the arguments
+SET PC, sh.detectarg.loop
+
+:sh.detectarg.process	;* PROCESSING *
+IFE [I], 0x5c	;backslash
+  SET PC, sh.detectarg.escape
+
+IFE [I], 0x27	;single quote
+  SET PC, sh.detectarg.quote
+
+IFE [I], 0x22	;double quote
+  SET PC, sh.detectarg.quote
+
+IFE [I], 0x20	;split arguments with spaces
+  IFC A, 0x0002	;unless they're quoted
+    JSR s.stdin.waitfornewarg
+
+;* END CHARACTER PROCESSING *
+
+STI [J], [I]	;copy the ASCII character literally
+SET PC, sh.detectarg.loop	;and continue looping until we reach null
+
+:sh.detectarg.exit	;when null is reached, go here
+
+SET PC, POP
