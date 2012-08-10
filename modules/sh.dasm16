@@ -89,7 +89,7 @@ IFE [I], 0x22	;double quote
 
 IFE [I], 0x20	;split arguments with spaces
   IFC A, 0x0002	;unless they're quoted
-    JSR s.stdin.waitfornewarg
+    JSR sh.detectarg.waitfornewarg
 
 ;* END CHARACTER PROCESSING *
 
@@ -97,5 +97,21 @@ STI [J], [I]	;copy the ASCII character literally
 SET PC, sh.detectarg.loop	;and continue looping until we reach null
 
 :sh.detectarg.exit	;when null is reached, go here
+
+			;at this point, C is an area for
+			;storing metadata about stdin:
+			;[C+0] is the location of stdin
+			;[C+1] is argc
+			;[C+2] through [C+17] are argv (storing pointers to arguments)
+			
+			;now sh needs to search the filesystem for argv[0]
+			;and execute it
+			
+SET A, 0 ;debug (output successful)
+
+SET J, POP
+SET I, POP
+SET C, POP
+SET B, POP
 
 SET PC, POP
