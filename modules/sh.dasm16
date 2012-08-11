@@ -159,6 +159,12 @@ SET Z, POP
 SET Y, POP
 SET X, POP
 
+SET A, POP
+JSR heap.free	;restore and free stdin location
+
+SET A, POP
+JSR heap.free	;restore and free metadata location
+
 			;exit status is returned in A by the program
 			;if the exit status is nonzero, trigger
 			;some sort of alert here? TODO
