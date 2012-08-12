@@ -6,6 +6,8 @@
 ;:Executes a single command pointed to by *pointerToCommand*.
 ;:
 :sh
+
+SET Z, C ;debug (for migration to independent output)
 SET PUSH, B
 SET PUSH, C ;save these
 SET PUSH, I ;for iteration
@@ -35,6 +37,8 @@ SET I, POP		;restore pointerToCommand and remove it from the stack
 	;	of an argument
 	; - rightmost bit is one if the next-processed character is escaped
 	; - second-right bit is one if current pointer is within quotes
+
+SET A, 0x8000	;just mark the first argument
 
 :sh.detectarg.loop
 IFE [I], 0
@@ -76,6 +80,7 @@ SET PC, sh.detectarg.loop
 IFB A, 0x8000	;if the wait-for-new-argument is already set,
 				;then ignore the extra space
   SET PC, sh.detectarg.loop
+
 XOR A, 0x8000	;enable the wait-for-new-argument bit
 STI [J], 0		;insert a null to split the arguments
 SET PC, sh.detectarg.loop
@@ -127,8 +132,8 @@ SET A, [C+2]	;make A the location again
 			;(such as "./a.out" or "bin/a.out", in which case that
 			;file should be executed instead
 			
-JSR crp.sum	;use bsdsum to get the 16-bit hash of the word
-JSR p.lookup
+JSR crp.sum		;use bsdsum to get the 16-bit hash of the word
+JSR p.lookup	;then look up the hash in the table of packages
 
 SET PUSH, C		;store metadata location (for unreserving)
 SET PUSH, [C]	;store stdin location (for unreserving)
@@ -151,6 +156,8 @@ SET X, A		;we are going to jump to X
 SET A, [C+1]	;get argc
 SET B, C    	;pointer to metadata,
 ADD B, 2		;then make it into a pointer to argv
+
+SET C, Z ;debug (for migration to independent output)
 
 JSR X ;calls the subroutine returned by *p.lookup*
 
