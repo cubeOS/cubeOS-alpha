@@ -1,0 +1,184 @@
+;;;;;;;;;;;;;;
+; SH ; Shell ;
+;;;;;;;;;;;;;;
+
+;:# sh (pointerToCommand)
+;:Executes a single command pointed to by *pointerToCommand*.
+;:
+:sh
+
+SET Z, C ;debug (for migration to independent output)
+SET PUSH, B
+SET PUSH, C ;save these
+SET PUSH, I ;for iteration
+SET PUSH, J ;for iteration
+
+				;TODO remove stdin and replace it with argv[0]
+				;such that the memory looks like argc, argv[16]
+
+SET PUSH, A		;store pointerToCommand
+SET A, 0x12		;memory for: (stdin, argc, argv[16])
+JSR heap.alloc	;reserve memory
+SET C, A		;store the memory location
+
+SET A, PEEK		;restore pointerToCommand
+JSR typ.ffz		;find the end of the string
+				;(the string cannot contain 0, because it is user input)
+ADD A, 1		;increase the length by one, so as to include the final 0
+
+JSR heap.alloc	;reserve memory for stdin, long enough to house the string
+SET [C], A		;store the location of stdin
+
+SET J, A		;make J the destination location
+SET I, POP		;restore pointerToCommand and remove it from the stack
+
+	;A is used for loop metadata
+	; - leftmost bit is one if the next character should mark the start
+	;	of an argument
+	; - rightmost bit is one if the next-processed character is escaped
+	; - second-right bit is one if current pointer is within quotes
+
+SET A, 0x8000	;just mark the first argument
+
+:sh.detectarg.loop
+IFE [I], 0
+  SET PC, sh.detectarg.exit
+
+IFB A, 0x8000	;if the markarg flag is set,
+  IFG [I], 0x20	;and the character is a printed, non-whitespace character,
+    JSR sh.detectarg.markarg	;then mark the argument
+
+
+IFC A, 0x0001	;if the character is not escaped, jump to processing
+  SET PC, sh.detectarg.process
+
+XOR A, 0x0001	;flip the option to off (instruction is smaller than ANDing)
+STI [J], [I]	;copy the character to stdin literally
+SET PC, sh.detectarg.loop
+
+:sh.detectarg.markarg
+XOR A, 0x8000	;flip the option to off
+
+SET B, C		;metadata location
+ADD B, 2		;go to argv location
+ADD B, [C+1]	;add argc in order to get the argv index (before adding 1)
+
+SET [B], J		;make that index store the location of the argument
+
+ADD [C+1], 1	;add 1 to argc
+SET PC, POP
+
+:sh.detectarg.escape
+XOR A, 0x0001	;enable the escape bit
+SET PC, sh.detectarg.loop
+
+:sh.detectarg.quote
+XOR A, 0x0002	;flip the quotation bit
+SET PC, sh.detectarg.loop
+
+:sh.detectarg.waitfornewarg
+IFB A, 0x8000	;if the wait-for-new-argument is already set,
+				;then ignore the extra space
+  SET PC, sh.detectarg.loop
+
+XOR A, 0x8000	;enable the wait-for-new-argument bit
+STI [J], 0		;insert a null to split the arguments
+SET PC, sh.detectarg.loop
+
+:sh.detectarg.process	;* PROCESSING *
+IFE [I], 0x5c	;backslash
+  SET PC, sh.detectarg.escape
+
+IFE [I], 0x27	;single quote
+  SET PC, sh.detectarg.quote
+
+IFE [I], 0x22	;double quote
+  SET PC, sh.detectarg.quote
+
+IFE [I], 0x20	;split arguments with spaces
+  IFC A, 0x0002	;unless they're quoted
+    JSR sh.detectarg.waitfornewarg
+
+;* END CHARACTER PROCESSING *
+
+STI [J], [I]	;copy the ASCII character literally
+SET PC, sh.detectarg.loop	;and continue looping until we reach null
+
+:sh.detectarg.exit	;when null is reached, go here
+SET [J], 0	;put null at the end of stdin
+
+			;at this point, C is an area for
+			;storing metadata about stdin:
+			;[C+0] is the location of stdin
+			;[C+1] is argc
+			;[C+2] through [C+17] are argv (storing pointers to arguments)
+			
+			;now sh needs to search the filesystem for argv[0]
+			;and execute it
+			
+SET A, [C+2]	;make A the location of argv[0]
+JSR typ.ffz		;make A the length of argv[0]
+SET B, A		;make B that length
+
+SET A, [C+2]	;make A the location again
+
+			;the block of code uses crp.sum to hash the first
+			;argument, and perform the lookup in the current
+			;package system.
+			;TODO
+			;instead, (or in addition,) it should search the PATH
+			;nonrecursively
+			;also note that the first argument may be a file path,
+			;(such as "./a.out" or "bin/a.out", in which case that
+			;file should be executed instead
+			
+JSR crp.sum		;use bsdsum to get the 16-bit hash of the word
+JSR p.lookup	;then look up the hash in the table of packages
+
+SET PUSH, C		;store metadata location (for unreserving)
+SET PUSH, [C]	;store stdin location (for unreserving)
+
+SET PUSH, X		;push other registers
+SET PUSH, Y
+SET PUSH, Z
+IAG B
+SET PUSH, B ;push IA
+
+			;all of the code executed from here until arguments
+			;are popped is for executing the user-selected
+			;program
+			
+			;A - argc
+			;B - argv[] in memory
+
+SET X, A		;we are going to jump to X
+
+SET A, [C+1]	;get argc
+SET B, C    	;pointer to metadata,
+ADD B, 2		;then make it into a pointer to argv
+
+SET C, Z ;debug (for migration to independent output)
+
+JSR X ;calls the subroutine returned by *p.lookup*
+
+IAS POP
+SET Z, POP
+SET Y, POP
+SET X, POP
+
+SET A, POP
+JSR heap.free	;restore and free stdin location
+
+SET A, POP
+JSR heap.free	;restore and free metadata location
+
+			;exit status is returned in A by the program
+			;if the exit status is nonzero, trigger
+			;some sort of alert here? TODO
+
+SET J, POP
+SET I, POP
+SET C, POP
+SET B, POP
+
+SET PC, POP
