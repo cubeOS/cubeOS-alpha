@@ -89,10 +89,12 @@ SET [clock.count], B     ;then update clock.count
 :clock.tick.alert
 IFE [A+1], 0                            ;if there is no frequency registered,
   SET PC, clock.tick.alert.continueloop ;then just move along.
-SET C, 60
+SET C, B
 MOD C, [A+1]
+SET PUSH, A
 IFE C, 0
   SET PC, clock.tick.jump
+SET A, POP
 
 :clock.tick.alert.continueloop
 ADD A, 2
