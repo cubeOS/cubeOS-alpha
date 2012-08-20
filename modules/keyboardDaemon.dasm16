@@ -128,9 +128,7 @@ SET PC, POP
 ;: |   Char Color   |
 ;: | Notify on Ctrl | <- jumped to when Control key is pressed.
 ;: |      ....      | <- Total length is 16 words
-;: +-------------
-
----+
+;: +----------------+
 ;:```
 ;:
 
