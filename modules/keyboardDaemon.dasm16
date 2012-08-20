@@ -30,7 +30,7 @@ IFE C, [A+3] ;if C is the exit character
     JSR [A+2] ;jump to "notify" location
 
 IFE C, 0x91 ; If the key typed is Control.
-    IFN [A+6], 0 ; If the notify location is not empty.
+    IFN [A+8], 0 ; If the notify location is not empty.
     	JSR [A+8] ; Jump to the Control handler.
 
 IFG C, 0x1f ;if the key is an ASCII key
