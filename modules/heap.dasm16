@@ -32,6 +32,8 @@ SET PC, POP
 ;:**returns** the location of the reserved memory, or 0 if no block of the requested size could be found. <br />
 ;:**modifies** A
 ;:
+:heap.alloc.int
+SET PUSH, pih.return ;return A
 :heap.alloc
 ; Walks the pointers with X to find a free region
 SET PUSH, B
@@ -106,6 +108,8 @@ SET PC, POP
 ;:Marks the region starting at *location* as free. **MUST BE THE BEGINNING OF THE .alloc'd REGION.**
 ;:Collapses adjacent free blocks into one.
 ;:
+:heap.free.int
+SET PUSH, pih.return ;return A
 :heap.free
 SET PUSH, X
 SET PUSH, Y
