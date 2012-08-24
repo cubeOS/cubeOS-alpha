@@ -79,6 +79,8 @@ RFI 1
 ;:Messages 0-63 are reserved for calls reagarding the OS.
 ;:Messages 64-127 are reserved for programs.
 ;:
+;:To call a normal subroutine through an interrupt, use a separate label for the interrupt call, and make the first instruction after that label `SET PUSH, pih.return`, so as to return properly in A. After that line, the process should continue into the body of the subroutine.
+;:
 :pih.initMessages
 
 ;:#### 10: Reserve Heap Space
@@ -86,12 +88,12 @@ RFI 1
 ;:
 
 SET A, 10
-SET B, tusk.getMem.int
+SET B, heap.alloc.int
 JSR pih.chOSMsg
 
 ;:#### 11
 SET A, 11
-SET B, tusk.dropMem.int
+SET B, heap.free.int
 JSR pih.chOSMsg
 
 SET PC, POP
