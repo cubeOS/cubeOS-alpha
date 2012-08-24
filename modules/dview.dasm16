@@ -36,6 +36,7 @@ SET PC, POP
 ;:
 ;:**returns** the screen location
 ;:
+:dview_newScreen 		; C wrapper
 :dview.newScreen
 SET B, [v.tusk.memStack] ;get the running process's memory
 SET B, [B+1] ;get the current dview instance's memory
@@ -104,6 +105,9 @@ SET PC, POP
 ;:**modifies** A, B <br />
 ;:**returns** literal memory location of that point on the current screen
 ;:
+:dview_getLoc ; C wrapper.
+SET B, POP
+SET A, POP
 :dview.getLoc
 SET PUSH, C
 SET C, [v.tusk.memStack] ;get the running process's memory
