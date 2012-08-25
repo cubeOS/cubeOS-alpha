@@ -11,7 +11,7 @@
 ;:
 
 :disk.mmr
-DAT 0x4000
+DAT 0x4000 ; Do not change without adjusting the value in getMMR() in fsint.go.
 :disk.mmrTop
 DAT 0x4400
 

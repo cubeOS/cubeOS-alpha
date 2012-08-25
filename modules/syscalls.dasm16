@@ -5,16 +5,21 @@
 ;: Any calls added to this table should be done without changing the order, or old programs will break.
 
 :syscalltable
-DAT fs.newBlock
+DAT fs.newBlock ; 0
 DAT fs.newInode
 DAT fs.getInode
 DAT fs.bitmapFree
 DAT fs.readFileAt
-DAT fs.dirLookup
+DAT fs.dirLookup ; 5
 DAT fs.addBlock
 DAT fs.addToDir
 DAT fs.newFile
 DAT fs.newDir
-DAT fs.delete
+DAT fs.delete ; 10
 DAT fs.format
+DAT fs.mkInodePtr
+DAT disk.read
+DAT disk.write
+DAT typ.memcopy ; 15
+DAT typ.dwordPlusUint
 

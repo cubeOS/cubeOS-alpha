@@ -3,6 +3,9 @@ package types
 type Block uint
 type InodeNumber uint
 
+type Dword struct {
+    lo, hi uint
+}
 
 type Inode struct {
     mode uint
@@ -21,5 +24,11 @@ type Inode struct {
     db7 Block
     dbSingleIndirect Block
     dbDoubleIndirect Block
+}
+
+func DwordLT(x, y Dword) bool {
+    if x.hi < y.hi { return true }
+    if x.hi > y.hi { return false }
+    return x.lo < y.lo
 }
 

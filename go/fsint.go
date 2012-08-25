@@ -2,25 +2,35 @@ package fsint
 
 import "types"
 
+// Keep this in sync with the value in disk.dasm16.
+const MMR uint = 0x4000
+
+
 // Defines the low-level filesystem system calls
 // Intended only to be used to implement the higher-level filesystem functions in fs.go, not in user code.
 
 // Finds and loads a new block, returning the block number.
-func NewBlock() uint {
-    calls := * ((*([]*func() uint)) (8))
+func NewBlock() types.Block {
+    calls := * ((*([]*func() types.Block)) (8))
     return calls[0]()
 }
 
 // Reserves a new inode and returns its number. Does NOT load the inode table into the MMR.
-func NewInode() uint {
-    calls := *((*[]*func() uint) (8))
+func NewInode() types.InodeNumber {
+    calls := *((*[]*func() types.InodeNumber) (8))
     return calls[1]()
 }
 
 // Given an inode number, loads the inode table and returns the block number.
-func GetInode(inode uint) uint {
-    calls := *((*[]*func(uint) uint) (8))
+func GetInode(inode types.InodeNumber) types.Block {
+    calls := *((*[]*func(types.InodeNumber) types.Block) (8))
     return calls[2](inode)
+}
+
+// Given an inode number, makes a copy of the inode on the heap, which must be `delete()`ed later.
+func MkInodePtr(inode types.InodeNumber) *types.Inode {
+    calls := *((*[]*func(types.InodeNumber) *types.Inode) (8))
+    return calls[12](inode)
 }
 
 func BitmapFree(typ, number uint) {
@@ -28,38 +38,38 @@ func BitmapFree(typ, number uint) {
     calls[3](typ, number)
 }
 
-func ReadFileAt(inodePtr types.Inode, offsetPtr types.Dword) uint {
-    calls := *((*[]*func(types.Inode, types.Dword) uint) (8))
+func ReadFileAt(inodePtr *types.Inode, offsetPtr *types.Dword) types.Block {
+    calls := *((*[]*func(*types.Inode, *types.Dword) types.Block) (8))
     return calls[4](inodePtr, offsetPtr)
 }
 
-func DirLookup(directory uint, filename string) uint {
-    calls := *((*[]*func(uint,string) uint) (8))
+func DirLookup(directory types.InodeNumber, filename string) types.InodeNumber {
+    calls := *((*[]*func(types.InodeNumber, string) types.InodeNumber) (8))
     return calls[5](directory, filename)
 }
 
-func AddBlock(inodePtr types.Inode) uint {
-    calls := *((*[]*func(types.Inode) uint) (8))
+func AddBlock(inodePtr *types.Inode) types.Block {
+    calls := *((*[]*func(*types.Inode) types.Block) (8))
     return calls[6](inodePtr)
 }
 
-func AddToDir(parent, inode uint, filename string) {
-    calls := *((*[]*func(uint, uint, string)) (8))
+func AddToDir(parent, inode types.InodeNumber, filename string) {
+    calls := *((*[]*func(types.InodeNumber, types.InodeNumber, string)) (8))
     calls[7](parent, inode, filename)
 }
 
-func NewFile(parent uint, filename string) uint {
-    calls := *((*[]*func(uint, string) uint) (8))
+func NewFile(parent types.InodeNumber, filename string) types.InodeNumber {
+    calls := *((*[]*func(types.InodeNumber, string) types.InodeNumber) (8))
     return calls[8](parent, filename)
 }
 
-func NewDir(parent uint, name string) uint {
-    calls := *((*[]*func(uint, string) uint) (8))
+func NewDir(parent types.InodeNumber, name string) types.InodeNumber {
+    calls := *((*[]*func(types.InodeNumber, string) types.InodeNumber) (8))
     return calls[9](parent, name)
 }
 
-func Delete(dirInode uint, filename string) {
-    calls := *((*[]*func(uint, string)) (8))
+func Delete(dirInode types.InodeNumber, filename string) {
+    calls := *((*[]*func(types.InodeNumber, string)) (8))
     calls[10](dirInode, filename)
 }
 
@@ -67,4 +77,23 @@ func Format(sizeInKW uint) {
     calls := *((*[]*func(uint)) (8))
     calls[11](sizeInKW)
 }
+
+
+// Returns a pointer to an inode on the disk.
+func ReadInode(inode types.InodeNumber) *types.Inode {
+    GetInode(inode)
+    return (*types.Inode)(MMR + (inode & 0x003f))
+}
+
+
+func ReadBlock(block types.Block) {
+    calls := *((*[]*func(types.Block)) (8))
+    calls[13](block)
+}
+
+func WriteBlock(block types.Block) {
+    calls := *((*[]*func(types.Block)) (8))
+    calls[14](block)
+}
+
 

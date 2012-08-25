@@ -460,3 +460,12 @@ SET A, B
 SET C, POP
 SET PC, POP
 
+
+;:### typ.dwordPlusUint (dwordPtr, number)
+;: Given a pointer to a 32-bit integer (little endian) and a number, adds the number to the 32-bit integer.
+;:
+:typ.dwordPlusUint
+ADD [A], B
+ADD [A+1], EX
+SET PC, POP
+
