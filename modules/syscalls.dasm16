@@ -5,6 +5,16 @@
 ;: Any calls added to this table should be done without changing the order, or old programs will break.
 
 :syscalltable
-DAT heap.alloc
-DAT heap.free
-DAT 
+DAT fs.newBlock
+DAT fs.newInode
+DAT fs.getInode
+DAT fs.bitmapFree
+DAT fs.readFileAt
+DAT fs.dirLookup
+DAT fs.addBlock
+DAT fs.addToDir
+DAT fs.newFile
+DAT fs.newDir
+DAT fs.delete
+DAT fs.format
+

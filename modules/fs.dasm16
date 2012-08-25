@@ -966,10 +966,10 @@ SET PC, POP
 
 ;:## High level
 ;:These commands are the ones intended to be called by external code. The low- and mid-level functions in this file are considered more or less private to the filesystem. The functions presented here are to be considered the filesystem API exposed by the OS.
-;:Trying to delete `.` or `..` is not supported and will cause Bad Things to happen.
 ;:
 ;:### fs.delete(dirInode, filename)
 ;:Takes the inode number of a directory and a filename within it, and deletes that file from the directory.
+;:Trying to delete `.` or `..` is not supported and will cause Bad Things to happen.
 ;:Frees the file's blocks.
 ;:
 :fs.delete
