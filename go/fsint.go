@@ -44,7 +44,7 @@ func AddBlock(inodePtr types.Inode) uint {
 }
 
 func AddToDir(parent, inode uint, filename string) {
-    calls := *((*[]*func(uint, uint, string)
+    calls := *((*[]*func(uint, uint, string)) (8))
     calls[7](parent, inode, filename)
 }
 
@@ -63,7 +63,7 @@ func Delete(dirInode uint, filename string) {
     calls[10](dirInode, filename)
 }
 
-func Format(sizeInKW) {
+func Format(sizeInKW uint) {
     calls := *((*[]*func(uint)) (8))
     calls[11](sizeInKW)
 }
