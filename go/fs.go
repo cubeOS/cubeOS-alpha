@@ -165,3 +165,11 @@ func Write(f *File, buf []uint, buflen uint) uint {
 }
 
 
+// Closes an open file.
+// The result of calling `Close()` on an already closed file is undefined, and probably bad.
+func Close(f *File) {
+    delete(f.pos)
+    delete(f)
+}
+
+

@@ -87,7 +87,7 @@ func ReadInode(inode types.InodeNumber) *types.Inode {
 
 // Does not delete the inode pointer.
 func WriteInode(num types.InodeNumber, inode *types.Inode) {
-    block := fsint.GetInode(f.inode)
+    block := GetInode(num)
     rawInode := (*types.Inode) (MMR + (num & 0x003f) * 16)
 
     rawInode.mode = inode.mode
@@ -107,7 +107,7 @@ func WriteInode(num types.InodeNumber, inode *types.Inode) {
     rawInode.dbSingleIndirect = inode.dbSingleIndirect
     rawInode.dbDoubleIndirect = inode.dbDoubleIndirect
 
-    fsint.WriteBlock(block)
+    WriteBlock(block)
 }
 
 func ReadBlock(block types.Block) {
