@@ -82,9 +82,33 @@ func Format(sizeInKW uint) {
 // Returns a pointer to an inode on the disk.
 func ReadInode(inode types.InodeNumber) *types.Inode {
     GetInode(inode)
-    return (*types.Inode)(MMR + (inode & 0x003f))
+    return (*types.Inode)(MMR + (inode & 0x003f) * 16)
 }
 
+// Does not delete the inode pointer.
+func WriteInode(num types.InodeNumber, inode *types.Inode) {
+    block := fsint.GetInode(f.inode)
+    rawInode := (*types.Inode) (MMR + (num & 0x003f) * 16)
+
+    rawInode.mode = inode.mode
+    rawInode.linkCount = inode.linkCount
+    rawInode.blockCount = inode.blockCount
+    rawInode.sizeLo = inode.sizeLo
+    rawInode.sizeHi = inode.sizeHi
+    rawInode._reserved = rawInode._reserved
+    rawInode.db0 = inode.db0
+    rawInode.db1 = inode.db1
+    rawInode.db2 = inode.db2
+    rawInode.db3 = inode.db3
+    rawInode.db4 = inode.db4
+    rawInode.db5 = inode.db5
+    rawInode.db6 = inode.db6
+    rawInode.db7 = inode.db7
+    rawInode.dbSingleIndirect = inode.dbSingleIndirect
+    rawInode.dbDoubleIndirect = inode.dbDoubleIndirect
+
+    fsint.WriteBlock(block)
+}
 
 func ReadBlock(block types.Block) {
     calls := *((*[]*func(types.Block)) (8))

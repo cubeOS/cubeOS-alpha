@@ -87,23 +87,8 @@ func Seek(f *File, offset *types.Dword) {
 
     // Now the file is big enough to contain the offset.
     f.pos = offset
-    block := fsint.GetInode(f.inode)
-    rawInode := fsint.ReadInode(f.inode)
-
-    rawInode.blockCount = inode.blockCount
-    rawInode.db0 = inode.db0
-    rawInode.db1 = inode.db1
-    rawInode.db2 = inode.db2
-    rawInode.db3 = inode.db3
-    rawInode.db4 = inode.db4
-    rawInode.db5 = inode.db5
-    rawInode.db6 = inode.db6
-    rawInode.db7 = inode.db7
-    rawInode.dbSingleIndirect = inode.dbSingleIndirect
-    rawInode.dbDoubleIndirect = inode.dbDoubleIndirect
-
+    fsint.WriteInode(f.inode, inode)
     delete(inode)
-    fsint.WriteBlock(block)
 }
 
 
@@ -136,10 +121,47 @@ func Read(f *File, maxlen uint, buf []uint) uint {
         util.Memcopy(([]uint)(start), buf, delta)
         math.DwordPlusUint(f.pos, delta)
         readSoFar += delta
+        buf = ([]uint)(&buf[delta]) // Move buf forward by the amount read.
     }
 
     // When this loop finishes, either we've read all there is to read, or all we were asked to provide.
     return readSoFar
+}
+
+// Writes `buflen` words (not bytes!) from `buf` to the file.
+// Grows the file if necessary to contain the incoming data.
+// Writes the number of words actually written, or 0xffff/-1 on error.
+func Write(f *File, buf []uint, buflen uint) uint {
+    inode := fsint.MkInodePtr(f.inode)
+    writtenSoFar := 0
+
+    // Write until we run out of data in the buffer.
+    for writtenSoFar < buflen {
+        blocksToHoldOffset := (f.pos.hi << 6) + (f.pos.lo >> 10)
+        if blocksToHoldOffset > inode.blockCount {
+            // Add a block to the file to make more room.
+            fsint.AddBlock(inode)
+        }
+        // Now the block we need is loaded.
+        start := (f.pos.lo & 0x03ff) + fsint.MMR
+        end := math.MinU( (start + 0x03ff) & 0xfc00, start+buflen+1 )
+        delta := end - start
+
+        util.Memcopy (([]uint)(start), buf, delta)
+        math.DwordPlusUint(f.pos, delta)
+        writtenSoFar += delta
+        buf = ([]uint)(&buf[delta])
+    }
+
+    // Now check if the position is longer than the inode's original size.
+    // If so, update it.
+    if f.pos.hi > inode.sizeHi || (f.pos.hi == inode.sizeHi && f.pos.lo > inode.sizeLo) {
+        inode.sizeHi = f.pos.hi
+        inode.sizeLo = f.pos.lo
+    }
+
+    fsint.WriteInode(f.inode, inode)
+    delete(inode)
 }
 
 
