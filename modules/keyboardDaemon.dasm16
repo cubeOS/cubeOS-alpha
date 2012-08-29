@@ -29,6 +29,10 @@ IFE C, [A+3] ;if C is the exit character
   IFN [A+2], 0 ;if the notify location is not empty
     JSR [A+2] ;jump to "notify" location
 
+IFE C, 0x91 ; If the key typed is Control.
+    IFN [A+8], 0 ; If the notify location is not empty.
+    	JSR [A+8] ; Jump to the Control handler.
+
 IFG C, 0x1f ;if the key is an ASCII key
 	SET PC, kd.checkASCII ;; Arrow keys ASCII codes are more than 0x1f, so we should check them, else we print the character.
 
@@ -122,7 +126,7 @@ SET PC, POP
 ;: |  Min-Position  | <- if 0, there is no minimum-position (onscreen)
 ;: |  Max-Position  | <- if 0, there is no maximum-position (onscreen)
 ;: |   Char Color   |
-;: |    Reserved    |
+;: | Notify on Ctrl | <- jumped to when Control key is pressed.
 ;: |      ....      | <- Total length is 16 words
 ;: +----------------+
 ;:```
