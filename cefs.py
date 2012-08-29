@@ -16,7 +16,8 @@ def block(n):
     return n * 2048
 
 def getWord(f):
-    return struct.unpack(">H", f.read(2))
+    w, = struct.unpack("H", f.read(2))
+    return w
 
 
 # Some constants
@@ -56,12 +57,13 @@ def getInode(f, n):
     return inode
 
 
-# Compares a slice of memory with a Python string. Does not compare their lengths. Pads with 0x00 in the last word.
+# Compares a slice of memory with a Python string. Does not compare their lengths. Pads with 0x00 in the last word if necessary.
 def compare(words, string):
-    string.append(0)
+    if len(string) % 2 == 1:
+        string += '\0' # if odd, pad with a 0
+    strWords = struct.unpack(str(len(string)/2) + "H", string)
     for i in range(len(words)):
-        strWord = (string[2*i] << 16) + string[2*i + 1]
-        if strWord != words[i]:
+        if strWords[i] != words[i]:
             return False
     return True
 
@@ -73,9 +75,10 @@ def fileContents(f, inodeNum):
     contents = []
 
     # Read from the direct data blocks
-    for b in inode['blocks']:
+    for b in inode['data']:
         if lenToGo <= 0:
             return contents
+        f.seek(block(b))
         toRead = min(1024, lenToGo)
         while toRead > 0:
             contents.append(getWord(f))
@@ -104,6 +107,7 @@ def lookupFile(f, path):
 
     for target in dirs:
         dirContents = fileContents(f, inodeNum)
+        print dirContents
         dirIndex = 0
 
         targetLen = (len(target) + 1) // 2 # length in words.
@@ -190,26 +194,26 @@ def cmdFormat():
 
     # Write the header:
     # Magic number 0x6201, number of blocks, used blocks, used inodes.
-    f.write(struct.pack(">4H", 0x6201, size, 12, 1))
+    f.write(struct.pack("4H", 0x6201, size, 12, 1))
 
     # Write the used block bitmap blocks
     f.seek(block(1))
-    f.write(struct.pack(">H", 0x0fff)) # First 12 blocks are used.
+    f.write(struct.pack("H", 0x0fff)) # First 12 blocks are used.
 
     freeBlocks = size-16 # -1 to remove the first word we already wrote
     allBlocks = 0xfff0 # one less than 64k
 
     while allBlocks > 0:
         if freeBlocks >= 16:
-            f.write(struct.pack(">H", 0))
+            f.write(struct.pack("H", 0))
             freeBlocks -= 16
         elif freeBlocks == 0:
-            f.write(struct.pack(">H", 0xffff))
+            f.write(struct.pack("H", 0xffff))
         else:
             word = 0
             for i in range(freeBlocks):
                 word = (word << 1) + 1
-            f.write(struct.pack(">H", word))
+            f.write(struct.pack("H", word))
             freeBlocks = 0
 
         allBlocks -= 16
@@ -221,10 +225,10 @@ def cmdFormat():
         sys.exit(1)
 
     # Write the inode table, only the first one used.
-    f.write(struct.pack(">H", 0x0001)) # Just the first inode used for the root directory.
+    f.write(struct.pack("H", 0x0001)) # Just the first inode used for the root directory.
     allBlocks = 4095
     while allBlocks > 0:
-        f.write(struct.pack(">H", 0))
+        f.write(struct.pack("H", 0))
         allBlocks -= 1
 
     # Now the cursor is at the beginning of the inode meta table.
@@ -234,11 +238,11 @@ def cmdFormat():
         sys.exit(1)
 
     # The first inode table block is always block 10.
-    f.write(struct.pack(">H", 10))
+    f.write(struct.pack("H", 10))
     # And the rest are 0:
     allBlocks = 1023
     while allBlocks > 0:
-        f.write(struct.pack(">H", 0))
+        f.write(struct.pack("H", 0))
         allBlocks -= 1
 
     # SANITY CHECK: Beginning of block 10
@@ -247,7 +251,7 @@ def cmdFormat():
         sys.exit(1)
 
     # Now write the inode for the root directory.
-    f.write(struct.pack(">16H",
+    f.write(struct.pack("16H",
         2, # Mode, directory.
         1, # Link count
         1, # Block count
@@ -267,7 +271,7 @@ def cmdFormat():
         ))
 
     for i in range(63*16):
-        f.write(struct.pack(">H", 0))
+        f.write(struct.pack("H", 0))
 
     # SANITY CHECK: Beginning of block 11, the root directory.
     if f.tell() != block(11):
@@ -275,8 +279,8 @@ def cmdFormat():
         sys.exit(1)
 
     # Write the directory entry for the root directory.
-    f.write(struct.pack(">3HcB", 4, 0, 1, ".", 0))
-    f.write(struct.pack(">3H2s", 0, 0, 1, ".."))
+    f.write(struct.pack("3HcB", 4, 0, 1, ".", 0))
+    f.write(struct.pack("3H2s", 0, 0, 1, ".."))
 
     # And we're done.
     f.close()
@@ -302,7 +306,7 @@ def cmdRead():
 
     df = open(dest, 'wb')
     for w in contents:
-        df.write(struct.pack(">H", w))
+        df.write(struct.pack("H", w))
     df.close()
 
     count = len(contents)
