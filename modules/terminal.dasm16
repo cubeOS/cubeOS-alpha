@@ -1,0 +1,76 @@
+;;;;;;;;;;;;
+; Terminal ;
+;;;;;;;;;;;;
+
+:terminal.stringres.prompt DAT 0xf001, "sh> ", 0	;TODO store as a pointer to a
+						;settable prompt
+
+;:### terminal.new ()
+;:Creates a new terminal instance (which will persist.)
+;:
+
+;TODO allow forking
+;TODO make all terminal values (xpos and ypos) into VARIABLES
+
+:terminal.new
+SET PUSH, A
+SET PUSH, I
+SET PUSH, X
+SET PUSH, Y
+SET PUSH, Z
+
+SET A, 64	;input buffer
+JSR heap.alloc	;reserve
+SET X, A	;store in X
+
+SET A, 64	;output buffer
+JSR heap.alloc	;reserve
+SET Y, A	;store in Y
+
+SET A, 132	;reserve enough words for 64 (-4 words for headers)
+JSR heap.alloc	;environment variables
+
+SET Z, A	;store the variable table location
+
+		;A is already the header pointer
+SET B, 64	;we will have 64 indicies
+SET C, 0	;we will start with no items already in the table
+JSR dl.makeHashTable	;now make the hashtable
+
+JSR dview.newScreen
+
+SET I, A
+
+:terminal.prompt
+
+
+SET A, I				;A is the screen location
+SET B, terminal.stringres.prompt	;B is the text to be printed
+SET C, X				;C is the input buffer
+JSR dview.prompt
+
+SET A, X	;set A to the input buffer
+SET B, Y	;set B to the output buffer
+JSR sh
+
+JSR terminal.newline
+
+SET A, I	;make A the first word on a new line
+SET B, Y	;make B the output buffer location
+JSR dview.write	;write the output to the screen
+
+SET I, A		;make I the location after the write finishes
+JSR terminal.newline	;make I the next line
+
+SUB PC, 1 ;debug
+
+:terminal.newline
+SET A, 0
+SET B, 0
+JSR dview.getLoc	;get the start of the screen
+
+SUB I, A	;make I a zero-based index
+ADD I, 32	;add 32
+AND I, 0xfff0	;make I a Y-index
+ADD I, A	;make I the first index on the new line
+

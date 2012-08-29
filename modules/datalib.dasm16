@@ -1,4 +1,4 @@
-;RETURNS INCORRECT VALUE IF DOING HASHGET ON AN UNPRESENT VALUE
+;TODO RETURNS INCORRECT VALUE IF DOING HASHGET ON AN UNPRESENT VALUE
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; DATALIB ; Data Managing Library ;
@@ -49,9 +49,7 @@ SET PC, POP
  ;
 
 ;:### dl.hashInsert (lookupValue, insertValue, hashTablePointer)
-;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table. This is designed to work very well with the 16-bit hashing algorithm crp.dsHash.
-;:
-;:**under development**
+;:Inserts *lookupValue* in a sorted way in the lookup portion of the hashTable at *hashTablePointer* and *insertValue* in an unsorted way at the same index in the value portion of the table. This is designed to work very well with the 16-bit hashing algorithm crp.sum.
 ;:
 :dl.hashInsert
 SET PUSH, B ;store *insertValue*
@@ -74,6 +72,36 @@ SET A, POP ;retrieve *insertValue* from stack
 
 SET PC, dl.unsortedInsert
  ;
+
+;:### dl.hashMod (lookupValue, newValue, hashTablePointer)
+;:Changes the value in *hashTablePointer* referenced by *lookupValue* to *newValue*. Returns 1 if the value is not present in the table. Returns 0 if successful.
+;:
+:dl.hashMod
+SET PUSH, B	;store the value to put in the table
+SET PUSH, [C+1]	;store the number of indicies
+
+SET B, C	;make B the header location
+ADD B, 4	;make B the location of the table itself
+SET C, PEEK	;make C the number of indicies, but keep that on the stack
+JSR dl.searchValTable
+
+IFE A, 1
+  SET PC, dl.hashMod.exf
+
+ADD A, POP	;add the number of indicies to the table so as to get
+		;the location of the linked value
+SET [A], POP	;set the linked value to *newValue*
+
+SET A, 0	;set A to 0, for success
+SET PC, POP
+
+:dl.hashMod.exf
+	;A is 1
+SET 0, POP ;remove the number of indicies from the stack
+SET B, POP ;restore the  value to put on the table
+SET PC, POP
+ ;
+
 
 ;:## Sorted Table
 ;:Subroutines for creating and searching sorted tables

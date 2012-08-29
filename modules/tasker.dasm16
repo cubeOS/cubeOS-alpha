@@ -42,6 +42,7 @@ SET PC, POP
 ;: | Heap Allocs    | <- begins at word 64
 ;: +----------------+
 ;:
+;:
 :tusk.newProcess
 SET PUSH, B
 SET PUSH, C

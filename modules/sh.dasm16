@@ -2,12 +2,12 @@
 ; SH ; Shell ;
 ;;;;;;;;;;;;;;
 
-;:# sh (pointerToCommand)
-;:Executes a single command pointed to by *pointerToCommand*.
+;:# sh (pointerToCommand, outputBuffer)
+;:Executes a single command pointed to by *pointerToCommand*, and writes the output into *outputBuffer*.
 ;:
 :sh
 
-SET Z, C ;debug (for migration to independent output)
+SET Z, B ;debug (for migration to independent output)
 SET PUSH, B
 SET PUSH, C ;save these
 SET PUSH, I ;for iteration
