@@ -35,7 +35,7 @@ JSR p.init ;initialize DPH
 
 ;JSR clock.init
 
-JSR s.instance ;spawn an instance of the DASH Shell
+JSR terminal.new ;spawn an instance of the Terminal
 
 SET PC, halt
 

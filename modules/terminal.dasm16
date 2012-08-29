@@ -37,6 +37,8 @@ SET B, 64	;we will have 64 indicies
 SET C, 0	;we will start with no items already in the table
 JSR dl.makeHashTable	;now make the hashtable
 
+JSR tusk.newProcess
+
 JSR dview.newScreen
 
 SET I, A
