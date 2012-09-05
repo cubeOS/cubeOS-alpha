@@ -83,7 +83,7 @@ RFI 1
 ;:
 :pih.initMessages
 
-;:#### 10: Reserve Heap Space
+;:#### 10: Allocate Heap Space
 ;:Reserves the amount of words in A on the heap, and returns the location of the reserved memory in A.
 ;:
 
@@ -91,7 +91,9 @@ SET A, 10
 SET B, heap.alloc.int
 JSR pih.chOSMsg
 
-;:#### 11
+;:#### 11: Free Heap Space
+;:Unreserves the heap allocation at the address in A. Reverse operation of `Allocate Heap Space`.
+;:
 SET A, 11
 SET B, heap.free.int
 JSR pih.chOSMsg
