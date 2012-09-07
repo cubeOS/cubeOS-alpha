@@ -43,9 +43,9 @@ SET PC, POP
 
 :kd.checkASCII
 IFG C, 0x7f
-	IFL C, 0x84
-		IFN [A+6], 0
-			SET PC, [A+6]    ;; Arrow keys.
+  IFL C, 0x84
+    IFN [A+6], 0
+      SET PC, [A+6]    ;; Arrow keys.
 
 ; Else:
 SET PC, kd.keystroke.writeChar ;; I know this is not necessary as this function is down here. If you expand code in between here, it'll cause NULL pain.
