@@ -2,114 +2,32 @@
 ; ICD ; Clock Daemon ;
 ;;;;;;;;;;;;;;;;;;;;;;
 
-:clock.heapSpace DAT 0
-:clock.count DAT 0
-:clock.heapEnd DAT 0
-
 ;:### clock.init 
+;:Starts the clock running at one tick per second.
 ;:
 :clock.init
-SET A, 32
-JSR tusk.getMem
-SET [clock.heapSpace], A
 
-ADD A, 32
-SET [clock.heapEnd], A
-SET [clock.count], 0
-
-SET A, clock.tick
-JSR pih.newMsg
-
-; Save the message number for later.
-SET PUSH, A
-
-; A=0: Clock will tick 60/B times per second, we want 60, so B=1.
 SET A, 0
-SET B, 1
+SET B, 0
+HWI [HW.GenericClock]	;turn off the clock, in case it's running
+
+SET A, clock.tick	;clock.tick will be our target for the interrupt
+JSR pih.newMsg		;get a new interrupt message
+			;A is the new interrupt message
+
+SET B, A	;the B register will contain the interrupt message
+SET A, 2	;the A register contains the instruction for the clock
 HWI [HW.GenericClock]
 
-; A=2: Clock will send interrupts with message 
-SET B, POP ; Retrieve the saved message number.
-SET A, 2
+SET B, 60	;now we're going to enable the clock again
+SET A, 0	;with one tick per second
 HWI [HW.GenericClock]
 
-SET A, clock.uptime
-SET B, 60
-JSR clock.newCall ;define once-per-second call to the uptime routine
-
-SET PC, POP
-
-;:### clock.uptime
-;:Adds one to the uptime counter (32 bit)
-;:
-:clock.uptime
-SET A, env.uptime
-
-:clock.uptime.loop
-ADD [A], 1
-IFE EX, 0
-  SET PC, POP
-
-:clock.uptime.addmore
-ADD A, 1
-IFN A, env.uptime+2
-  SET PC, clock.uptime.loop
-
-;This area of code is what happens if the uptime counter overflows.
-SUB PC, 1
-
-;:### clock.newCall (notifyLocation, frequency)
-;:
-:clock.newCall
-SET C, [clock.heapSpace]
-
-:clock.newCall.findSpace
-IFE [C], 0
-  SET PC, clock.newCall.addCall
-ADD C, 2
-IFN C, [clock.heapEnd]
-  SET PC, clock.newCall.findSpace
-
-:clock.newCall.addCall
-SET [C], A
-SET [C+1], B
-SET PC, POP
+SET PC, POP ;exit
 
 ;:### clock.tick
+;:The routine called by the clock on every tick.
 ;:
 :clock.tick
-SET A, [clock.heapSpace] ;make A the location of the schedule
-SET B, [clock.count]     ;make B the number of ticks (mod 60) so far
-ADD B, 1                 ;add one to that number of ticks
-IFE B, 60                ;if the value has topped out,
-  SET B, 0               ;set it to zero
-
-SET [clock.count], B     ;then update clock.count
-
-:clock.tick.alert
-IFE [A+1], 0                            ;if there is no frequency registered,
-  SET PC, clock.tick.alert.continueloop ;then just move along.
-SET C, B
-MOD C, [A+1]
-SET PUSH, A
-IFE C, 0
-  SET PC, clock.tick.jump
-SET A, POP
-
-:clock.tick.alert.continueloop
-ADD A, 2
-
-IFL A, [clock.heapEnd]
-  SET PC, clock.tick.alert
-
-SET PC, POP
-
-:clock.tick.jump
-SET PUSH, A
-SET PUSH, B
-SET PUSH, C
-JSR [A]
-SET C, POP
-SET B, POP
-SET A, POP
-SET PC, clock.tick.alert.continueloop
+ADD [env.uptime], 1	;add one second to the system uptime
+SET PC, POP ;exit
