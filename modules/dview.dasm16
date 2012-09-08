@@ -19,8 +19,8 @@ SET PUSH, A
 SET A, 0x20
 JSR heap.alloc
 
-SET B, [v.tusk.memStack]
-SET [B+1], A ;register this instance of dview to the currently running process
+SET B, [v.tusk.runMem]
+SET [B+10], A ;register this instance of dview to the currently running process
 
 SET [A], A
 ADD [A], 3 ;make the pointer its location plus three, for ports
@@ -37,8 +37,8 @@ SET PC, POP
 ;:**returns** the screen location
 ;:
 :dview.newScreen
-SET B, [v.tusk.memStack] ;get the running process's memory
-SET B, [B+1] ;get the current dview instance's memory
+SET B, [v.tusk.runMem] ;get the running process's memory
+SET B, [B+10] ;get the current dview instance's memory
 
 SET A, 0x180 ;enough memory for one full 12x32 screen
 
@@ -72,8 +72,8 @@ SET PC, POP
 ;:Closes the latest window for the currently running process, remapping to the one opened before that.
 ;:
 :dview.close
-SET B, [v.tusk.memStack] ;get the running process's memory
-SET B, [B+1] ;get the current dview instance's memory
+SET B, [v.tusk.runMem] ;get the running process's memory
+SET B, [B+10] ;get the current dview instance's memory
 
 SUB [B], 1 ;move the memstack pointer down once
 SET C, [B+1] ;get the LEM1802 port
@@ -106,8 +106,8 @@ SET PC, POP
 ;:
 :dview.getLoc
 SET PUSH, C
-SET C, [v.tusk.memStack] ;get the running process's memory
-SET C, [C+1] ;get the current dview instance's memory
+SET C, [v.tusk.runMem]	;get the running process's memory
+SET C, [C+10]		;get the current dview instance's memory
 
 SET C, [C]        ;get the pointer to the pointer to screen memory
 SET C, [C+0xffff] ;get the literal screen memory location
@@ -245,7 +245,7 @@ SET PC, dview.write.loop
 
 ;:#### Tab `0x09`
 ;:**documentation pending** (defaults to tab 4)
-;:**syntax** `0x ll 09`` where `ll` is the number which the new screen location must be divisible by (for alignment)
+;:**syntax** `0x ll 09`` where `ll` is the maximum number of spaces in the tab
 ;:
 :dview.write.directive.tab
 SET A, 0
@@ -358,14 +358,16 @@ SET A, 1
 JSR kd.init
 
 SET A, [HW.GenericKeyboard]
-JSR kd.newKeyboard ;binds the keyboard
+JSR kd.newKeyboard	;binds the keyboard, and returns its block of options
 
-SET B, A
+SET B, A	;store options location in B, so that we can turn
+            ;the keyboard on and off as necessary
 
 SET A, 0x20
-JSR tusk.getMem
+JSR heap.alloc	;allocate 32 words of memory
+SET C, A	;store the location, so we can unreserve it
 
-SET [B], A
+SET [B+3], A    ;set the option block pointer to point to our new block
 
 SET [A+1], POP             ;the output location (after the prompt)
 SET [A], POP               ;*userTextOutput*
@@ -382,14 +384,19 @@ SET PUSH, A ;store A for screen pointer retreival
 ;SET [A], 0
 SET [dview.temp.promptflag], 1
 
+SET [B], 2  ;turn on the keyboard
+
 :dview.prompt.loop
 IFN [dview.temp.promptflag], 0
   SET PC, dview.prompt.loop
 
+SET [B], 1  ;turn off the keyboard
+
 SET A, POP ;restore memory location
 SET A, [A+1] ;make A the last screen index
 
-JSR tusk.dropMem
+SET A, C	;restore memory pointer
+JSR heap.free	;and unreserve the memory
 
 SET PC, POP
 

@@ -2,6 +2,10 @@
 ; Terminal ;
 ;;;;;;;;;;;;
 
+:v.cwd DAT 0	;TODO this is for temporary backwards compatibility with old packages
+:v.cwds DAT 0	;TODO "
+:v.stdout DAT 0 ;TODO "
+
 :terminal.stringres.prompt DAT 0xf001, "sh> ", 0	;TODO store as a pointer to a
 						;settable prompt
 
@@ -55,6 +59,8 @@ SET A, X	;set A to the input buffer
 SET B, Y	;set B to the output buffer
 JSR sh
 
+SUB PC, 1 ;debug
+
 JSR terminal.newline
 
 SET A, I	;make A the first word on a new line
@@ -64,7 +70,7 @@ JSR dview.write	;write the output to the screen
 SET I, A		;make I the location after the write finishes
 JSR terminal.newline	;make I the next line
 
-SUB PC, 1 ;debug
+SET PC, terminal.prompt
 
 :terminal.newline
 SET A, 0

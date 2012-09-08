@@ -5,11 +5,9 @@
 :v.tusk.processList DAT 0
 
 :v.tusk.IDiterator DAT 1000 ;the iterator through which to get unique IDs
-:v.tusk.runPID DAT 0 ;the ID of the process that is currently running
 
-:v.tusk.PIDloc DAT tusk.PIDs
-:v.tusk.memStack DAT 0 ;should be replaced with a file or heapspace
-                       ;carrying a bunch of pointers to memstacks
+:v.tusk.runPID DAT 0 ;the ID of the process that is currently running
+:v.tusk.runMem DAT 0 ;the process block owned by the current process
 
 ;:### tusk.init (ProcessSpace)
 ;:Initializes the TUSK Process manager with enough memory for *ProcessSpace* simultaneous processes.
@@ -29,101 +27,40 @@ SET PC, POP
  ;
 
 ;:### tusk.newProcess
-;:Registers a new process of unique ID. <strike>Adds the process id to the table at *v.tusk.PIDloc*.</strike>
+;:Registers a new process of unique ID. <strike>Adds the process id to the table of existing processes. (TODO)</strike>
 ;:
 ;:**modifies** A
-;:**returns** a pointer to the first memory for the process's use
+;:**returns** 0 <strike>if successful, and 1 if not</strike>
 ;:**under development**
 ;:
-;:```
-;: +----------------+
-;: | Process Memory |
-;: | ...            |
-;: | Heap Allocs    | <- begins at word 64
-;: +----------------+
+;:The architecture of a process block is as follows.
 ;:
+;:```
+;: +----------------
+;: | %d size | usage
+;: +----------------
+;: | 10 | storing registers
+;: | 01 | pointer to windowing system block
+;: | 05 | free
+;: +----------------
+;:```
 ;:
 :tusk.newProcess
 SET PUSH, B
 SET PUSH, C
 
-SET [v.tusk.runPID], [v.tusk.IDiterator] ;change to the new process
-ADD [v.tusk.IDiterator], 1 ;increase iterator by 1
+SET [v.tusk.runPID], [v.tusk.IDiterator]	;identify this process as the one
+					;that is currently running
+ADD [v.tusk.IDiterator], 1		;increase iterator by 1
 
-SET A, 0x80 ;reserve 128 words, the first 64 for child memory
-            ;and the second for the process's actual use
+SET A, 16	
 JSR heap.alloc
 
-SET B, A
-ADD B, 0x40 ;make B the first index of memory for the process's use
-SET PUSH, B
-
-SET B, A
-ADD B, 2 ;make B the index after the dview pointer
-
-SET [A], B ;make the first word in the memstack its stack pointer
-
-SET PUSH, A ;store memStack pointer
-
-SET [v.tusk.memStack], POP
+SET [v.tusk.runMem], A	;store a pointer to the process block
 
 SET A, [HW.LEM1802]
 JSR dview.init
 
-SET A, POP ;make A the return value (pointer to memory)
 SET C, POP
 SET B, POP
 SET PC, POP
-
-;:### tusk.getMem (length)
-;:Reserves a *length* amount of memory from the heap using *heap.alloc*, and stores *length* and the location of the reserved memory on the "memory stack," which allows that memory to be freed either when the process calls *tusk.free* or when it terminates.
-;:
-;:**modifies** A <br />
-;:**returns** the first location of the reserved memory
-;:
-:tusk.getMem.int
-SET PUSH, pih.return ;return A
- ;
-:tusk.getMem
-SET PUSH, B
-SET PUSH, C
-
-SET B, [v.tusk.memStack]
-SET C, [B] ;v.tusk.memStack points to a pointer
-           ;the pointer is the open space after the current memory, though
-ADD [B], 1 ;add 1 to the pointer, so we don't have to do it later
-
-SET [B], A
-
-JSR heap.alloc
-SET C, POP
-SET B, POP
-SET PC, POP
- ;
-
-;:### tusk.dropMem ()
-;:
-;:
-;:**does not modify registers**
-;:
-:tusk.dropMem.int
-SET PUSH, pih.return ;return A
- ;
-:tusk.dropMem
-SET PUSH, A
-SET PUSH, B
-SET PUSH, C
-
-SET A, [v.tusk.memStack]
-SUB [A], 1 ;decrease the pointer, so it points to the most recent item
-SET A, [A] ;v.tusk.memStack points to a pointer
-
-JSR heap.free ;location
-
-SET C, POP
-SET B, POP
-SET A, POP
-SET PC, POP
-
-:tusk.PIDs ;64 open spaces
-DAT 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0

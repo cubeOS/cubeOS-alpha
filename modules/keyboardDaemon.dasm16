@@ -15,6 +15,9 @@ JSR typ.ffw            ;find the word with this interrupt message,
 
 ADD A, [kd.daemonlist] ;make A a memory location rather than a length
 
+IFE [A+0xfffe], 1   ;if keyboard is marked as not in use,
+  SET PC, POP
+
 SUB A, 1     ;make A a pointer to the port number
 SET B, [A]   ;make B the port number
 SET A, [A+2] ;make A the configuration location
@@ -98,22 +101,22 @@ SET PC, POP
 
 
 ;:## Data Structures
+;:The daemon list lives in the heap and is pointed to by a labelled word. It contains four words per keyboard, because each keyboard has four words associated with it as follows.
 ;:
-;:### Daemon Instance List
+;:### Daemon Instance Block
 ;:
-;:``` 
-;: +---------+
-;: |  Port0  | <- (in heap) location, stored in kd.daemonlist
-;: |  Msg 0  |
-;: | OptLoc0 |
-;: |  Port1  |
-;: |  Msg 1  |
-;: | OptLoc1 |
-;: |   ...   |
-;: +---------+
+;:```
+;: +--------------
+;: | %d size | use
+;: +--------------
+;: | 1 | is-active
+;: | 1 | keyboard port
+;: | 1 | keyboard interrupt message
+;: | 1 | config block location
+;: +--------------
 ;:```
 ;:
-;:*Portx* refers to a Generic Keyboard port, and the *OptLocx* following directly after refers to the current "options" selection, which contains all of the information necessary to support a single keyboard (and integrates with dview.)
+;:The first word in the block is a boolean **(1 or 2)** referring to the state of the keyboard. If it is 1, the keyboard is currently not in use. If it is 2, then it is currently acting as a source of input. The port is the DCPU-16 port that the keyboard is attached to. The keyboard interrupt message is the unique interrutp message given to the keyboard. The configuration block location is described below.
 ;:
 ;:### Option Block
 ;:
@@ -133,7 +136,7 @@ SET PC, POP
 ;:
 
 :kd.daemonlist
-DAT 0 ;memory location containing three memory locations per keyboard device
+DAT 0 ;memory location containing four words per keyboard device
 
 :kd.length
 DAT 0 ;number of literal words in the daemon list
@@ -142,7 +145,7 @@ DAT 0 ;number of literal words in the daemon list
 ;:Initializes the keyboard handler with enough room for *slots* many Generic Keyboard devices.
 ;:
 :kd.init
-MUL A, 3 ;multiply by 3, because each keyboard has 3 words associated with it
+MUL A, 4 ;multiply by 3, because each keyboard has 3 words associated with it
 SET [kd.length], A
 JSR heap.alloc ;
 SET [kd.daemonlist], A
@@ -152,7 +155,8 @@ SET PC, POP
 ;:### kd.newKeyboard (GenericKeyboard)
 ;:Defines a new keyboard in the first open memory location carried by *kd.daemonlist*, as defined *kd.init*, or adds a new one if it doesn't exist.
 ;:
-;:**returns** a pointer to the *GenericKeyboard*'s OptLoc word
+;:**returns** a pointer to the *GenericKeyboard*'s instance block, see below for use
+;:The instance block is described above as the Daemon Instance Block. The value of the word that is returned is the bool (1 is FALSE and 2 is TRUE). In order for the daemon to react to keystrokes, this word must be set to 2. The options word should point to a valid options pointer, **first**, however.
 ;:
 :kd.newKeyboard
 SET B, [kd.daemonlist]
@@ -161,7 +165,7 @@ SET C, [kd.length]
 ADD C, B ;make C the ending location of the list
 
 :kd.newKeyboard.findexisting
-IFE [B], A ;if the port exists
+IFE [B+1], A ;if the port exists ;TODO make this an actual search
   SET PC, kd.newKeyboard.found
 
 ADD B, 2
@@ -177,26 +181,29 @@ ADD A, [kd.daemonlist] ;typ.ffz adds the list
 
 SET C, A ;need to use C instead, here, so A isn't lost
 
-SET [C], POP ;add the new port
+SET [C], 1  ;set the "keyboard is active" bool to FALSE (2 is TRUE *IN THIS CASE*)
+
+SET [C+1], POP ;add the new port
 SET PUSH, C
 
 SET A, kd.keystroke.int ;make the location to jump to the keystroke handler
 JSR pih.newMsg ;make A a new interrupt message
 SET C, POP
 
-SET [C+1], A ;store the new message
-SET [C+2], 0 ;set the next word to 0, just in case
+SET [C+2], A ;store the new message
+SET [C+3], 0xffff ;set the next word to 0xffff, so it's skipped in the search, just in case
 
 SET B, A ;put the message in B for the hardware call
 
 SET A, 3    ;hardware call to enable interrupts with message in B
-HWI [C]  ;interrupt the GenericKeyboard port
+HWI [C+1]  ;interrupt the GenericKeyboard port
 
-SET A, C ;set A to C, because we changed it earlier
-;then continue as if we'd found the value
+SET B, C    ;set B to the first word of the keyboard instance's block
+            ;for easy handling below
 
 :kd.newKeyboard.found
-ADD A, 2     ;add two to A, because we return the location of the OptLoc
+SET A, B
+;A is the first word of the keyboard's instance block, so return that
 SET PC, POP
 
 
