@@ -1,4 +1,6 @@
 #!/usr/bin/python
+# Users must have the go10cc binary on the system path or present in 
+# the CubeOS directory.
 
 import sys, os, glob, subprocess
 
@@ -9,8 +11,13 @@ modLoc = location + "modules" + os.sep
 moduleExtention = ".dasm16"
 modules = []
 
+
 packLoc = location + os.pardir + os.sep + "cubeOS-packages" + os.sep + "stdlib" + os.sep
 packageExtention = ".package"
+
+# Turn any .go files in the packages directory into .package files.
+for files in glob.glob(packLoc + "*.go"):
+    subprocess.check_call(["go10cc", "-o", files.replace(".go", ".package"), "-p", "-L", packLoc, files])
 
 packageModule = modLoc + "package" + moduleExtention
 builtPackageModule = ""
@@ -24,6 +31,13 @@ modules.append(modLoc + "boot" + moduleExtention)
 for files in glob.glob(modLoc + "*" + moduleExtention):
 	if files != modules[0] and files != modules[1] and files != packageModule:
 		modules.append(files)
+
+goDir = location + "go" + os.sep
+
+for files in glob.glob(goDir + "*.go"):
+    outputFile = files.replace(".go", ".dasm16")
+    subprocess.check_call(["go10cc", "-o", outputFile, "-L", goDir, files])
+    modules.append(outputFile)
 
 # Create a string containing all packages
 # also create a DASM string to load the packages

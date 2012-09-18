@@ -7,3 +7,11 @@ CubeOS Organization actively encourages anyone and everything to use CubeOS, dev
 **CubeOS has one major philosophy by which we encourage all developers to live by.**
 
 ***Release early, release often, and think outside the cube.***
+
+# Installation
+
+To run a CubeOS binary, one only needs a standards-compliant DCPU-16 emulator, such as [Benedek's emulator](https://bitbucket.org/benedek/dcpu-16/), which can run DCPU-16 binaries.
+
+A pre-built *CubeOS.dasm16* file can be assembled and run by any standards-compliant DCPU-16 assembler, such as [das](https://github.com/jonpovey/das), or compiler/emulator combination, such as [dcpu.ru](http://dcpu.ru).
+
+CubeOS can be built from source, as long as one has the necessary tools: [das](https://github.com/jonpovey/das) and [go10cc](https://github.com/shepheb/go10c). These must be present on the system PATH, (easily accomplished on UNIX systems,) or in the CubeOS-alpha directory.
