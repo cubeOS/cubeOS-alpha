@@ -19,8 +19,8 @@ SET B, A	;the B register will contain the interrupt message
 SET A, 2	;the A register contains the instruction for the clock
 HWI [HW.GenericClock]
 
-SET B, 60	;now we're going to enable the clock again
-SET A, 0	;with one tick per second
+SET A, 0
+SET B, 1	; will tick 60 times per second.
 HWI [HW.GenericClock]
 
 SET PC, POP ;exit
@@ -29,5 +29,11 @@ SET PC, POP ;exit
 ;:The routine called by the clock on every tick.
 ;:
 :clock.tick
-ADD [env.uptime], 1	;add one second to the system uptime
+ADD [env.tick], 1	;add one tick to system ticks.
+SET PUSH, A
+SET A, [env.tick]
+MOD A, 60
+IFE A, 0
+    ADD [env.uptime], 1 ;add one to system uptime.
+SET A, POP
 SET PC, POP ;exit
