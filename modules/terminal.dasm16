@@ -59,8 +59,6 @@ SET A, X	;set A to the input buffer
 SET B, Y	;set B to the output buffer
 JSR sh
 
-SUB PC, 1 ;debug
-
 JSR terminal.newline
 
 SET A, I	;make A the first word on a new line
