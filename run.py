@@ -1,7 +1,8 @@
 #!/usr/bin/python2
-# This is a platform-independent script to automate building, compiling,
-# and assembling cubeOS. Windows users must have das and dcpu-16 binaries
-# in the cubeOS directory, or in their system PATH location
+# This is a platform-independent script to automate building, 
+# compiling, and assembling cubeOS. Windows users must have das, 
+# go10cc, and dcpu-16 binaries in the cubeOS directory, or in their 
+# system PATH location
 from subprocess import call
 import build	#Runs build.py
 assembleStatus = call(["das","-o","cubeOS.bin","cubeOS.dasm16"])
