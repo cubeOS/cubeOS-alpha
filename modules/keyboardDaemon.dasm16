@@ -3,6 +3,14 @@
 ;;;;;;;;;;;;;;;;;;
 ;:An instance of KeyboardDemon should be registered to any process that requires detection of keypresses. It requests an interrupt value from the operating system, and, when it detects that interrupt, writes the pressed key, if it is ASCII, to the location registered on its instantiation. (That location is, of course, incremented.)
 ;:
+
+:kd.daemonlist
+DAT 0 ;memory location containing four words per keyboard device
+DAT 0 ;debug
+
+:kd.length
+DAT 0 ;number of literal words in the daemon list
+
 ;:## The Handler
 ;:All keyboards using KeyboardDaemon are given unique interrupt messages, all of which point *kd.keystroke*. 
 ;:
@@ -135,17 +143,11 @@ SET PC, POP
 ;:```
 ;:
 
-:kd.daemonlist
-DAT 0 ;memory location containing four words per keyboard device
-
-:kd.length
-DAT 0 ;number of literal words in the daemon list
-
 ;:### kd.init (slots)
 ;:Initializes the keyboard handler with enough room for *slots* many Generic Keyboard devices.
 ;:
 :kd.init
-MUL A, 4 ;multiply by 3, because each keyboard has 3 words associated with it
+MUL A, 4 ;multiply by 4, because each keyboard has 4 words associated with it
 SET [kd.length], A
 JSR heap.alloc ;
 SET [kd.daemonlist], A
@@ -168,7 +170,7 @@ ADD C, B ;make C the ending location of the list
 IFE [B+1], A ;if the port exists ;TODO make this an actual search
   SET PC, kd.newKeyboard.found
 
-ADD B, 2
+ADD B, 4
 IFL B, C ;C will point to the very last OptLoc, so we use IFL to be safe
   SET PC, kd.newKeyboard.findexisting
 

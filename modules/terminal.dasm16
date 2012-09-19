@@ -14,7 +14,6 @@
 ;:
 
 ;TODO allow forking
-;TODO make all terminal values (xpos and ypos) into VARIABLES
 
 :terminal.new
 SET PUSH, A
@@ -49,9 +48,8 @@ SET I, A
 
 :terminal.prompt
 
-
 SET A, I				;A is the screen location
-SET B, terminal.stringres.prompt	;B is the text to be printed
+SET B, terminal.stringres.prompt		;B is the text to be printed
 SET C, X				;C is the input buffer
 JSR dview.prompt
 
@@ -60,6 +58,9 @@ SET B, Y	;set B to the output buffer
 JSR sh
 
 JSR terminal.newline
+
+IFE [Y], 0		;if there is nothing in the write buffer
+  SET PC, terminal.prompt ;then skip to prompting again on the new line
 
 SET A, I	;make A the first word on a new line
 SET B, Y	;make B the output buffer location
@@ -80,3 +81,6 @@ ADD I, 32	;add 32
 AND I, 0xfff0	;make I a Y-index
 ADD I, A	;make I the first index on the new line
 
+SET PC, POP
+
+:debug DAT 0

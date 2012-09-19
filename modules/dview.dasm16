@@ -393,7 +393,6 @@ SET [B], 2  ;turn on the keyboard
 :dview.prompt.loop
 IFN [dview.temp.promptflag], 0
   SET PC, dview.prompt.loop
-
 SET [B], 1  ;turn off the keyboard
 
 SET A, POP ;restore memory location
