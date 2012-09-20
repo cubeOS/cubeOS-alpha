@@ -37,15 +37,20 @@ HWQ J
 
 IFE A, 0xf615
   IFE B, 0x7349
-    SET [HW.LEM1802], J
+    IFE X, 0x8b36
+      IFE Y, 0x1c6c
+        IFE C, 0x1802
+          SET [HW.LEM1802], J
 
 IFE A, 0xb402
   IFE B, 0x12d0
-    SET [HW.GenericClock], J
+    IFE C, 1
+      SET [HW.GenericClock], J
     
 IFE A, 0x7406
   IFE B, 0x30cf
-    SET [HW.GenericKeyboard], J
+    IFE C, 1
+      SET [HW.GenericKeyboard], J
 
 IFE A, 0x0001
   IFE B, 0x0206
