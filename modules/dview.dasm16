@@ -297,7 +297,7 @@ SET PC, dview.write.loop
 ;:`0b0000 0000 m000 0000`, where m is the "memory" bit, implying that the next word is a pointer to the actual word to be interpreted
 ;:
 ;:**decimal**       `64` as referring to **d**; *literal* <br />
-;:**packed string** `70` as referring to **p**; *pointer* <br />
+;:<strike>**packed string** `70` as referring to **p**; *pointer*</strike><br />
 ;:**string**        `73` as referring to **s**; *pointer* <br />
 ;:**hexidecimal**   `78` as referring to **x**; *literal* <br />
 ;:
@@ -310,6 +310,15 @@ SET A, [I+1] ;relevant word
 
 IFB [I], 0x0080 ;if the eighth bit from the left is on,
   SET A, [A]    ;A is interpreted as a pointer
+
+IFN C, 0x73	;if the item is not a string, skip this step
+  SET PC, dview.write.directive.substitute.skipstring
+  
+SET B, [A]	;make B the first word of the string
+IFB B, 0xff00	;if B is in *packed* form
+  SET C, 0x70	;then make the directive "p" TODO this is a bit of a hack
+
+:dview.write.directive.substitute.skipstring
 
 SET B, J     ;get the output location
 
