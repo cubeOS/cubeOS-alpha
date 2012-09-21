@@ -2,12 +2,31 @@
 ; Terminal ;
 ;;;;;;;;;;;;
 
+:v.terminal.table
+DAT 0		;this is a pointer to a table of terminal data
+		;initialized by terminal.init
+
 :v.cwd DAT 0	;TODO this is for temporary backwards compatibility with old packages
 :v.cwds DAT 0	;TODO "
 :v.stdout DAT 0 ;TODO "
 
 :terminal.stringres.prompt DAT 0xf001, "sh> ", 0	;TODO store as a pointer to a
 						;settable prompt
+						
+;:### terminal.init (maxInstances)
+;:Creates a space for keeping track of terminal sessions
+;:
+:terminal.init
+SET PUSH, A ;need to store the number of instances for a little while
+
+;A is the number of instances we need space for
+ADD A, 1 ;but we need one more, to keep the total number in memory
+JSR heap.alloc
+
+SET [v.terminal.table], A	;store the table's location
+SET [A], POP		;store the maximum number of terminals
+
+SET PC, POP
 
 ;:### terminal.new ()
 ;:Creates a new terminal instance (which will persist.)
@@ -18,9 +37,20 @@
 :terminal.new
 SET PUSH, A
 SET PUSH, I
+SET PUSH, J
 SET PUSH, X
 SET PUSH, Y
 SET PUSH, Z
+
+;TODO make sure that there's space for this terminal in the table
+
+SET A, 1	;going to reserve a word for terminal.print
+JSR heap.alloc	;to access the current screen location, so
+SET J, A	;that it can be accessed and modified
+
+SET A, [v.terminal.table]
+SET [A+1], J	;add this instance's screen pointer pointer to the table
+;TODO set this in a way that it doesn't assume that it's the first terminal
 
 SET A, 64	;input buffer
 JSR heap.alloc	;reserve
@@ -44,11 +74,11 @@ JSR tusk.newProcess
 
 JSR dview.newScreen
 
-SET I, A
+SET [J], A
 
 :terminal.prompt
 
-SET A, I				;A is the screen location
+SET A, [J]				;A is the screen location
 SET B, terminal.stringres.prompt		;B is the text to be printed
 SET C, X				;C is the input buffer
 JSR dview.prompt
@@ -62,11 +92,11 @@ JSR terminal.newline
 IFE [Y], 0		;if there is nothing in the write buffer
   SET PC, terminal.prompt ;then skip to prompting again on the new line
 
-SET A, I	;make A the first word on a new line
+SET A, [J]	;make A the first word on a new line
 SET B, Y	;make B the output buffer location
 JSR dview.write	;write the output to the screen
 
-SET I, A		;make I the location after the write finishes
+SET [J], A		;make I the location after the write finishes
 JSR terminal.newline	;make I the next line
 
 SET PC, terminal.prompt
@@ -76,11 +106,33 @@ SET A, 0
 SET B, 0
 JSR dview.getLoc	;get the start of the screen
 
-SUB I, A	;make I a zero-based index
-ADD I, 32	;add 32
-AND I, 0xfff0	;make I a Y-index
-ADD I, A	;make I the first index on the new line
+SUB [J], A	;make I a zero-based index
+ADD [J], 32	;add 32
+AND [J], 0xfff0	;make I a Y-index
+ADD [J], A	;make I the first index on the new line
 
 SET PC, POP
+
+;:### terminal.print (inputBuffer)
+;:Prints the C-style string contained in *inputBuffer* to the terminal.
+;:
+:terminal.print
+SET PUSH, B
+
+SET B, A		;make B the location of the text to write
+
+SET A, [v.terminal.table]	;getting the screen table
+SET PUSH, A		;storing the table location for use later
+SET A, [A+1]		;get the screen pointer location of terminal 1
+
+;TODO do not assume that terminal 1 is in use
+
+JSR dview.write		;write the text onscreen
+
+SET B, POP		;restore the table pointer location
+SET [B+1], A		;update the screen location
+
+SET B, POP		;restore B
+SET PC, POP		;exit
 
 :debug DAT 0
