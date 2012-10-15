@@ -72,10 +72,6 @@ IFN I, J
 SET PC, popReg
  ;
  
-;:### HWF.LEM1802
-;:Finds the LEM1802 in as few cycles as possible and sets the memory location at the label *LEM1802* to its port number without mapping other hardware. This is intended to be run at boottime in order to quickly start the monitor and display a boot screen.
-;:**Under development**
-;:
 
 ;:### pushReg
 ;:Pushes all registers to the stack.
@@ -107,4 +103,23 @@ SET C, POP
 SET B, POP
 SET A, POP
 SET PC, POP
+ ;
+
+;:## Hardware Specific Subroutines
+;:These are subroutines dedicated to specific functions, such as performing a LEM1802 screen map.
+;:
+
+;:### HW.LEM1802.MemMapScreen (LEM1802number, videoRAMlocation)
+;:Maps the LEM1802 indicated by LEM1802number (always 0, due to single-screen support,) to videoRAMlocation using interrupt behavior 1, `MEM_MAP_SCREEN`.
+;:
+:HW.LEM1802.MemMapScreen
+SET PUSH, C
+SET C, [HW.LEM1802] ;always using screen 0, currently
+
+SET A, 0 ;we're going to use behavior 0, MEM_MAP_SCREEN
+;and B is already the target location
+HWI C
+
+SET C, POP ;restore C
+SET PC, POP ;and return
  ;

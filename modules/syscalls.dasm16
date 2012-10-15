@@ -1,0 +1,25 @@
+;: # System calls
+;:
+;: This table contains the addresses of all the system calls, so that they can be "linked" against by external programs loaded from disk. Any language that wants to link against these can rely on the location of `env.syscalls` being `0x0008`, and it will contain the address of the table.
+;:
+;: Any calls added to this table should be done without changing the order, or old programs will break.
+
+:syscalltable
+DAT 0 ; 0
+DAT 0
+DAT 0
+DAT 0
+DAT 0
+DAT 0 ; 5
+DAT 0
+DAT 0
+DAT 0
+DAT 0
+DAT 0 ; 10
+DAT 0
+DAT 0
+DAT 0
+DAT 0
+DAT 0 ; 15
+DAT 0
+DAT HW.LEM1802.MemMapScreen

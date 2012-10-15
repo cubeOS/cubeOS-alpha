@@ -7,5 +7,9 @@ DAT SYSTEM.CRASH
 :env.fs DAT 0   ;the address of the filesystem header
 :env.heap DAT 0 ;the address of the heap header
 :env.uptime DAT 0, 0 ;32-bit word
-:env.tick DAT 0 ;a counter for keeping the clock running at full speed
+
+; DO NOT MOVE THESE, compiled code relies on them starting at 0x0008
+:env.syscalls DAT syscalltable
+
+:env.tick DAT 0 ;system tick counter
  ;;
